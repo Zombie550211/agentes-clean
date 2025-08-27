@@ -47,8 +47,8 @@ let db;
     db = await connectToMongoDB();
     console.log('Conexión a la base de datos establecida correctamente');
   } catch (error) {
-    console.error('Error al conectar a la base de datos:', error);
-    process.exit(1);
+    console.error('Error al conectar a la base de datos en el arranque:', error?.message);
+    console.warn('Continuando sin conexión inicial. Los endpoints intentarán reconectar bajo demanda...');
   }
 })();
 
