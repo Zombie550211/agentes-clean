@@ -809,6 +809,37 @@
     // Variables globales
     let leadActual = null;
 
+    // Helper: detectar si el usuario actual es Irania Serrano
+    function esIrania() {
+      try {
+        // 1) Intentar desde local/session storage
+        const userRaw = localStorage.getItem('user') || sessionStorage.getItem('user');
+        if (userRaw) {
+          const u = JSON.parse(userRaw || '{}');
+          const nombre = (u.name || u.fullName || u.username || u.email || u.usuario?.name || '').toString();
+          if (normalizarTexto(nombre) === normalizarTexto('Irania Serrano')) return true;
+        }
+        // 2) Intentar desde token JWT
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (token && token.split('.').length === 3) {
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]) || '{}');
+            const nombreTok = (payload.username || payload.name || payload.fullName || payload.email || '').toString();
+            if (normalizarTexto(nombreTok) === normalizarTexto('Irania Serrano')) return true;
+          } catch(_) {}
+        }
+      } catch(_) {}
+      return false;
+    }
+
+    // Helper: quitar prefijo "team" del supervisor para mostrar limpio
+    function limpiarSupervisor(displayName) {
+      try {
+        const s = (displayName || '').toString();
+        return s.replace(/^\s*team\s+/i, '').trim();
+      } catch { return displayName || ''; }
+    }
+  
     // Funciones para el manejo de comentarios
     function abrirComentarios(leadId) {
       leadActual = leadId;
@@ -1546,8 +1577,8 @@
       tbody.innerHTML = '';
       console.log('Contenido de tbody limpiado');
       
-      // Usar el array de leads procesado
-      leadsArray.forEach(lead => {
+      // Función interna para añadir una fila de lead manteniendo el orden y estilos
+      function appendLeadRow(lead) {
         const tr = document.createElement('tr');
         
         // Normalizar estado al conjunto requerido y su clase
@@ -1618,9 +1649,37 @@
             </button>
           </td>
         `;
-        
         tbody.appendChild(tr);
-      });
+      }
+
+      // Si es Irania, agrupar por supervisor con encabezados por agente
+      if (typeof esIrania === 'function' && esIrania()) {
+        // Agrupar
+        const grupos = new Map();
+        leadsArray.forEach(l => {
+          const sup = (l && l.supervisor) ? l.supervisor : 'Sin asignar';
+          if (!grupos.has(sup)) grupos.set(sup, []);
+          grupos.get(sup).push(l);
+        });
+
+        // Orden por nombre de supervisor
+        const clavesOrdenadas = Array.from(grupos.keys()).sort((a,b) => a.localeCompare(b, 'es', {sensitivity:'base'}));
+
+        clavesOrdenadas.forEach(sup => {
+          const headerTr = document.createElement('tr');
+          const display = (typeof limpiarSupervisor === 'function') ? limpiarSupervisor(sup) : sup;
+          headerTr.innerHTML = `
+            <td colspan="21" style="background: #f0f4ff; color:#1f3a8a; font-weight:600; padding:10px 12px; border-top:2px solid #c7d2fe; border-bottom:1px solid #dbeafe;">
+              <i class="fas fa-user" style="margin-right:8px;"></i> Agente: ${escapeHtml ? escapeHtml(display) : display}
+            </td>
+          `;
+          tbody.appendChild(headerTr);
+          grupos.get(sup).forEach(appendLeadRow);
+        });
+      } else {
+        // Render plano por defecto
+        leadsArray.forEach(appendLeadRow);
+      }
     }
 
     // Función para actualizar las tarjetas de resumen
