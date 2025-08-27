@@ -35,13 +35,15 @@ getAgenteInfo().then(info => {
 document.getElementById('formLead').onsubmit = async function(e) {
   e.preventDefault();
   const f = this;
+  // Normalizar teléfono: solo dígitos
+  const telefonoLimpio = (f.telefono.value || '').replace(/\D+/g, '');
   const data = {
     fecha: f.fecha.value,
     team: f.team.value,
     agente: f.agente.value,
     producto: f.producto.value,
     puntaje: f.puntaje.value,
-    telefono: f.telefono.value,
+    telefono: telefonoLimpio,
     direccion: f.direccion.value,
     zip: f.zip.value
   };
@@ -86,8 +88,31 @@ async function cargarGraficaMensual() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend:{position:'top'}, title:{display:true,text:'Ventas mensuales personales'} },
-      scales: { x:{ticks:{color:'#222'}}, y:{beginAtZero:true} }
+      plugins: {
+        legend:{position:'top'},
+        title:{display:true,text:'Ventas mensuales personales'},
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              const ds = ctx.dataset || {};
+              const arr = Array.isArray(ds.data) ? ds.data.map(Number) : [];
+              const idx = (ctx.dataIndex != null ? ctx.dataIndex : 0);
+              const sum = arr.slice(0, idx + 1).reduce((a,b)=>a + b, 0);
+              // Mostrar acumulado exacto sin redondeo
+              return (ds.label ? ds.label + ' acumulado: ' : 'Acumulado: ') + sum;
+            }
+          }
+        }
+      },
+      scales: {
+        x:{ticks:{color:'#222'}},
+        y:{
+          beginAtZero:true,
+          ticks: {
+            callback: function(value){ return value; }
+          }
+        }
+      }
     }
   });
 }
@@ -102,7 +127,34 @@ async function cargarGraficaProducto() {
       labels: data.labels,
       datasets: [{ label:'Ventas por producto', data: data.data, backgroundColor: '#22b3ec' }]
     },
-    options:{ responsive:true, plugins:{legend:{display:false},title:{display:true,text:'Ventas por producto'}}, indexAxis:'x', scales:{x:{ticks:{color:'#222'}}, y:{beginAtZero:true}} }
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        title:{display:true,text:'Ventas por producto'},
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              const ds = ctx.dataset || {};
+              const arr = Array.isArray(ds.data) ? ds.data.map(Number) : [];
+              const idx = (ctx.dataIndex != null ? ctx.dataIndex : 0);
+              const sum = arr.slice(0, idx + 1).reduce((a,b)=>a + b, 0);
+              return (ds.label ? ds.label + ' acumulado: ' : 'Acumulado: ') + sum;
+            }
+          }
+        }
+      },
+      indexAxis:'x',
+      scales:{
+        x:{ticks:{color:'#222'}},
+        y:{
+          beginAtZero:true,
+          ticks:{
+            callback: function(value){ return value; }
+          }
+        }
+      }
+    }
   });
 }
 
