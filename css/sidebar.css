@@ -1,0 +1,94 @@
+/* Sidebar Styles (unificado, claro, tipo pill) */
+.sidebar {
+  width: 240px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background: #ffffff;
+  color: #1f2937;
+  padding: 16px 0;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+  border-right: 1px solid #e5e7eb;
+  z-index: 1000;
+}
+
+/* Encabezado y títulos dentro del sidebar */
+.sidebar h3 {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 4px 12px 8px;
+}
+
+/* Lista base */
+.sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.sidebar li {
+  list-style: none;
+  margin: 4px 0;
+}
+
+/* Enlaces estilo pill */
+.sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  color: #4b5563;
+  text-decoration: none;
+  border-radius: 10px;
+  transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+}
+
+.sidebar a:link,
+.sidebar a:visited {
+  color: #4b5563;
+  text-decoration: none;
+}
+
+.sidebar a:hover {
+  background: #e6f2ff;
+  color: #0369a1;
+}
+
+.sidebar a.active {
+  background: #e6f2ff;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+/* Íconos alineados */
+.sidebar a i {
+  width: 20px;
+  text-align: center;
+}
+
+/* Pie (si existiera) */
+.sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  padding: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+#logout-btn {
+  display: flex;
+  align-items: center;
+  color: #4b5563;
+  text-decoration: none;
+}
+
+#logout-btn:hover {
+  color: #e74c3c;
+}
+
+#logout-btn i {
+  margin-right: 10px;
+}

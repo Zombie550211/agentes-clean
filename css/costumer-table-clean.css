@@ -1,0 +1,61 @@
+/* Estilos para la tabla de clientes - Versión limpia */
+.costumer-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0;
+}
+
+.costumer-table th,
+.costumer-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.costumer-table th {
+  background-color: #f7fafc;
+  color: #4a5568;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.costumer-table tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* Estilos para los estados */
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-success {
+  background-color: #c6f6d5;
+  color: #22543d;
+}
+
+.badge-warning {
+  background-color: #feebc8;
+  color: #7b341e;
+}
+
+.badge-danger {
+  background-color: #fed7d7;
+  color: #742a2a;
+}
+
+.badge-info {
+  background-color: #bee3f8;
+  color: #2a4365;
+}

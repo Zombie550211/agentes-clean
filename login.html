@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Login</title>
+    <style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    body {
+        min-height: 100vh;
+        background: #fff;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        height: 100vh;
+    }
+    .login-center {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0; left: 0;
+    }
+    .login-glass {
+        position: relative;
+        z-index: 1;
+        width: 370px;
+        padding: 44px 36px 36px 36px;
+        border-radius: 38px;
+        background: #fff;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.09);
+        border: 1.5px solid #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+    .login-form-glass {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 0px;
+    }
+    .input-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 0px;
+        position: relative;
+    }
+    .icon-mail, .icon-lock {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 36px;
+        color: #888;
+        opacity: 0.95;
+    }
+    .input-row input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: #222;
+        font-size: 1.07rem;
+        flex: 1;
+        padding: 13px 0 10px 0;
+        letter-spacing: 0.02em;
+    }
+    .input-row input::placeholder {
+        color: #888;
+        opacity: 0.8;
+        font-weight: 400;
+    }
+    .underline {
+        height: 1px;
+        background: linear-gradient(90deg, #e0e0e0 0%, #f7f7f7 100%);
+        margin-bottom: 18px;
+        margin-top: -2px;
+        border-radius: 2px;
+    }
+    .options-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.98rem;
+        margin-bottom: 30px;
+        margin-top: 4px;
+    }
+    .remember-me {
+        color: #888;
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .remember-me input[type="checkbox"] {
+        accent-color: #888;
+        width: 15px;
+        height: 15px;
+        margin-right: 2px;
+    }
+    .forgot-password {
+        color: #b3b3b3;
+        font-style: italic;
+        font-size: 0.97rem;
+        text-decoration: none;
+        opacity: 0.85;
+        transition: color 0.2s;
+    }
+    .forgot-password:hover {
+        color: #222;
+        opacity: 1;
+    }
+    .login-btn-glass {
+        width: 100%;
+        padding: 13px 0;
+        margin-top: 5px;
+        margin-bottom: 7px;
+        background: linear-gradient(90deg, #232323 0%, #6a7bb8 100%);
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.09rem;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        box-shadow: 0 2px 8px rgba(80,80,140,0.08);
+        cursor: pointer;
+        transition: background 0.2s, box-shadow 0.2s;
+    }
+    .login-btn-glass:hover {
+        background: linear-gradient(90deg, #333 0%, #7a8be8 100%);
+        box-shadow: 0 4px 18px rgba(80,80,140,0.13);
+    }
+    #message {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 0.97rem;
+        font-weight: 500;
+        padding: 8px;
+        border-radius: 7px;
+    }
+    .success {
+        background: #eafaf1;
+        color: #27ae60;
+        border: 1px solid #b8eac7;
+    }
+    .error {
+        background: #fdeaea;
+        color: #e74c3c;
+        border: 1px solid #f5b7b1;
+    }
+    @media (max-width: 500px) {
+        .login-glass {
+            width: 97vw;
+            padding: 18px 4vw 18px 4vw;
+            border-radius: 20px;
+        }
+        .avatar svg { width: 65px; height: 65px; }
+    }
+    </style>
+</head>
+<body>
+    <div class="login-center">
+        <div class="login-glass">
+            <div class="avatar">
+                <svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="35" r="22" fill="#e0e0e0"/><ellipse cx="45" cy="70" rx="28" ry="14" fill="#e0e0e0"/><circle cx="45" cy="35" r="20" fill="#bcbcbc"/><path d="M45 48c-7.5 0-13.5-6-13.5-13.5S37.5 21 45 21s13.5 6 13.5 13.5S52.5 48 45 48Zm0 3c9.5 0 20 4.5 20 10.5V66a2 2 0 0 1-2 2H27a2 2 0 0 1-2-2v-4.5c0-6 10.5-10.5 20-10.5Z" fill="#bcbcbc"/></svg>
+            </div>
+            <form id="loginForm" class="login-form-glass" autocomplete="off">
+                <div class="input-row">
+                    <span class="icon-mail">
+                        <svg width="22" height="22" fill="none"><path d="M3 7.5v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2Zm14 0-6 4.5L5 7.5" stroke="#888" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    <input type="text" id="username" name="username" placeholder="Nombre de usuario" required>
+                </div>
+                <div class="underline"></div>
+                <div class="input-row">
+                    <span class="icon-lock">
+                        <svg width="22" height="22" fill="none"><path d="M7 10V8a4 4 0 1 1 8 0v2m-9 0h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Zm5 3v2" stroke="#888" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    <input type="password" id="password" name="password" placeholder="Password" required>
+                </div>
+                <div class="underline"></div>
+                <div class="options-row">
+                    <label class="remember-me"><input type="checkbox" id="remember"> Remember me</label>
+                    <a href="#" class="forgot-password" onclick="forgotPassword()">Forgot Password?</a>
+                </div>
+                <button type="submit" class="login-btn-glass">LOGIN</button>
+                <div id="message"></div>
+                <!-- Enlace a registro removido por políticas de acceso -->
+                <!-- <div style="text-align: center; margin-top: 1rem;">
+                    <p>¿No tienes cuenta? <a href="/register.html">Crear cuenta</a></p>
+                </div> -->
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Inicialización del login sin redirección automática
+        document.addEventListener('DOMContentLoaded', () => {
+            // Siempre mostrar el formulario de login
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+        });
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const rememberMe = document.getElementById('remember').checked;
+            
+            // Mostrar indicador de carga
+            const submitBtn = document.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Iniciando sesión...';
+            
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = 'Verificando credenciales...';
+            messageDiv.className = 'success';
+            messageDiv.style.display = 'block';
+            
+            try {
+                // Enviar credenciales al servidor
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Guardar el token JWT y la información del usuario en localStorage o sessionStorage según "Recordarme"
+                    if (rememberMe) {
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('user', JSON.stringify({
+                            name: data.user.username,
+                            role: data.user.role || 'user'
+                        }));
+                    } else {
+                        sessionStorage.setItem('token', data.token);
+                        sessionStorage.setItem('user', JSON.stringify({
+                            name: data.user.username,
+                            role: data.user.role || 'user'
+                        }));
+                    }
+                    
+                    // Mostrar mensaje de éxito
+                    messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
+                    messageDiv.className = 'success';
+                    
+                    // Redirigir a la página de inicio después de un breve retraso
+                    setTimeout(() => {
+                        window.location.href = '/inicio';
+                    }, 1000);
+                    
+                } else {
+                    // Mostrar mensaje de error
+                    messageDiv.textContent = data.message || 'Error al iniciar sesión. Verifica tus credenciales.';
+                    messageDiv.className = 'error';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Iniciar sesión';
+                }
+                
+            } catch (error) {
+                console.error('Error al iniciar sesión:', error);
+                messageDiv.textContent = 'Error de conexión. Intenta de nuevo más tarde.';
+                messageDiv.className = 'error';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Iniciar sesión';
+            }
+        }
+        
+        function forgotPassword() {
+            alert("Funcionalidad de recuperación de contraseña próximamente...");
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+/* Estilos para la sección de comentarios en la tabla de clientes */
+.comments-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border-radius: 4px;
+  border-left: 3px solid #3182ce;
+}
+
+.comments-section h4 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: #2d3748;
+  font-size: 0.95rem;
+}
+
+.comment {
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-left: 2px solid #e2e8f0;
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+  color: #4a5568;
+}
+
+.comment-author {
+  font-weight: 600;
+  color: #2c5282;
+}
+
+.comment-date {
+  color: #718096;
+  font-size: 0.75rem;
+}
+
+.comment-text {
+  color: #4a5568;
+  line-height: 1.5;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.no-comments {
+  font-style: italic;
+  color: #718096;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Estilos para el formulario de comentarios */
+.comment-form {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.comment-form textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  resize: vertical;
+  margin-bottom: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.comment-form button {
+  background-color: #3182ce;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.comment-form button:hover {
+  background-color: #2c5282;
+}
+
+.comment-form button:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
+}

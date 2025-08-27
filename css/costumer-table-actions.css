@@ -1,0 +1,81 @@
+/* Estilos para los botones de acción en la tabla de clientes */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  background: none;
+}
+
+.btn i {
+  margin-right: 4px;
+  font-size: 1rem;
+}
+
+.btn-edit {
+  color: #3182ce;
+  background-color: #ebf8ff;
+}
+
+.btn-edit:hover {
+  background-color: #bee3f8;
+}
+
+.btn-delete {
+  color: #e53e3e;
+  background-color: #fff5f5;
+}
+
+.btn-delete:hover {
+  background-color: #fed7d7;
+}
+
+.btn-comment {
+  color: #38a169;
+  background-color: #f0fff4;
+}
+
+.btn-comment:hover {
+  background-color: #c6f6d5;
+}
+
+/* Estilos para el modal de comentarios */
+.comment-form {
+  margin-top: 1rem;
+}
+
+.comment-form textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+
+.comment-form button {
+  background-color: #3182ce;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.comment-form button:hover {
+  background-color: #2c5282;
+}

@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Inicio</title>
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/sidebar-inicio.css">
+  <link rel="stylesheet" href="css/costumer-table-actions.css">
+  
+  <!-- Scripts -->
+  <script src="agentes/js/auth-check.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="/js/logout-handler.js"></script>
+  <script src="/js/user-info.js"></script>
+  <style>
+    /* Estilos globales para eliminar scroll */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    .layout {
+      height: 100vh;
+      display: flex;
+    }
+    
+    .main-content {
+      flex: 1;
+      height: 100vh;
+      overflow: hidden;
+      margin-left: 240px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .ranking-panel {
+      transform: translateY(-120px) !important;
+      max-width: 1000px;
+      width: 100%;
+    }
+    
+    /* Limpieza: se eliminan overrides agresivos de .main-content */
+    
+    .ranking-header {
+      position: relative !important;
+      z-index: 10 !important;
+      margin-bottom: 30px !important;
+    }
+    
+    .ranking-icon {
+      position: relative !important;
+      z-index: 15 !important;
+    }
+    
+    /* Sidebar específico está en css/sidebar-inicio.css */
+    
+    .user-info {
+      text-align: center;
+      padding: 0 20px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 20px;
+    }
+    
+    .avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      margin: 0 auto 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5em;
+      color: #64748b;
+    }
+    
+    .user-name {
+      display: block;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 5px;
+    }
+    
+    .user-role {
+      display: block;
+      font-size: 0.9em;
+      color: #64748b;
+    }
+    
+    .sidebar h3 {
+      color: #22b3ec;
+      font-size: 1.1rem;
+      margin: 0 24px 24px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    
+    /* Sidebar: estilos unificados en css/sidebar.css */
+    
+    /* Estilos para el contenedor de la gráfica */
+    .graph-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    /* Estilos para el layout principal */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    /* Estilos para el contenido principal */
+    .main-content {
+      flex: 1;
+      padding: 20px;
+      margin-left: 260px; /* Ancho del sidebar-inicio */
+      width: calc(100vw - 260px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      position: relative;
+    }
+    
+    /* Estilos para el panel de ranking */
+    .ranking-panel {
+      background: transparent;
+      border-radius: 0;
+      box-shadow: none;
+      margin: 0;
+      width: 90%;
+      max-width: 1400px;
+      overflow: visible;
+      position: relative;
+      backdrop-filter: none;
+      border: none;
+    }
+
+
+    .ranking-header {
+      text-align: center;
+      padding: 50px 30px 30px;
+      color: #1e293b;
+      position: relative;
+      z-index: 1;
+      background: transparent;
+      backdrop-filter: none;
+      border-radius: 0;
+    }
+
+    .ranking-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      color: #ffd700;
+      text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .ranking-title {
+      font-size: 3rem;
+      font-weight: 800;
+      margin: 0 0 15px 0;
+      background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    .ranking-subtitle {
+      font-size: 1.3rem;
+      margin: 0;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+
+    .ranking-content {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      padding: 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Podio Circular */
+    .circular-podium {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 80px;
+      margin: 60px 0;
+      position: relative;
+    }
+
+    .podium-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .podium-line {
+      width: 200px;
+      height: 4px;
+      background: #e5e7eb;
+      margin-bottom: 20px;
+      border-radius: 2px;
+    }
+
+    .second-place .podium-line {
+      background: #9ca3af;
+    }
+
+    .first-place .podium-line {
+      background: #fbbf24;
+    }
+
+    .third-place .podium-line {
+      background: #f97316;
+    }
+
+    .podium-circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: white;
+      border: 6px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .second-place .podium-circle {
+      border-color: #9ca3af;
+    }
+
+    .first-place .podium-circle {
+      border-color: #fbbf24;
+      width: 140px;
+      height: 140px;
+    }
+
+    .third-place .podium-circle {
+      border-color: #f97316;
+    }
+
+    .medal-icon, .trophy-icon {
+      font-size: 2.5rem;
+      color: #9ca3af;
+    }
+
+    .first-place .trophy-icon {
+      font-size: 3rem;
+      color: #fbbf24;
+    }
+
+    .third-place .medal-icon {
+      color: #f97316;
+    }
+
+    .position-badge {
+      position: absolute;
+      bottom: -10px;
+      right: -10px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #9ca3af;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      font-weight: 700;
+      border: 3px solid white;
+    }
+
+    .first-place .position-badge {
+      background: #fbbf24;
+      width: 50px;
+      height: 50px;
+      font-size: 1.2rem;
+    }
+
+    .third-place .position-badge {
+      background: #f97316;
+    }
+
+    .agent-info {
+      text-align: center;
+    }
+
+    .agent-info h3 {
+      margin: 0 0 8px 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .agent-info p {
+      margin: 0 0 16px 0;
+      color: #6b7280;
+      font-size: 0.875rem;
+      font-weight: 400;
+      padding: 4px 12px;
+      background: #f3f4f6;
+      border-radius: 12px;
+      display: inline-block;
+    }
+
+    .first-place .agent-info p {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .third-place .agent-info p {
+      background: #fed7aa;
+      color: #c2410c;
+    }
+
+    .score {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #9ca3af;
+    }
+
+    .first-place .score {
+      color: #fbbf24;
+      font-size: 2.5rem;
+    }
+
+    .third-place .score {
+      color: #f97316;
+    }
+
+    /* Otros participantes */
+    .other-ranks {
+      margin-top: 40px;
+    }
+
+    .other-ranks h3 {
+      text-align: center;
+      color: #1e293b;
+      font-size: 1.5rem;
+      margin-bottom: 30px;
+      font-weight: 700;
+    }
+
+    .rank-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .rank-item {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .rank-item:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .rank-number {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #64748b;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .rank-item .agent-info {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex: 1;
+    }
+
+    .rank-item .agent-avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #64748b 0%, #94a3b8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    .agent-details h4 {
+      margin: 0 0 3px 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .agent-details p {
+      margin: 0;
+      color: #64748b;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .rank-item .agent-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      text-align: right;
+    }
+
+    .points {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .sales {
+      font-size: 0.8rem;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* Responsive para ranking */
+    @media (max-width: 768px) {
+      .ranking-panel {
+        border-radius: 15px;
+      }
+      
+      .ranking-header {
+        padding: 30px 20px 20px;
+      }
+      
+      .ranking-title {
+        font-size: 2rem;
+      }
+      
+      .ranking-subtitle {
+        font-size: 0.9rem;
+      }
+      
+      .ranking-content {
+        padding: 30px 20px;
+      }
+      
+      .podium {
+        flex-direction: column;
+        gap: 30px;
+        align-items: center;
+      }
+      
+      .podium-position {
+        flex-direction: row;
+        width: 100%;
+        max-width: 350px;
+      }
+      
+      .podium-agent {
+        margin-bottom: 0;
+        margin-right: 20px;
+        flex: 1;
+        padding: 20px 15px;
+      }
+      
+      .agent-avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
+      }
+      
+      .podium-agent h3 {
+        font-size: 1.1rem;
+      }
+      
+      .podium-stats {
+        gap: 10px;
+      }
+      
+      .stat-number {
+        font-size: 1.2rem;
+      }
+      
+      .podium-base {
+        width: 80px;
+        height: 60px;
+      }
+      
+      .first-place {
+        height: 70px;
+      }
+      
+      .second-place {
+        height: 60px;
+      }
+      
+      .third-place {
+        height: 50px;
+      }
+      
+      .position-number {
+        font-size: 1.4rem;
+      }
+      
+      .rank-item {
+        padding: 15px;
+        gap: 15px;
+      }
+      
+      .rank-item .agent-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+      }
+      
+      .agent-details h4 {
+        font-size: 1rem;
+      }
+      
+      .rank-number {
+        font-size: 1.2rem;
+        min-width: 30px;
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .welcome-panel {
+        flex-direction: column;
+        min-height: auto;
+      }
+      
+      .welcome-header {
+        flex: none;
+        padding: 40px 30px;
+      }
+      
+      .welcome-content {
+        flex: none;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        margin-left: 0;
+        width: 100%;
+        padding: 15px;
+      }
+      
+      .welcome-panel {
+        width: 100%;
+        border-radius: 15px;
+        flex-direction: column;
+        min-height: auto;
+      }
+      
+      .welcome-header {
+        padding: 30px 20px;
+        flex: none;
+      }
+      
+      .welcome-title {
+        font-size: 2.2rem;
+      }
+      
+      .welcome-subtitle {
+        font-size: 1.1rem;
+      }
+      
+      .welcome-content {
+        padding: 20px;
+        flex: none;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      
+      .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+      
+      .actions-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      
+      .status-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+    
+    /* Estilos para la barra superior */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .search-bar {
+      position: relative;
+      width: 300px;
+    }
+    
+    .search-bar input {
+      width: 100%;
+      padding: 8px 15px 8px 35px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      outline: none;
+    }
+    
+    .search-bar i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #888;
+    }
+    
+    .user-actions {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .notification {
+      position: relative;
+      cursor: pointer;
+    }
+    
+    .badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background: #ff4757;
+      color: white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+    }
+  </style>
+  <script>
+    // Verificar autenticación
+    document.addEventListener('DOMContentLoaded', function() {
+      // Verificar si ya estamos en la página de login para evitar bucle
+      if (window.location.pathname.endsWith('login.html')) {
+        return;
+      }
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      if (!token) {
+        // Solo redirigir si no estamos ya en la página de login
+        if (!window.location.pathname.endsWith('login.html')) {
+          window.location.href = 'login.html';
+        }
+        return;
+      }
+
+      // Decodificar el token para obtener información del usuario
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        
+        // Mostrar nombre de usuario en el sidebar
+        const welcomeMessage = document.getElementById('welcome-message');
+        if (welcomeMessage) {
+          welcomeMessage.textContent = `Bienvenido/a, ${payload.username || 'Usuario'}`;
+        }
+        
+        // Mostrar nombre de usuario en el perfil de usuario
+        const userNameElement = document.getElementById('user-name');
+        if (userNameElement) {
+          userNameElement.textContent = payload.username || 'Usuario';
+        }
+        
+        // Mostrar rol del usuario
+        const userRoleElement = document.getElementById('user-role');
+        if (userRoleElement) {
+          const role = payload.role || 'usuario';
+          userRoleElement.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+        }
+
+        // Mostrar opción de "Crear cuenta" solo si es ADMIN
+        const createAccountItem = document.getElementById('menu-create-account');
+        if (createAccountItem) {
+          const roleLower = (payload.role || '').toLowerCase();
+          createAccountItem.style.display = roleLower === 'admin' ? 'block' : 'none';
+        }
+      } catch (error) {
+        console.error('Error al decodificar el token:', error);
+        // Si hay un error con el token, redirigir al login solo si no estamos ya ahí
+        if (!window.location.pathname.endsWith('login.html')) {
+          window.location.href = 'login.html';
+        }
+      }
+    });
+  </script>
+  <script src="js/core/dashboard.js"></script>
+  <script src="js/ranking.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <nav class="sidebar sidebar-inicio">
+      
+      <!-- Usuario -->
+      <div class="user-info">
+        <div class="avatar"><i class="fas fa-user-circle"></i></div>
+        <div class="user-details">
+          <span id="user-name" class="user-name">Usuario</span>
+          <span id="user-role" class="user-role">Rol</span>
+        </div>
+      </div>
+
+      <!-- Menú principal (botones propios) -->
+      <ul class="menu">
+        <li><a href="inicio.html" class="btn btn-sidebar is-active">Inicio</a></li>
+        <li><a href="lead.html" class="btn btn-sidebar">Lead</a></li>
+        <li><a href="Costumer.html" class="btn btn-sidebar">Costumer</a></li>
+        <!-- Visible solo para ADMIN vía JS -->
+        <li id="menu-create-account" style="display:none;"><a href="register.html" class="btn btn-sidebar">Crear cuenta</a></li>
+        <li><a href="#" id="logoutBtn" data-logout-button class="btn btn-sidebar btn-logout">Cerrar sesión</a></li>
+      </ul>
+
+      <!-- Frase al pie -->
+      <div class="sidebar-footer-quote">“Conectando tu éxito, un cliente a la vez”</div>
+    </nav>
+    <main class="main-content">
+          <!-- Ranking de Agentes -->
+          <div class="ranking-panel">
+            <div class="ranking-header">
+              <div class="ranking-icon">
+                <i class="fas fa-trophy"></i>
+              </div>
+              <h1 class="ranking-title">Ranking de Agentes</h1>
+              <p class="ranking-subtitle">Clasificación por desempeño mensual</p>
+            </div>
+            
+            <div class="ranking-content">
+              <!-- Podio Circular -->
+              <div class="circular-podium">
+                <!-- Segundo Lugar -->
+                <div class="podium-item second-place">
+                  <div class="podium-line"></div>
+                  <div class="podium-circle">
+                    <div class="medal-icon">
+                      <i class="fas fa-medal"></i>
+                    </div>
+                    <div class="position-badge">2°</div>
+                  </div>
+                  <div class="agent-info">
+                    <h3>Ana García</h3>
+                    <p>Team Irania</p>
+                    <div class="score">22.0</div>
+                  </div>
+                </div>
+
+                <!-- Primer Lugar -->
+                <div class="podium-item first-place">
+                  <div class="podium-line"></div>
+                  <div class="podium-circle">
+                    <div class="trophy-icon">
+                      <i class="fas fa-trophy"></i>
+                    </div>
+                    <div class="position-badge">1°</div>
+                  </div>
+                  <div class="agent-info">
+                    <h3>Carlos Mendoza</h3>
+                    <p>Team Roberto</p>
+                    <div class="score">28.5</div>
+                  </div>
+                </div>
+
+                <!-- Tercer Lugar -->
+                <div class="podium-item third-place">
+                  <div class="podium-line"></div>
+                  <div class="podium-circle">
+                    <div class="medal-icon">
+                      <i class="fas fa-award"></i>
+                    </div>
+                    <div class="position-badge">3°</div>
+                  </div>
+                  <div class="agent-info">
+                    <h3>Luis Rodríguez</h3>
+                    <p>Team Pleitez</p>
+                    <div class="score">0.80</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Resto del ranking -->
+              <div class="other-ranks">
+                <h3>Otros Participantes</h3>
+                <div class="rank-list">
+                  <div class="rank-item">
+                    <span class="rank-number">4</span>
+                    <div class="agent-info">
+                      <div class="agent-avatar">
+                        <i class="fas fa-user"></i>
+                      </div>
+                      <div class="agent-details">
+                        <h4>María López</h4>
+                        <p>Team Irania</p>
+                      </div>
+                    </div>
+                    <div class="agent-stats">
+                      <span class="points">834 pts</span>
+                      <span class="sales">65 ventas</span>
+                    </div>
+                  </div>
+
+                  <div class="rank-item">
+                    <span class="rank-number">5</span>
+                    <div class="agent-info">
+                      <div class="agent-avatar">
+                        <i class="fas fa-user"></i>
+                      </div>
+                      <div class="agent-details">
+                        <h4>Pedro Sánchez</h4>
+                        <p>Team Roberto</p>
+                      </div>
+                    </div>
+                    <div class="agent-stats">
+                      <span class="points">756 pts</span>
+                      <span class="sales">58 ventas</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+    </main>
+</body>
+</html>

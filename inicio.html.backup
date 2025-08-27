@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>CRM Agente - Inicio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js DataLabels Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.js"></script>
+  <script src="/js/logout-handler.js"></script>
+  <script src="/js/user-info.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- CSS Personalizado -->
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/dashboard-styles.css">
+  <style>
+    /* Estilos personalizados adicionales */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f5f7fb;
+      color: #333;
+    }
+    
+    .main-content {
+      margin-left: 250px;
+      padding: 2rem;
+      min-height: 100vh;
+      transition: all 0.3s;
+    }
+    
+    @media (max-width: 992px) {
+      .main-content {
+        margin-left: 0;
+        padding: 1rem;
+      }
+    }
+    
+    /* Ajustes para las tarjetas */
+    .stats-card {
+      margin-bottom: 1.5rem;
+    }
+    
+    /* Mejoras en la tipografía */
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+    }
+    
+    /* Ajustes para los gráficos */
+    .chart-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Información del Usuario -->
+      <div class="user-info">
+        <div class="avatar">
+          <i class="fas fa-user-circle"></i>
+        </div>
+        <div class="user-details">
+          <span id="user-name" class="user-name">Usuario</span>
+          <span id="user-role" class="user-role">Rol</span>
+        </div>
+      </div>
+      
+      <h3>Menú</h3>
+      <ul>
+        <li><a href="inicio.html" class="active"><i class="fas fa-home"></i> <span>Inicio</span></a></li>
+        <li><a href="lead.html"><i class="fas fa-user-plus"></i> <span>Nuevo Lead</span></a></li>
+        <li><a href="Costumer.html"><i class="fas fa-users"></i> <span>Clientes</span></a></li>
+        <li id="teamMenuItem"><a href="team.html"><i class="fas fa-users-cog"></i> <span>Team</span></a></li>
+        <li>
+          <a href="#" id="logoutBtn" style="color: #e74c3c;">
+            <i class="fas fa-sign-out-alt"></i> <span>Cerrar sesión</span>
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content p-4">
+      <!-- Encabezado -->
+      <div class="page-header">
+        <div class="page-title">
+          <h1>Panel de Control</h1>
+          <p>Bienvenido de nuevo, <span id="user-greeting">Usuario</span>. Aquí tienes un resumen de tu actividad.</p>
+              <h2 style="margin: 0; color: #2c3e50; font-size: 1.4em;">Ranking de Ventas</h2>
+            </div>
+            
+            <div class="ranking-list">
+              <!-- Primer lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #4a90e2; min-width: 30px;">1</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Evelyn Garcia</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">23</div>
+              </div>
+              
+              <!-- Segundo lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #7f8c8d; min-width: 30px;">2</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Tatiana Ayala</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">22</div>
+              </div>
+              
+              <!-- Tercer lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #cd7f32; min-width: 30px;">3</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Nelson Ceren</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">18</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Ranking por Puntos -->
+          <div class="ranking-card" style="flex: 1; min-width: 400px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 30px;">
+            <div class="ranking-header" style="display: flex; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #f0f0f0;">
+              <div class="ranking-icon" style="width: 40px; height: 40px; background: linear-gradient(135deg, #e74c3c 0%, #e67e22 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 15px;">
+                <i class="fas fa-star" style="color: white; font-size: 1.2em;"></i>
+              </div>
+              <h2 style="margin: 0; color: #2c3e50; font-size: 1.4em;">Ranking por Puntos</h2>
+            </div>
+            
+            <div class="ranking-list">
+              <!-- Primer lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #4a90e2; min-width: 30px;">1</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Tatiana Ayala</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">23.9</div>
+              </div>
+              
+              <!-- Segundo lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #7f8c8d; min-width: 30px;">2</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Evelyn Garcia</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">21.8</div>
+              </div>
+              
+              <!-- Tercer lugar -->
+              <div class="ranking-item" style="display: flex; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 8px;">
+                <div class="rank-number" style="font-size: 1.3em; font-weight: bold; color: #cd7f32; min-width: 30px;">3</div>
+                <div class="agent-name" style="flex: 1; font-size: 1.1em;">Nelson Ceren</div>
+                <div class="agent-score" style="font-weight: bold; color: #2c3e50;">18</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div style="margin-top: 40px; color: var(--text-light); font-size: 0.9em; text-align: center;">
+          <i class="fas fa-sync-alt" style="margin-right: 5px;"></i> Actualizado: 11/08/2025
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script>
+    // Función para verificar el rol del usuario y mostrar/ocultar elementos según corresponda
+    function checkUserRole() {
+      try {
+        // Ocultar el ítem de Team por defecto
+        const teamMenuItem = document.getElementById('teamMenuItem');
+        if (teamMenuItem) {
+          teamMenuItem.style.display = 'none';
+        }
+        
+        // Obtener el usuario del localStorage o sessionStorage
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const userRole = userData.role ? userData.role.toLowerCase() : '';
+        
+        // Mostrar el ítem de Team para roles 'B:O' o 'admin'
+        if (teamMenuItem) {
+          if (userRole === 'b:o' || userRole === 'admin') {
+            teamMenuItem.style.display = 'block';
+          }
+        }
+      } catch (error) {
+        console.error('Error al verificar el rol del usuario:', error);
+      }
+    }
+
+    // Función para cargar la información del usuario
+    function cargarInfoUsuario() {
+      // Obtener datos del usuario del localStorage o sessionStorage
+      let userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+      
+      if (!userStr) {
+        console.warn('No se encontró información del usuario en el almacenamiento local');
+        return;
+      }
+      
+      try {
+        const userData = JSON.parse(userStr);
+        
+        // Actualizar la interfaz con los datos del usuario
+        if (userData.name) {
+          const userNameElement = document.getElementById('user-name');
+          if (userNameElement) {
+            userNameElement.textContent = userData.name;
+          }
+        }
+        
+        if (userData.role) {
+          const userRoleElement = document.getElementById('user-role');
+          if (userRoleElement) {
+            // Formatear el rol para mostrarlo mejor
+            const roleNames = {
+              'admin': 'Administrador',
+              'supervisor': 'Supervisor',
+              'agent': 'Agente'
+            };
+            userRoleElement.textContent = roleNames[userData.role] || userData.role;
+          }
+        }
+      } catch (error) {
+        console.error('Error al cargar la información del usuario:', error);
+      }
+    }
+
+    // Función para cerrar sesión
+    function cerrarSesion() {
+      // Eliminar datos de autenticación
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      
+      // Redirigir al login
+      window.location.href = '/login.html';
+    }
+
+    // Asegurar que el enlace activo en el menú se actualice correctamente
+    document.addEventListener('DOMContentLoaded', function() {
+      // Cargar información del usuario
+      cargarInfoUsuario();
+      
+      // Verificar rol y mostrar/ocultar elementos según corresponda
+      checkUserRole();
+      
+      // Configurar botón de cerrar sesión
+      const logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          cerrarSesion();
+        });
+      }
+      
+      // Resaltar enlace activo en el menú
+      const currentPage = window.location.pathname.split('/').pop() || 'inicio.html';
+      const menuLinks = document.querySelectorAll('.sidebar a');
+      
+      menuLinks.forEach(link => {
+        const linkHref = link.getAttribute('href');
+        if (linkHref === currentPage) {
+          link.classList.add('active');
+        } else {
+          link.classList.remove('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

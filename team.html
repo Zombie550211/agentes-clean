@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="es">
+  <script>
+    // Función para verificar autenticación y roles
+    function checkAuthAndRole() {
+      // Verificar si el usuario está autenticado
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        console.log('No se encontró token de autenticación');
+        window.location.href = 'inicio.html';
+        return false;
+      }
+
+      // Obtener datos del usuario
+      const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+      const roleRaw = (userData.role || userData?.usuario?.role || '').toString();
+      const userRole = roleRaw.toLowerCase().trim();
+      
+      // Mostrar en consola para depuración
+      console.log('Datos del usuario:', userData);
+      console.log('Rol del usuario:', userRole);
+      
+      // Verificar si el usuario tiene permiso: admin, supervisor, backoffice (y variantes)
+      const allowed = new Set(['admin','supervisor','backoffice','b:o','b.o','b-o','bo']);
+      if (!allowed.has(userRole)) {
+        console.log('Redirigiendo a inicio. Rol actual:', userRole);
+        window.location.href = 'inicio.html';
+        return false;
+      }
+      
+      // Exponer rol actual para uso de UI
+      window.currentRole = userRole;
+      return true;
+    }
+    
+    // Verificar autenticación y roles inmediatamente
+    if (!checkAuthAndRole()) {
+      // Detener la ejecución si la verificación falla
+      throw new Error('Verificación de autenticación fallida');
+    }
+  </script>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CRM Agente - Equipo</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js DataLabels Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.css" />
+    <!-- Scripts de la aplicación -->
+  <!-- Eliminado bloque de redirección basado en window.authChecked; se confía en checkAuthAndRole() -->
+  <script src="/js/logout-handler.js"></script>
+  <script src="/js/user-info.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <!-- Sidebar CSS -->
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/sidebar-inicio.css">
+  <!-- Script para cargar la información del usuario en el sidebar -->
+  <style>
+    /* Estilos para el contenedor de la gráfica */
+    .graph-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+      width: 100%;
+      height: 400px;
+      position: relative;
+    }
+    
+    .graph-canvas {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 350px;
+    }
+    /* Submenú del sidebar */
+    .submenu { list-style:none; margin:6px 0 0 28px; padding:0; }
+    .submenu li a { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:6px; color:#475569; }
+    .submenu li a.active, .submenu li a:hover { background:#eef2ff; color:#1d4ed8; }
+    
+    /* Estilos para notificaciones */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      transform: translateX(120%);
+      transition: transform 0.3s ease-in-out;
+      max-width: 350px;
+    }
+
+    .notification.show {
+      transform: translateX(0);
+    }
+
+    .notification.success {
+      background-color: #10b981;
+      border-left: 4px solid #059669;
+    }
+
+    .notification.error {
+      background-color: #ef4444;
+      border-left: 4px solid #dc2626;
+    }
+
+    .notification i {
+      margin-right: 10px;
+      font-size: 20px;
+    }
+
+    :root {
+      --azul-oscuro: #1e293b;
+      --azul-acento: #22b3ec;
+      --gris-bg: #f5f7fa;
+      --gris-borde: #e3e8ee;
+      --gris-titulo: #edf3fa;
+      --azul-celda: #f1f5fa;
+      --radius: 15px;
+      --sombra: 0 4px 24px 0 rgba(30,41,59,0.09);
+      --trans: 0.18s;
+      --form-width: 420px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', 'Roboto', 'Montserrat', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      background: var(--gris-bg);
+      color: var(--azul-oscuro);
+    }
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    /* Estilos del sidebar unificados en css/sidebar.css */
+    /* Estilos para la información del usuario en la barra lateral */
+    .user-info {
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 10px;
+    }
+    
+    .user-info .avatar {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto 10px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: #4a5568;
+    }
+    
+    .user-info {
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    
+    .user-avatar {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 15px;
+      background: #f0f4f8;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      color: #4a5568;
+    }
+    
+    .user-details {
+      margin-top: 10px;
+    }
+    
+    .user-name {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: #2d3748;
+      font-size: 1.1em;
+    }
+    
+    .user-role {
+      display: inline-block;
+      font-size: 0.8em;
+      color: white;
+      background: #4a5568;
+      padding: 3px 12px;
+      border-radius: 12px;
+      margin-top: 5px;
+      font-weight: 500;
+    }
+
+    .sidebar .sidebar-sep {
+      height: 1px;
+      background: #e2e8f0;
+      width: calc(100% - 48px);
+      margin: 10px 24px 12px;
+    }
+    /* MAIN CONTENT */
+    .main-content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      width: calc(100% - 260px);
+      margin-left: 260px;
+      min-height: 100vh;
+      background-color: #f8fafc;
+    }
+    
+    .team-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .team-container h1 {
+      color: #1e293b;
+      margin-bottom: 20px;
+      font-size: 1.8rem;
+    }
+    
+    .team-container p {
+      color: #64748b;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+    
+    /* Estilos para el contenedor principal */
+    .team-container {
+      display: flex;
+      flex-direction: row;
+      gap: 40px;
+      width: 100%;
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 0 20px 20px 20px;
+      align-items: flex-start;
+      box-sizing: border-box;
+    }
+    .graphs-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+      height: 100%;
+      min-height: 100%;
+      box-sizing: border-box;
+      padding: 20px 10px;
+      overflow-y: auto;
+    }
+    
+    .graph-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      overflow: hidden;
+      box-sizing: border-box;
+      width: 100%;
+      min-height: 0;  /* Permite que se encoja si es necesario */
+    }
+    .form-section {
+      background: white;
+      border-radius: 12px;
+      padding: 30px 35px 90px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+      margin: 0;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 100px);
+      max-height: 900px;
+    }
+    
+    .form-section h2 {
+      color: var(--azul-oscuro);
+      margin-bottom: 20px;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+    
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      margin: 0 -10px 15px;
+    }
+    
+    .form-group {
+      flex: 1 1 50%;
+      padding: 0 10px;
+      margin-bottom: 15px;
+      min-width: 200px;
+    }
+    
+    /* Contenedor del formulario con scroll */
+    #crmForm {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden; /* Ocultar el scroll por defecto */
+    }
+    
+    /* Contenedor de los campos del formulario con scroll */
+    .form-fields-container {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 8px; /* Espacio para la barra de desplazamiento */
+      margin-right: -8px; /* Compensar el padding para mantener el ancho */
+    }
+    
+    /* Estilo para la barra de desplazamiento */
+    .form-fields-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .form-fields-container::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    .form-fields-container::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    
+    .form-fields-container::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    /* Contenedor del botón fijo */
+    .form-button-container {
+      position: absolute;
+      bottom: 25px;
+      left: 35px;
+      right: 35px;
+      background: white;
+      padding: 15px 0 5px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+    }
+    
+    .btn-submit {
+      background: #25a9dd;
+      color: #fff;
+      border-radius: 9px;
+      border: none;
+      font-weight: 700;
+      font-size: 1.18em;
+      padding: 12px 30px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      max-width: 300px;
+      margin: 0 auto;
+      display: block;
+    }
+    
+    .btn-submit:hover {
+      background: #183153;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-submit:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: var(--azul-oscuro);
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--gris-borde);
+      border-radius: 4px;
+      font-size: 0.9rem;
+      transition: border-color 0.2s;
+    }
+    
+    .form-control:focus {
+      outline: none;
+      border-color: var(--azul-acento);
+      box-shadow: 0 0 0 2px rgba(34, 179, 236, 0.2);
+    }
+    
+    .radio-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 5px;
+    }
+    
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+    
+    .radio-label input[type="radio"] {
+      margin: 0;
+    }
+    
+    textarea.form-control {
+      min-height: 80px;
+      resize: vertical;
+    }
+    
+    @media (max-width: 600px) {
+      .form-group {
+        flex: 1 1 100%;
+      }
+    }
+    .form-section h2 {
+      font-weight: 700;
+      font-size: 2em;
+      color: #183153;
+      margin-bottom: 28px;
+      margin-top: 0;
+    }
+    .form-group { margin-bottom: 18px;}
+    .form-section label {
+      color: #25a9dd;
+      font-weight: 700;
+      margin-bottom: 7px;
+      display: block;
+    }
+    .form-section label[for="fecha-lead"] {
+      color: #183153;
+    }
+    .form-section input, .form-section select {
+      background: #f8fcff;
+      border-radius: 7px;
+      border: 1.5px solid #e4e6f1;
+      padding: 13px 15px;
+      font-size: 1.12em;
+      width: 100%;
+      margin-top: 2px;
+    }
+    .form-section button[type="submit"] {
+      background: #25a9dd;
+      color: #fff;
+      border-radius: 9px;
+      border: none;
+      font-weight: 700;
+      font-size: 1.18em;
+      padding: 16px 0;
+      width: 100%;
+      margin-top: 9px;
+      transition: background 0.2s;
+    }
+    .form-section button[type="submit"]:hover {
+      background: #183153;
+    }
+    .graph-container {
+      min-height: 300px;
+      height: 100%;
+      max-height: 400px;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--sombra);
+      padding: 20px;
+      overflow: hidden;
+      box-sizing: border-box;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    
+    .graph-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .graph-header h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      color: var(--azul-oscuro);
+    }
+    
+    .week-navigation {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .week-nav-button {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #64748b;
+      transition: all 0.2s ease;
+    }
+    
+    .week-nav-button:hover:not(:disabled) {
+      background: #f1f5f9;
+      color: var(--azul-acento);
+      border-color: #cbd5e1;
+    }
+    
+    .week-nav-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    #semana-actual {
+      font-size: 0.9rem;
+      color: #64748b;
+      min-width: 100px;
+      text-align: center;
+    }
+    
+    .graph-scroll-container {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; /* Firefox */
+      margin-bottom: 10px;
+    }
+    
+    .graph-scroll-container::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Opera */
+    }
+    
+    .graph-wrapper {
+      min-width: 100%;
+      width: max-content;
+      height: 300px;
+    }
+    
+    .graph-scroll-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .scroll-button {
+      background: #f0f4f8;
+      border: 1px solid #d9e2ec;
+      border-radius: 4px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #486581;
+      transition: all 0.2s ease;
+    }
+    
+    .scroll-button:hover {
+      background: #e0e7ff;
+      color: #3b82f6;
+    }
+    
+    .scroll-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .scroll-track {
+      flex: 1;
+      height: 6px;
+      background: #e9ecef;
+      border-radius: 3px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .scroll-thumb {
+      position: absolute;
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 3px;
+      width: 100px;
+      left: 0;
+      top: 0;
+    }
+
+    /* Agentes clicables dentro del sidebar */
+    .agent-link { background: none; border: 0; padding: 0; color: #334155; cursor: pointer; font: inherit; }
+    .agent-link:hover { text-decoration: underline; color: #1f2937; }
+    /* Encabezados de Team (estados visuales) */
+    .team-header { position: relative; user-select: none; padding: 6px 10px; border-radius: 8px; transition: background-color .18s ease, color .18s ease, box-shadow .18s ease; }
+    .team-header::before { content: '\25BC'; display: inline-block; margin-right: 8px; transition: transform 0.2s ease; color: #64748b; }
+    .team-section.collapsed .team-header::before { transform: rotate(-90deg); }
+    .team-section.collapsed ul { display: none !important; }
+    .team-header:hover { background: #eef2ff; color: #0f172a; }
+    .team-header.active { color: #0f172a !important; background: linear-gradient(90deg, #e0e7ff 0%, #f0f9ff 100%); box-shadow: inset 3px 0 0 #3b82f6; }
+    .team-section.collapsed .team-header { color: #475569; opacity: 0.9; }
+
+    /* Avisos del sidebar */
+    .sidebar-notice { 
+      margin: 8px 0 10px; 
+      padding: 10px 12px; 
+      border-radius: 8px; 
+      font-size: 0.92em; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      line-height: 1.25; 
+    }
+    .sidebar-notice.info { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+    .sidebar-notice.error { background: #fff1f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .team-header.active { color: #0f172a !important; }
+    
+    @media (max-width: 1100px) {
+      .lead-content-row { 
+        flex-direction: column; 
+        gap: 20px; 
+        max-height: none;
+      }
+      .main-content { 
+        padding: 15px; 
+        height: auto;
+      }
+      .form-section {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        position: static;
+      }
+    }
+    @media (max-width: 700px) {
+      .layout { flex-direction: column;}
+      /* Reglas responsive del sidebar unificadas en css/sidebar.css */
+      .main-content { 
+        padding: 12px 2px; 
+        flex-direction: column;
+      }
+      .lead-content-row { 
+        flex-direction: column; 
+        gap: 12px;
+        max-width: 100%;
+      }
+      .form-section, .graphs-section { 
+        width: 100%;
+        max-width: 100%;
+        padding: 13px 7px;
+      }
+      .graphs-section {
+        grid-template-columns: 1fr !important;
+      }
+    }
+    /* Estilos para el filtro de fecha */
+    .date-filter-container {
+      width: 100%;
+      margin-bottom: 20px;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .date-filter {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .date-filter label {
+      color: #15344a;
+      font-weight: 600;
+      margin-right: 5px;
+    }
+    
+    .date-select {
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background-color: #f9fafb;
+      font-size: 14px;
+      min-width: 120px;
+    }
+    
+    .filter-button {
+      padding: 8px 16px;
+      background-color: #15344a;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.2s;
+    }
+    
+    .filter-button:hover {
+      background-color: #1e4b6e;
+    }
+    
+    #reset-filter {
+      background-color: #6b7280;
+    }
+    
+    #reset-filter:hover {
+      background-color: #4b5563;
+    }
+  </style>
+  <!-- Estilos de la tabla de clientes (reutilizados) -->
+  <link rel="stylesheet" href="css/costumer-table-clean.css">
+  <link rel="stylesheet" href="css/costumer-table-actions.css">
+  <link rel="stylesheet" href="css/costumer-table-comments.css">
+</head>
+<body>
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar sidebar-inicio">
+    <!-- Información del Usuario -->
+    <div class="user-info">
+      <div class="user-avatar">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <div class="user-details">
+        <span id="user-name" class="user-name">Usuario</span>
+        <span id="user-role" class="user-role">Usuario</span>
+      </div>
+    </div>
+    <div class="sidebar-sep"></div>
+    
+    <h3>Menú</h3>
+    <div class="sidebar-underline"></div>
+    <ul class="menu">
+      <li><a href="inicio.html" class="btn btn-sidebar"><i class="fas fa-home"></i> <span>Inicio</span></a></li>
+      <li><a href="lead.html" class="btn btn-sidebar"><i class="fas fa-user-plus"></i> <span>Nuevo Lead</span></a></li>
+      <li><a href="Costumer.html" class="btn btn-sidebar"><i class="fas fa-users"></i> <span>Clientes</span></a></li>
+      <li class="has-submenu">
+        <a href="team.html" class="btn btn-sidebar is-active"><i class="fas fa-users-cog"></i> <span>Equipo</span></a>
+      </li>
+    </ul>
+    <!-- Controles y filtros (movidos arriba de la tabla) -->
+    <!-- Lista de equipos dentro del sidebar (agrupación por Team) -->
+    <div class="teams-block" style="width:100%; padding: 8px 24px 18px;">
+      <div class="sidebar-sep"></div>
+      <h4 style="color:#22b3ec; margin:0 0 10px; font-weight:700;">Equipos</h4>
+
+      <div class="team-section" data-team="irania" style="margin-bottom:14px;">
+        <div class="team-header" data-team="irania" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM IRANIA</div>
+        <ul id="team-irania" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="pleitez" style="margin-bottom:14px;">
+        <div class="team-header" data-team="pleitez" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM PLEITEZ</div>
+        <ul id="team-pleitez" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="marisol" style="margin-bottom:14px;">
+        <div class="team-header" data-team="marisol" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM MARISOL</div>
+        <ul id="team-marisol" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="randal" style="margin-bottom:14px;">
+        <div class="team-header" data-team="randal" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM RANDAL</div>
+        <ul id="team-randal" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="roberto" style="margin-bottom:14px;">
+        <div class="team-header" data-team="roberto" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM ROBERTO</div>
+        <ul id="team-roberto" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="lineas" style="margin-bottom:14px;">
+        <div class="team-header" data-team="lineas" style="font-weight:700; color:#1e293b; margin-bottom:6px; cursor:pointer;">TEAM LINEAS (JONATHAN)</div>
+        <ul id="team-lineas" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+      <div class="team-section" data-team="otros" style="margin-bottom:14px;">
+        <div class="team-header" data-team="otros" style="font-weight:700; color:#64748b; margin-bottom:6px; cursor:pointer;">OTROS</div>
+        <ul id="team-otros" style="margin:0; padding-left:20px; color:#334155;"></ul>
+      </div>
+    </div>
+    <!-- Botón de cerrar sesión al final del sidebar -->
+    <a href="#" id="logoutBtn" data-logout-button class="btn btn-sidebar btn-logout">
+      <i class="fas fa-sign-out-alt"></i> <span>Cerrar sesión</span>
+    </a>
+  </nav>
+  <!-- CONTENIDO PRINCIPAL: Tabla completa de clientes/ventas -->
+  <div class="main-content">
+    <div class="team-container" style="display:block; max-width:100%; background:transparent; box-shadow:none; padding:0;">
+      <!-- Tabla de Clientes (misma estructura que Costumer.html) -->
+      <div class="costumer-table-container">
+        <div class="costumer-table-header">
+          <h2 class="costumer-table-title" id="costumer-table-title">Lista de Clientes</h2>
+          <div class="costumer-table-actions"><!-- Controles principales movidos al bloque inferior table-controls --></div>
+          <!-- Controles y filtros movidos desde el sidebar -->
+          <div class="table-controls" style="display:flex; gap:12px; align-items:center; margin:12px 0; flex-wrap:wrap;">
+            <!-- Botones principales (IDs preservados) -->
+            <button id="toggle-compact" class="btn-compact">Modo compacto</button>
+            <button id="refresh-table" class="btn-refresh">Refrescar</button>
+            <!-- Filtros locales (IDs preservados para bindFilterUI) -->
+            <div class="filters" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <input id="flt-search" type="text" placeholder="Buscar nombre, teléfono o cuenta" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; min-width:260px;" />
+              <select id="flt-status" style="padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px;">
+                <option value="">Estado: Todos</option>
+                <option value="Pending">Pending</option>
+                <option value="Hold">Hold</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Rescheduled">Rescheduled</option>
+                <option value="Completed">Completed</option>
+              </select>
+              <label style="display:flex; align-items:center; gap:6px; color:#334155;">
+                <input id="flt-with-comments" type="checkbox" /> Con comentarios
+              </label>
+              <span id="flt-count" style="color:#64748b; font-size:0.9rem;"></span>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="costumer-table">
+            <thead>
+              <tr>
+                <th>Nombre cliente</th>
+                <th>Teléfono principal</th>
+                <th>Teléfono alterno</th>
+                <th>Numero de cuenta</th>
+                <th>Autopago</th>
+                <th>Dirección</th>
+                <th>Tipo de servicios</th>
+                <th>Sistema</th>
+                <th>Riesgo</th>
+                <th>Dia de venta</th>
+                <th>Día de instalación</th>
+                <th>Status</th>
+                <th>Servicios</th>
+                <th>Mercado</th>
+                <th>Supervisor</th>
+                <th>Comentario</th>
+                <th>Motivo llamada</th>
+                <th>ZIP CODE</th>
+                <th>Puntaje</th>
+                <th>Comentarios sobre la Venta</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="costumer-tbody">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Desactivar carga automática global del módulo de clientes y mostrar mensaje inicial -->
+<script>
+  (function(){
+    window.SKIP_AUTO_LOAD_CUSTOMERS = true;
+    // Mensaje inicial en la tabla
+    const title = document.getElementById('costumer-table-title');
+    if (title) title.textContent = 'Selecciona un agente para ver sus clientes';
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="21" style="text-align:center; padding:2em; color:#64748b;">
+            Selecciona un agente en el panel izquierdo para cargar sus clientes.
+          </td>
+        </tr>`;
+    }
+  })();
+  </script>
+<!-- Script núcleo que contiene renderCostumerTable() y utilidades -->
+  <script>
+    // Evitar que script.js cargue todos los clientes automáticamente en esta página
+    window.SKIP_AUTO_LOAD_CUSTOMERS = true;
+  </script>
+  <script src="js/core/script.js"></script>
+  <script>
+  // Mapa de agentes a equipos (rellenar cuando nos pases los agentes)
+  // Ejemplo: TEAM_MAP['Daniel Martínez'] = 'lineas';
+  window.TEAM_MAP = window.TEAM_MAP || {};
+  const TEAM_KEYS = ['irania','pleitez','marisol','randal','roberto','lineas','otros'];
+
+  // ====== Asignaciones provistas por el usuario ======
+  // Team Pleitez
+  TEAM_MAP['Abigail Galdamez'] = 'pleitez';
+  TEAM_MAP['Alexander Rivera'] = 'pleitez';
+  TEAM_MAP['Bryan Pleitez'] = 'pleitez';
+  TEAM_MAP['Diego Mejia'] = 'pleitez';
+  TEAM_MAP['Evelin Garcia'] = 'pleitez';
+  TEAM_MAP['Fabricio Panameño'] = 'pleitez';
+  TEAM_MAP['Luis Chavarria'] = 'pleitez';
+  TEAM_MAP['Steven Varela'] = 'pleitez';
+
+  // Team Irania
+  TEAM_MAP['Irania Serrano'] = 'irania';
+  TEAM_MAP['Irvin Cruz'] = 'irania';
+  TEAM_MAP['Josue Renderos'] = 'irania';
+  TEAM_MAP['Miguel Nunez'] = 'irania';
+  TEAM_MAP['Pamela Urritia'] = 'irania';
+  TEAM_MAP['Roxana Martinez'] = 'irania';
+
+  // Team Lineas
+  TEAM_MAP['Jonathan Figueroa'] = 'lineas';
+  TEAM_MAP['Lineas- Daniel'] = 'lineas';
+  TEAM_MAP['Lineas- Karla'] = 'lineas';
+  TEAM_MAP['Lineas-Angie'] = 'lineas';
+  TEAM_MAP['Lineas-Aracely'] = 'lineas';
+  TEAM_MAP['Lineas-Carlos'] = 'lineas';
+  TEAM_MAP['Lineas-Cristian R'] = 'lineas';
+  TEAM_MAP['Lineas-Diego.O'] = 'lineas';
+  TEAM_MAP['Lineas-Edward'] = 'lineas';
+  TEAM_MAP['Lineas-Jocelyn'] = 'lineas';
+  TEAM_MAP['Lineas-Luis G'] = 'lineas';
+  TEAM_MAP['Lineas-Oscar R'] = 'lineas';
+  TEAM_MAP['Lineas-Ricardo'] = 'lineas';
+  TEAM_MAP['Lineas-Sandy'] = 'lineas';
+  TEAM_MAP['Lineas-Stanley'] = 'lineas';
+
+  // Team Marisol
+  TEAM_MAP['Carlos Perez'] = 'marisol';
+  TEAM_MAP['Fernanda Castillo'] = 'marisol';
+  TEAM_MAP['Jennifer Barrera'] = 'marisol';
+  TEAM_MAP['Jonathan Morales'] = 'marisol';
+  TEAM_MAP['Katerine Gomez'] = 'marisol';
+  TEAM_MAP['Kimberly Iglesias'] = 'marisol';
+  TEAM_MAP['Marisol Beltran'] = 'marisol';
+  TEAM_MAP['Stefani Martinez'] = 'marisol';
+  TEAM_MAP['Vanessa Aleman'] = 'marisol';
+
+  // Team Randal
+  TEAM_MAP['Anderson Guzman'] = 'randal';
+  TEAM_MAP['Carlos Grande'] = 'randal';
+  TEAM_MAP['Giselle Diaz'] = 'randal';
+  TEAM_MAP['Guadalupe Santana'] = 'randal';
+  TEAM_MAP['Julio Chavez'] = 'randal';
+  TEAM_MAP['Priscila Hernandez'] = 'randal';
+  TEAM_MAP['Randal Martinez'] = 'randal';
+  TEAM_MAP['Riquelmi Torres'] = 'randal';
+
+  // Team Roberto
+  TEAM_MAP['Cindy Flores'] = 'roberto';
+  TEAM_MAP['Daniela Bonilla'] = 'roberto';
+  TEAM_MAP['Fernando Vasquez'] = 'roberto';
+  TEAM_MAP['Francisco Aguilar'] = 'roberto';
+  TEAM_MAP['Josue Estrada'] = 'roberto';
+  TEAM_MAP['Levy Ceren'] = 'roberto';
+  TEAM_MAP['Lisbeth Cortez'] = 'roberto';
+  TEAM_MAP['Lucia Ferman'] = 'roberto';
+  TEAM_MAP['Nelson Ceren'] = 'roberto';
+  TEAM_MAP['Roberto Velasquez'] = 'roberto';
+  TEAM_MAP['Tatiana Ayala'] = 'roberto';
+  function normalizeTeamKey(k){
+    return (k||'').toString().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').replace(/[^a-z0-9]+/g,'').trim();
+  }
+  function ensureTeamLists(){
+    const ids = ['team-irania','team-pleitez','team-marisol','team-randal','team-roberto','team-lineas','team-otros'];
+    ids.forEach(id=>{ if(!document.getElementById(id)){ const ul=document.createElement('ul'); ul.id=id; document.querySelector('.teams-block')?.appendChild(ul);} });
+  }
+
+  // Avisos visibles en el sidebar
+  function showSidebarNotice(type, message){
+    try{
+      const block = document.querySelector('.teams-block');
+      if (!block) return;
+      // Eliminar avisos previos del mismo tipo para evitar duplicados
+      block.querySelectorAll(`.sidebar-notice.${type}`).forEach(n=> n.remove());
+      const div = document.createElement('div');
+      div.className = `sidebar-notice ${type}`;
+      const icon = type === 'error' ? '⚠️' : 'ℹ️';
+      div.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+      // Insertar al principio de la sección de equipos
+      const firstTeam = block.querySelector('.team-section');
+      if (firstTeam && firstTeam.parentNode){
+        block.insertBefore(div, block.firstChild);
+      } else {
+        block.appendChild(div);
+      }
+    }catch(e){ console.warn('showSidebarNotice falló:', e); }
+  }
+  function agentTeamKey(name){
+    const map = window.TEAM_MAP || {};
+    const key = map[name] || '';
+    if (key) return key;
+    // fallback por si vienen variantes en mayúsculas/minúsculas
+    const found = Object.keys(map).find(k => (k||'').toString().trim().toLowerCase() === (name||'').toString().trim().toLowerCase());
+    return found ? map[found] : 'otros';
+  }
+  function organizeAgentsByTeam(){
+    try{
+      ensureTeamLists();
+      const lists = {
+        irania: document.getElementById('team-irania'),
+        pleitez: document.getElementById('team-pleitez'),
+        marisol: document.getElementById('team-marisol'),
+        randal: document.getElementById('team-randal'),
+        roberto: document.getElementById('team-roberto'),
+        lineas: document.getElementById('team-lineas'),
+        otros: document.getElementById('team-otros')
+      };
+      // Limpiar listas
+      Object.values(lists).forEach(ul=>{ if(ul) ul.innerHTML=''; });
+      // Mover cada agente a su lista
+      document.querySelectorAll('.teams-block .agent-link').forEach(btn=>{
+        const li = btn.closest('li') || (function(){ const l=document.createElement('li'); btn.parentNode?.insertBefore(l, btn); l.appendChild(btn); return l; })();
+        const name = btn.getAttribute('data-agent') || (btn.textContent||'').trim();
+        const k = agentTeamKey(name);
+        const target = lists[k] || lists.otros;
+        target && target.appendChild(li);
+      });
+      bindAgentListeners();
+    }catch(e){ console.warn('organizeAgentsByTeam error:', e); }
+  }
+  function bindAgentListeners(){
+    try{
+      if (window.__bindAgentsInit) return; // evitar múltiples bindings
+      const block = document.querySelector('.teams-block');
+      if (!block) return;
+      block.addEventListener('click', async function(ev){
+        const header = ev.target.closest('.team-header');
+        if (header && block.contains(header)){
+          const section = header.closest('.team-section');
+          if (section){
+            const collapsed = section.classList.toggle('collapsed');
+            // Marcar activo el header expandido y desactivar otros
+            document.querySelectorAll('.team-header').forEach(h=> h.classList.toggle('active', h===header && !collapsed));
+            ev.preventDefault();
+          }
+        }
+        const agentBtn = ev.target.closest('.agent-link');
+        if (agentBtn && block.contains(agentBtn)){
+          document.querySelectorAll('.agent-link.active').forEach(b=> b.classList.remove('active'));
+          agentBtn.classList.add('active');
+          const nombre = agentBtn.getAttribute('data-agent') || (agentBtn.textContent || '').trim();
+          await cargarClientesPorAgente(nombre);
+          ev.preventDefault();
+        }
+      });
+      window.__bindAgentsInit = true;
+      // Expandir primer team con agentes y seleccionar el primero si no hay activo
+      const firstSection = Array.from(document.querySelectorAll('.team-section')).find(sec => sec.querySelector('.agent-link'));
+      if (firstSection){
+        firstSection.classList.remove('collapsed');
+        const hdr = firstSection.querySelector('.team-header');
+        if (hdr){ document.querySelectorAll('.team-header').forEach(h=> h.classList.toggle('active', h===hdr)); }
+        const firstAgent = firstSection.querySelector('.agent-link');
+        if (firstAgent && !document.querySelector('.agent-link.active')){
+          firstAgent.classList.add('active');
+          const nombreInit = firstAgent.getAttribute('data-agent') || (firstAgent.textContent||'').trim();
+          cargarClientesPorAgente(nombreInit).catch(e=> console.warn('Auto-carga inicial falló:', e));
+        }
+      }
+    }catch(e){ console.warn('bindAgentListeners error:', e); }
+  }
+  function apiBase(){
+    try {
+      const fromWindow = (window.API_BASE || '').toString().trim();
+      if (fromWindow) return fromWindow.replace(/\/$/, '');
+    } catch {}
+    try {
+      const fromStorage = (localStorage.getItem('API_BASE') || '').toString().trim();
+      if (fromStorage) return fromStorage.replace(/\/$/, '');
+    } catch {}
+    // Fallback automático en desarrollo: si estamos en localhost y no hay API_BASE, usar backend local
+    try {
+      const host = (location.hostname || '').toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:3002'; // puerto definido en server.js
+      }
+    } catch {}
+    return '';
+  }
+  function apiUrl(path){
+    const base = apiBase();
+    if (!base) return path; // mismo origen
+    return base + (path.startsWith('/') ? path : ('/' + path));
+  }
+  function getAuthToken(){
+    return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+  }
+  function setLoadingTable(msg){
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="21" style="text-align:center; padding:2em; color:#64748b;">
+            <i class="fas fa-spinner fa-spin"></i> ${msg || 'Cargando...'}
+          </td>
+        </tr>`;
+    }
+  }
+
+  // Estado de datos y filtros en memoria
+  const State = {
+    allLeads: [],
+    filters: { search: '', status: '', withComments: false }
+  };
+  function setAllLeads(leads){
+    State.allLeads = Array.isArray(leads) ? leads : [];
+    applyFiltersAndRender();
+  }
+  function getCellText(v){ return (v ?? '').toString().toLowerCase(); }
+  function applyFiltersAndRender(){
+    const { search, status, withComments } = State.filters;
+    const s = (search||'').trim().toLowerCase();
+    const filtered = State.allLeads.filter(item => {
+      // Filtro búsqueda
+      const haystack = [
+        getCellText(item.nombre_cliente),
+        getCellText(item.telefono_principal),
+        getCellText(item.numero_cuenta),
+        getCellText(item.direccion),
+        getCellText(item.servicios)
+      ].join(' ');
+      if (s && !haystack.includes(s)) return false;
+      // Filtro estado
+      if (status && (item.status||'') !== status) return false;
+      // Filtro con comentarios
+      if (withComments) {
+        const c = (item.comentario||'').toString().trim();
+        if (!c) return false;
+      }
+      return true;
+    });
+    const counter = document.getElementById('flt-count');
+    if (counter){ counter.textContent = `${filtered.length} de ${State.allLeads.length}`; }
+    if (typeof renderCostumerTable === 'function') renderCostumerTable(filtered);
+  }
+  function bindFilterUI(){
+    const q = document.getElementById('flt-search');
+    const st = document.getElementById('flt-status');
+    const wc = document.getElementById('flt-with-comments');
+    let tId = null;
+    if (q){
+      q.addEventListener('input', function(){
+        clearTimeout(tId);
+        tId = setTimeout(()=>{ State.filters.search = q.value || ''; applyFiltersAndRender(); }, 200);
+      });
+    }
+    if (st){ st.addEventListener('change', function(){ State.filters.status = st.value || ''; applyFiltersAndRender(); }); }
+    if (wc){ wc.addEventListener('change', function(){ State.filters.withComments = !!wc.checked; applyFiltersAndRender(); }); }
+  }
+
+  // Obtener rol actual (usa función global si existe)
+  function getRole(){
+    try { if (typeof getCurrentUserRole === 'function') return (getCurrentUserRole()||'').toString(); } catch {}
+    try {
+      const token = getAuthToken();
+      if (!token) return '';
+      const parts = token.split('.');
+      if (parts.length !== 3) return '';
+      const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+      return (payload?.role || '').toString();
+    } catch { return ''; }
+  }
+
+  async function cargarMisClientes(){
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+      const title = document.getElementById('costumer-table-title');
+      if (title) title.textContent = 'Mis Clientes';
+      setLoadingTable('Cargando mis clientes...');
+      const res = await fetch(apiUrl('/api/customers'), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const ct = res.headers.get('content-type') || '';
+      console.log('[TEAM] own customers status:', res.status, '| content-type:', ct);
+      if (!res.ok) {
+        const txt = await res.text().catch(()=> '');
+        throw new Error(`Error ${res.status}: ${txt || res.statusText}`);
+      }
+      const data = await res.json();
+      const leads = data.leads || data || [];
+      setAllLeads(leads);
+    } catch (e) {
+      console.error('Error cargando mis clientes:', e);
+    }
+  }
+  async function cargarClientesPorAgente(nombre){
+    try{
+      if (!nombre) return;
+      const title = document.getElementById('costumer-table-title');
+      if (title) title.textContent = `Lista de Clientes — ${nombre}`;
+      setLoadingTable('Cargando clientes del agente...');
+      const token = getAuthToken();
+      // Detectar si hay un agenteId en el elemento activo
+      const activeEl = document.querySelector('.agent-link.active');
+      let agenteId = activeEl ? (activeEl.getAttribute('data-agent-id') || activeEl.dataset.agentId || '') : '';
+      // Si no hay agenteId (lista estática), intentar resolverlo desde /api/users/agents
+      if (!agenteId) {
+        try {
+          const resAgents = await fetch(apiUrl('/api/users/agents'), {
+            headers: {
+              'Authorization': token ? `Bearer ${token}` : ''
+            }
+          });
+          const ct = resAgents.headers.get('content-type') || '';
+          console.log('[TEAM] resolver agenteId users/agents ->', resAgents.status, ct);
+          if (resAgents.ok && ct.includes('application/json')) {
+            const payload = await resAgents.json();
+            const agents = payload.agents || payload || [];
+            const safe = (nombre || '').trim().toLowerCase();
+            const found = agents.find(a => (
+              (a.name || a.nombre || a.fullName || a.username || '').toString().trim().toLowerCase() === safe
+            ));
+            if (found && found.id) agenteId = found.id;
+          }
+        } catch(e){ console.warn('No se pudo resolver agenteId desde users/agents:', e?.message); }
+      }
+      const url = agenteId
+        ? apiUrl(`/api/customers?agenteId=${encodeURIComponent(agenteId)}`)
+        : apiUrl(`/api/customers?agente=${encodeURIComponent(nombre)}`);
+      console.log('[TEAM] Fetch URL:', url, '| agenteId:', agenteId || 'N/A');
+      const res = await fetch(url, { headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }});
+      if (!res.ok){
+        const txt = await res.text().catch(()=> '');
+        throw new Error(`Error ${res.status}: ${txt || res.statusText}`);
+      }
+      const data = await res.json();
+      const leads = data.leads || data || [];
+      setAllLeads(leads);
+    } catch(err){
+      console.error('Fallo al cargar clientes por agente:', err);
+      const tbody = document.getElementById('costumer-tbody');
+      if (tbody){
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="21" style="text-align:center; padding:2em; color:#ef4444;">${err.message || 'Error desconocido'}</td>
+          </tr>`;
+      }
+    }
+  }
+  function bindFilterUI(){
+      const q = document.getElementById('flt-search');
+      const st = document.getElementById('flt-status');
+      const wc = document.getElementById('flt-with-comments');
+      let tId = null;
+      if (q){
+        q.addEventListener('input', function(){
+          clearTimeout(tId);
+          tId = setTimeout(()=>{ State.filters.search = q.value || ''; applyFiltersAndRender(); }, 200);
+        });
+      }
+      if (st){ st.addEventListener('change', function(){ State.filters.status = st.value || ''; applyFiltersAndRender(); }); }
+      if (wc){ wc.addEventListener('change', function(){ State.filters.withComments = !!wc.checked; applyFiltersAndRender(); }); }
+    }
+
+    // Obtener rol actual (usa función global si existe)
+    function getRole(){
+      try { if (typeof getCurrentUserRole === 'function') return (getCurrentUserRole()||'').toString(); } catch {}
+      try {
+        const token = getAuthToken();
+        if (!token) return '';
+        const parts = token.split('.');
+        if (parts.length !== 3) return '';
+        const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+        return (payload?.role || '').toString();
+      } catch { return ''; }
+    }
+
+    async function cargarMisClientes(){
+      try {
+        const token = getAuthToken();
+        if (!token) return;
+        const title = document.getElementById('costumer-table-title');
+        if (title) title.textContent = 'Mis Clientes';
+        setLoadingTable('Cargando mis clientes...');
+        const res = await fetch(apiUrl('/api/customers'), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const ct = res.headers.get('content-type') || '';
+        console.log('[TEAM] own customers status:', res.status, '| content-type:', ct);
+        if (!res.ok) {
+          const txt = await res.text().catch(()=> '');
+          throw new Error(`Error ${res.status}: ${txt || res.statusText}`);
+        }
+        const data = await res.json();
+        const leads = data.leads || data || [];
+        setAllLeads(leads);
+      } catch (e) {
+        console.error('Error cargando mis clientes:', e);
+      }
+    }
+    async function cargarClientesPorAgente(nombre){
+      try{
+        if (!nombre) return;
+        const title = document.getElementById('costumer-table-title');
+        if (title) title.textContent = `Lista de Clientes — ${nombre}`;
+        setLoadingTable('Cargando clientes del agente...');
+        const token = getAuthToken();
+        // Detectar si hay un agenteId en el elemento activo
+        const activeEl = document.querySelector('.agent-link.active');
+        let agenteId = activeEl ? (activeEl.getAttribute('data-agent-id') || activeEl.dataset.agentId || '') : '';
+        // Si no hay agenteId (lista estática), intentar resolverlo desde /api/users/agents
+        if (!agenteId) {
+          try {
+            const resAgents = await fetch(apiUrl('/api/users/agents'), {
+              headers: {
+                'Authorization': token ? `Bearer ${token}` : ''
+              }
+            });
+            const ct = resAgents.headers.get('content-type') || '';
+            console.log('[TEAM] resolver agenteId users/agents ->', resAgents.status, ct);
+            if (resAgents.ok && ct.includes('application/json')) {
+              const payload = await resAgents.json();
+              const agents = payload.agents || payload || [];
+              const safe = (nombre || '').trim().toLowerCase();
+              const found = agents.find(a => (
+                (a.name || a.nombre || a.fullName || a.username || '').toString().trim().toLowerCase() === safe
+              ));
+              if (found && found.id) agenteId = found.id;
+            }
+          } catch(e){ console.warn('No se pudo resolver agenteId desde users/agents:', e?.message); }
+        }
+        const url = agenteId
+          ? apiUrl(`/api/customers?agenteId=${encodeURIComponent(agenteId)}`)
+          : apiUrl(`/api/customers?agente=${encodeURIComponent(nombre)}`);
+        console.log('[TEAM] Fetch URL:', url, '| agenteId:', agenteId || 'N/A');
+        const res = await fetch(url, { headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }});
+        if (!res.ok){
+          const txt = await res.text().catch(()=> '');
+          throw new Error(`Error ${res.status}: ${txt || res.statusText}`);
+        }
+        const data = await res.json();
+        const leads = data.leads || data || [];
+        setAllLeads(leads);
+      } catch(err){
+        console.error('Fallo al cargar clientes por agente:', err);
+        const tbody = document.getElementById('costumer-tbody');
+        if (tbody){
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="21" style="text-align:center; padding:2em; color:#ef4444;">${err.message || 'Error desconocido'}</td>
+            </tr>`;
+        }
+      }
+    }
+
+      // Hidratar sidebar desde /api/customers/agents-summary
+      async function hydrateSidebarFromSummary(){
+    try {
+          const token = getAuthToken();
+          if (!token) return false;
+          const res = await fetch(apiUrl('/api/customers/agents-summary'), {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const ct = res.headers.get('content-type') || '';
+          console.log('[TEAM] agents-summary status:', res.status, '| content-type:', ct);
+          if (!res.ok) {
+            showSidebarNotice('error', 'No se pudo cargar el resumen de agentes.');
+            return false;
+          }
+          if (!ct.includes('application/json')) {
+            showSidebarNotice('error', 'El resumen de agentes devolvió contenido no JSON.');
+            const text = await res.text().catch(()=> '');
+            console.warn('agents-summary devolvió contenido no JSON. Primeros 120 chars:', text.slice(0,120));
+            return false;
+          }
+          const data = await res.json();
+          if (!data || !Array.isArray(data.summary) || data.summary.length === 0) {
+            showSidebarNotice('error', 'No se encontraron agentes en el resumen.');
+            return false;
+          }
+
+          // Insertar agentes en un contenedor oculto para luego organizarlos por Team (sin alterar los headings)
+          const block = document.querySelector('.teams-block');
+          if (!block) return false;
+          let list = block.querySelector('ul.agents-auto');
+          if (!list) {
+            list = document.createElement('ul');
+            list.className = 'agents-auto';
+            list.style.display = 'none';
+            block.appendChild(list);
+          }
+          list.innerHTML = '';
+          data.summary.forEach(item => {
+            const nombre = item.agenteNombre || '(sin nombre)';
+            const id = item.agenteId || '';
+            const li = document.createElement('li');
+            li.innerHTML = `<button type="button" class="agent-link" data-agent="${nombre}" ${id ? `data-agent-id="${id}"` : ''}>${nombre} ${item.count ? `<span style='color:#64748b'>(${item.count})</span>` : ''}</button>`;
+            list.appendChild(li);
+          });
+          bindAgentListeners();
+          // Reubicar a las secciones por Team
+          organizeAgentsByTeam();
+          // Autoseleccionar el primero con id (o el primero disponible)
+          const firstWithId = block.querySelector('.agent-link[data-agent-id]') || block.querySelector('.agent-link');
+          if (firstWithId){
+            firstWithId.classList.add('active');
+            const nombreInit = firstWithId.getAttribute('data-agent') || (firstWithId.textContent || '').trim();
+            console.log('[TEAM] Autocarga (summary) agente inicial:', nombreInit, '| agenteId:', firstWithId.getAttribute('data-agent-id') || 'N/A');
+            await cargarClientesPorAgente(nombreInit);
+          }
+          return true;
+      } catch (e) {
+        console.warn('No se pudo hidratar sidebar desde summary:', e);
+        showSidebarNotice('error', 'No se pudo cargar el resumen de agentes.');
+        try { showSidebarNotice('error', 'No se pudo cargar el resumen de agentes. Intentando otra fuente...'); } catch {}
+        return false;
+      }
+    }
+
+    // Fallback: hidratar sidebar desde /api/users/agents cuando falle summary
+    async function hydrateSidebarFromUsers(){
+    try {
+        const token = getAuthToken();
+        if (!token) return false;
+        const res = await fetch(apiUrl('/api/users/agents'), {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const ct = res.headers.get('content-type') || '';
+        console.log('[TEAM] users/agents status:', res.status, '| content-type:', ct);
+        if (!res.ok) return false;
+        if (!ct.includes('application/json')) return false;
+        const data = await res.json();
+        if (!data || !Array.isArray(data.agents) || data.agents.length === 0) return false;
+
+        const block = document.querySelector('.teams-block');
+        if (!block) return false;
+        let list = block.querySelector('ul.agents-auto');
+        if (!list) {
+          list = document.createElement('ul');
+          list.className = 'agents-auto';
+          list.style.display = 'none';
+          block.appendChild(list);
+        }
+        list.innerHTML = '';
+        data.agents.forEach(item => {
+          const nombre = item.name || item.username || '(sin nombre)';
+          const id = item.id || '';
+          const li = document.createElement('li');
+          li.innerHTML = `<button type="button" class="agent-link" data-agent="${nombre}" ${id ? `data-agent-id="${id}"` : ''}>${nombre}</button>`;
+          list.appendChild(li);
+        });
+        bindAgentListeners();
+        // Reubicar a las secciones por Team
+        organizeAgentsByTeam();
+        // Autoseleccionar el primero
+        const firstWithId = block.querySelector('.agent-link[data-agent-id]') || block.querySelector('.agent-link');
+        if (firstWithId){
+          firstWithId.classList.add('active');
+          const nombreInit = firstWithId.getAttribute('data-agent') || (firstWithId.textContent || '').trim();
+          console.log('[TEAM] Autocarga (users) agente inicial:', nombreInit, '| agenteId:', firstWithId.getAttribute('data-agent-id') || 'N/A');
+          await cargarClientesPorAgente(nombreInit);
+        }
+        return true;
+      } catch (e) {
+        console.warn('No se pudo hidratar sidebar desde users:', e);
+        try { showSidebarNotice('error', 'No se pudo cargar la lista de agentes. Usando lista estática...'); } catch {}
+        return false;
+      }
+    }
+
+    // Controles UI de la tabla
+    document.addEventListener('DOMContentLoaded', async function(){
+      const toggleBtn = document.getElementById('toggle-compact');
+      const refreshBtn = document.getElementById('refresh-table');
+      bindFilterUI();
+      const role = (getRole()||'').toLowerCase();
+      if (role === 'agent') {
+        // Ocultar sidebar de agentes para agentes
+        const block = document.querySelector('.teams-block');
+        if (block) block.style.display = 'none';
+        // Cargar directamente sus propios clientes (backend ya filtra por su id)
+        await cargarMisClientes();
+        // Evitar el resto de la hidratación de sidebar
+        if (toggleBtn){
+          toggleBtn.addEventListener('click', function(){
+            document.body.classList.toggle('compact');
+            toggleBtn.classList.toggle('active');
+          });
+        }
+        if (refreshBtn){
+          refreshBtn.addEventListener('click', function(){ cargarMisClientes(); });
+        }
+        return;
+      }
+      // Intentar hidratar desde summary; si no, usar lista estática
+      const hydrated = await hydrateSidebarFromSummary();
+      organizeAgentsByTeam();
+      if (!hydrated){
+        const hydratedUsers = await hydrateSidebarFromUsers();
+        organizeAgentsByTeam();
+        if (!hydratedUsers){
+        bindAgentListeners();
+        const first = document.querySelector('.agent-link');
+        if (first) {
+          const nombreInit = first.getAttribute('data-agent') || (first.textContent || '').trim();
+          first.classList.add('active');
+          console.log('[TEAM] Autocarga (estática) agente inicial:', nombreInit);
+          try { showSidebarNotice('info', 'Usando lista estática de agentes.'); } catch {}
+          cargarClientesPorAgente(nombreInit);
+        }
+        }
+      }
+      if (toggleBtn){
+        toggleBtn.addEventListener('click', function(){
+          document.body.classList.toggle('compact');
+          toggleBtn.classList.toggle('active');
+        });
+      }
+      if (refreshBtn){
+        refreshBtn.addEventListener('click', function(){
+          const act = document.querySelector('.agent-link.active');
+          let nombre = '';
+          if (act) {
+            nombre = act.getAttribute('data-agent') || (act.textContent || '').trim();
+          }
+          if (nombre) {
+            cargarClientesPorAgente(nombre);
+          } else {
+            // No hay agente activo: mantener mensaje inicial, no cargar todo
+            setLoadingTable('Selecciona un agente para ver sus clientes');
+          }
+        });
+      }
+    });
+  </script>
+  </div>
+  <script>
+  // Forzar recarga de la info del usuario cuando la página termina de cargar
+  window.addEventListener('load', function() {
+    if (window.cargarInfoUsuario) {
+      try { window.cargarInfoUsuario(); } catch (e) { console.warn('cargarInfoUsuario falló:', e); }
+    }
+  });
+</script>
+</body>
+</html>
