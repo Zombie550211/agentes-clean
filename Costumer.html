@@ -839,6 +839,20 @@
         return s.replace(/^\s*team\s+/i, '').trim();
       } catch { return displayName || ''; }
     }
+
+    // Helper: detectar si el usuario es admin o backoffice
+    function esAdminOBackoffice() {
+      try {
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const roleRaw = (userData.role || userData?.usuario?.role || '').toString();
+        const role = roleRaw.toLowerCase().trim();
+        const allowed = new Set(['admin','supervisor','backoffice','b:o','b.o','b-o','bo']);
+        // Solo admin o backoffice/variantes, no supervisor
+        if (role === 'admin') return true;
+        if (allowed.has(role) && role !== 'supervisor') return true;
+        return false;
+      } catch { return false; }
+    }
   
     // Funciones para el manejo de comentarios
     function abrirComentarios(leadId) {
@@ -1652,8 +1666,8 @@
         tbody.appendChild(tr);
       }
 
-      // Si es Irania, agrupar por supervisor con encabezados por agente
-      if (typeof esIrania === 'function' && esIrania()) {
+      // Agrupar por supervisor solo para roles admin/backoffice
+      if (typeof esAdminOBackoffice === 'function' && esAdminOBackoffice()) {
         // Agrupar
         const grupos = new Map();
         leadsArray.forEach(l => {
