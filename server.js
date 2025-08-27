@@ -18,6 +18,13 @@ const { connectToMongoDB, getDb } = require('./config/db');
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
 const JWT_EXPIRES_IN = '24h'; // El token expira en 24 horas
 
+// Silenciar logs en producción (mantener warn/error)
+if (process.env.NODE_ENV === 'production') {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
+
 // Configuración de rutas de archivos estáticos
 const staticPath = path.join(__dirname, '/');
 const publicPath = path.join(__dirname, '/');
