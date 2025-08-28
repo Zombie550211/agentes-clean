@@ -2028,93 +2028,124 @@
         console.warn('No se pudo aplicar la vista plana para Irania:', e);
       }
 
-      // Agrupar por supervisor solo para roles admin/backoffice
+      // Vista ADMIN/BACKOFFICE: toolbar por TEAM y render plano filtrado por team
       if (typeof esAdminOBackoffice === 'function' && esAdminOBackoffice()) {
-        // Agrupar
-        const grupos = new Map();
-        leadsArray.forEach(l => {
-          const sup = (l && l.supervisor) ? l.supervisor : 'Sin asignar';
-          if (!grupos.has(sup)) grupos.set(sup, []);
-          grupos.get(sup).push(l);
-        });
+        try {
+          const teamsApi = (window && window.Teams) ? window.Teams : null;
+          const teams = teamsApi && typeof teamsApi.getAllTeams === 'function' ? teamsApi.getAllTeams() : [];
+          const tbodyEl = document.getElementById('costumer-tbody');
+          if (!tbodyEl) return;
+          const tableEl = tbodyEl.closest('table');
+          const host = tableEl ? tableEl : tbodyEl;
 
-        // Orden por nombre de supervisor
-        const clavesOrdenadas = Array.from(grupos.keys()).sort((a,b) => a.localeCompare(b, 'es', {sensitivity:'base'}));
-
-        clavesOrdenadas.forEach(sup => {
-          const headerTr = document.createElement('tr');
-          const display = (typeof limpiarSupervisor === 'function') ? limpiarSupervisor(sup) : sup;
-          const count = (grupos.get(sup) || []).length;
-
-          // Encabezado de Supervisor
-          headerTr.innerHTML = `
-            <td colspan="21" style="background: #f0f4ff; color:#1f3a8a; font-weight:600; padding:10px 12px; border-top:2px solid #c7d2fe; border-bottom:1px solid #dbeafe;">
-              <i class="fas fa-user" style="margin-right:8px;"></i> Supervisor: ${escapeHtml ? escapeHtml(display) : display} (${count})
-            </td>
-          `;
-          tbody.appendChild(headerTr);
-
-          const leadsGrupo = grupos.get(sup) || [];
-          const supNorm = (display || '').toString().trim().toLowerCase();
-
-          // Si el supervisor es Irania (team Irania), sub-agrupar por Agente con orden fijo
-          if (supNorm.includes('irania')) {
-            const ordenAgentes = [
-              'josue renderos',
-              'miguel nunez',
-              'roxana martinez',
-              'giselle diaz',
-              'tatiana ayala'
-            ];
-
-            // Normalizar nombre de agente para comparación
-            const norm = s => (s||'').toString().trim().toLowerCase();
-
-            // Construir buckets por agente
-            const buckets = new Map();
-            ordenAgentes.forEach(a => buckets.set(a, []));
-            const otros = [];
-
-            leadsGrupo.forEach(l => {
-              const a = norm(l.agente);
-              if (buckets.has(a)) {
-                buckets.get(a).push(l);
-              } else {
-                otros.push(l);
-              }
-            });
-
-            // Render por cada agente en el orden dado
-            ordenAgentes.forEach(a => {
-              const lista = buckets.get(a) || [];
-              if (!lista.length) return;
-              const agentHeader = document.createElement('tr');
-              const label = a.replace(/\b\w/g, c => c.toUpperCase());
-              agentHeader.innerHTML = `
-                <td colspan="21" style="background:#eef2ff; color:#1d4ed8; font-weight:600; padding:8px 12px; border-left:4px solid #93c5fd;">
-                  <i class="fas fa-user-circle" style="margin-right:8px;"></i> Agente: ${label} (${lista.length})
-                </td>
-              `;
-              tbody.appendChild(agentHeader);
-              lista.forEach(appendLeadRow);
-            });
-
-            // Render "Otros" si corresponde
-            if (otros.length) {
-              const othersHeader = document.createElement('tr');
-              othersHeader.innerHTML = `
-                <td colspan="21" style="background:#eef2ff; color:#1d4ed8; font-weight:600; padding:8px 12px; border-left:4px solid #93c5fd;">
-                  <i class="fas fa-user-circle" style="margin-right:8px;"></i> Agente: Otros (${otros.length})
-                </td>
-              `;
-              tbody.appendChild(othersHeader);
-              otros.forEach(appendLeadRow);
-            }
-          } else {
-            // Para otros supervisores, listar plano dentro del grupo
-            leadsGrupo.forEach(appendLeadRow);
+          // Crear/asegurar contenedor de scroll (para que solo filas se desplacen)
+          let container = document.getElementById('clientes-scroll-container');
+          if (!container) {
+            container = document.createElement('div');
+            container.id = 'clientes-scroll-container';
+            container.style.maxHeight = '70vh';
+            container.style.overflowY = 'auto';
+            container.style.border = '1px solid #e5e7eb';
+            container.style.borderRadius = '10px';
+            container.style.background = '#fff';
+            container.style.padding = '8px';
+            const parent = host.parentElement || host;
+            parent.insertBefore(container, host);
+            container.appendChild(host);
           }
-        });
+
+          // Crear/asegurar toolbar de TEAM
+          let bar = document.getElementById('teams-filter-bar');
+          if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'teams-filter-bar';
+            bar.style.margin = '10px 0';
+            bar.style.display = 'flex';
+            bar.style.flexWrap = 'wrap';
+            bar.style.gap = '8px';
+            const parent = container.parentElement || container;
+            parent.insertBefore(bar, container);
+            // sticky del toolbar
+            bar.style.position = 'sticky';
+            bar.style.top = '0';
+            bar.style.zIndex = '10';
+            bar.style.background = '#ffffff';
+            bar.style.padding = '8px 0';
+          }
+
+          const mkBtn = (label, value) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.dataset.value = value || '';
+            b.style.padding = '6px 10px';
+            b.style.border = '1px solid #e5e7eb';
+            b.style.borderRadius = '9999px';
+            b.style.background = (window.adminTeamFilter === value) ? '#1d4ed8' : '#f9fafb';
+            b.style.color = (window.adminTeamFilter === value) ? '#fff' : '#111827';
+            b.style.cursor = 'pointer';
+            b.style.fontSize = '12px';
+            b.addEventListener('click', () => {
+              window.adminTeamFilter = value || null;
+              try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+            });
+            return b;
+          };
+
+          // Render botones con conteo de ventas (status Completed)
+          bar.innerHTML = '';
+          // Conteo total de ventas (todas los TEAM)
+          try {
+            const totalVentas = (Array.isArray(leadsArray) ? leadsArray : []).reduce((acc, l) => acc + (normalizeStatusLabel(l.status) === 'Completed' ? 1 : 0), 0);
+            bar.appendChild(mkBtn(`Todos (${totalVentas})`, null));
+          } catch(_) {
+            bar.appendChild(mkBtn('Todos', null));
+          }
+          teams.forEach(teamKey => {
+            const def = teamsApi.getTeamDef(teamKey) || { displayName: teamKey };
+            const label = def.displayName || teamKey;
+            // Calcular ventas del TEAM
+            let count = 0;
+            try {
+              const agentsCanon = teamsApi.getAgentsByTeam(teamKey) || [];
+              count = (Array.isArray(leadsArray) ? leadsArray : []).reduce((acc, l) => {
+                const isAgentTeam = agentsCanon.includes((() => {
+                  if (l && l.__agentCanon) return l.__agentCanon;
+                  const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+                  return (teamsApi && typeof teamsApi.canonicalFromName === 'function') ? teamsApi.canonicalFromName(cand) : (cand||'').toString().trim().toLowerCase();
+                })());
+                const isVenta = normalizeStatusLabel(l.status) === 'Completed';
+                return acc + (isAgentTeam && isVenta ? 1 : 0);
+              }, 0);
+            } catch(_) { count = 0; }
+            bar.appendChild(mkBtn(`${label} (${count})`, teamKey));
+          });
+
+          // Helper para obtener agente canónico
+          const canonicalFromName = (name) => {
+            if (teamsApi && typeof teamsApi.canonicalFromName === 'function') return teamsApi.canonicalFromName(name);
+            return (name || '').toString().trim().toLowerCase();
+          };
+          const getAgentCanon = (l) => {
+            if (l && l.__agentCanon) return l.__agentCanon;
+            const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+            return canonicalFromName(cand);
+          };
+
+          // Filtrar por TEAM seleccionado (por agentes del team)
+          const selectedTeam = window.adminTeamFilter || null;
+          let list = Array.isArray(leadsArray) ? leadsArray.slice() : [];
+          if (selectedTeam) {
+            const agentsCanon = teamsApi.getAgentsByTeam(selectedTeam) || [];
+            list = list.filter(l => agentsCanon.includes(getAgentCanon(l)) && normalizeStatusLabel(l.status) === 'Completed');
+          } else {
+            // En 'Todos' mostrar solo ventas (Completed) de todos los TEAM
+            list = list.filter(l => normalizeStatusLabel(l.status) === 'Completed');
+          }
+
+          // Render plano
+          list.forEach(appendLeadRow);
+          return; // evitar ramas siguientes
+        } catch (e) { console.warn('Error en vista admin por TEAM:', e); }
       } else {
         // Render plano por defecto
         leadsArray.forEach(appendLeadRow);
