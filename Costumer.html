@@ -1616,7 +1616,9 @@
       // Filtro especial: si el usuario es Irania Serrano, mostrar solo leads de su TEAM
       try {
         const isIraniaUser = (typeof esIrania === 'function') && esIrania();
-        if (isIraniaUser) {
+        // No aplicar el filtro de TEAM IRANIA para roles admin o supervisor
+        const __role = (typeof getUserRole_local === 'function') ? (getUserRole_local() || '') : '';
+        if (isIraniaUser && !['admin','supervisor'].includes((__role || '').toLowerCase())) {
           const norm = s => (s || '')
             .toString()
             .normalize('NFD')
@@ -1734,6 +1736,9 @@
           };
           // ordenAgentes ya fue declarado arriba
 
+          // Preservar lista original para fallback si el filtro quedara vacío
+          const __originalLeads = Array.isArray(leadsArray) ? leadsArray.slice() : [];
+
           // Log de agentes detectados antes del filtro
           try {
             const agentesDetectados = Array.from(new Set((leadsArray||[]).map(getAgentName))).filter(Boolean);
@@ -1810,7 +1815,13 @@
             } catch(_) {}
             return false;
           });
-          leadsArray = filteredStrict;
+          // Si el filtro deja la lista vacía, mantener la lista original para no ocultar datos
+          if (!filteredStrict || filteredStrict.length === 0) {
+            console.warn('[Filtro TEAM IRANIA] Resultado vacío; se mantiene lista original para no ocultar datos.');
+            leadsArray = __originalLeads;
+          } else {
+            leadsArray = filteredStrict;
+          }
           console.log('[Filtro TEAM IRANIA - estricto] Leads tras filtro:', leadsArray.length);
         }
       } catch (e) {
