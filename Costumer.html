@@ -739,6 +739,7 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <script src="utils/teams.js"></script>
   <script>
     // Función para verificar el rol del usuario y mostrar/ocultar elementos según corresponda
     function checkUserRole() {
@@ -1248,6 +1249,19 @@
         // Identificadores
         _id: id,
         id: id,
+        // Preservar crudo para diagnóstico/agrupación posterior
+        _raw: lead,
+        // Pasar posibles campos de IDs de agente y variantes (sin transformar) para facilitar detección aguas abajo
+        agenteId: lead.agenteId || lead.AGENTEID || lead.agente_id || lead.AGENTE_ID || lead.idAgente || lead.IDAGENTE || lead.agentId || lead.AGENTID || lead.creadoPor || lead.CREADO_POR || lead.creado_por || lead.createdBy || lead.ownerId || lead.assignedId || '',
+        agente_id: lead.agente_id || lead.AGENTE_ID || '',
+        idAgente: lead.idAgente || lead.IDAGENTE || '',
+        agentId: lead.agentId || lead.AGENTID || '',
+        creadoPor: lead.creadoPor || lead.CREADO_POR || lead.creado_por || '',
+        createdBy: lead.createdBy || '',
+        ownerId: lead.ownerId || '',
+        assignedId: lead.assignedId || '',
+        // Pasar posibles campos de nombre de agente y variantes
+        agenteNombre: lead.agenteNombre || lead.AGENTE_NOMBRE || lead.nombreAgente || lead.NOMBRE_AGENTE || lead.agente || lead.Agente || lead.agent || lead.Agent || lead.vendedor || lead.seller || lead.nombre_agente || lead.agente_nombre || lead.agentName || lead.salesAgent || lead.asignadoA || lead.asignado_a || lead.assignedTo || lead.assigned_to || lead.usuario || lead.owner || lead.registeredBy || '',
       };
     }
 
@@ -1350,6 +1364,8 @@
 
         // Actualizar la interfaz
         renderCostumerTable(normalizedLeads);
+        // Logs de diagnóstico de asignación (por TEAM y agente)
+        try { if (typeof logDiagnosticoAsignacion === 'function') logDiagnosticoAsignacion(normalizedLeads); } catch(_) {}
         updateSummaryCards(normalizedLeads);
 
         return normalizedLeads;
@@ -1591,11 +1607,215 @@
       console.log('renderCostumerTable llamada con leads:', leads);
       
       // Asegurarse de que leads sea un array
-      const leadsArray = Array.isArray(leads) 
+      let leadsArray = Array.isArray(leads) 
         ? leads 
         : (leads && leads.leads && Array.isArray(leads.leads)) 
           ? leads.leads 
           : [];
+      
+      // Filtro especial: si el usuario es Irania Serrano, mostrar solo leads de su TEAM
+      try {
+        const isIraniaUser = (typeof esIrania === 'function') && esIrania();
+        if (isIraniaUser) {
+          const norm = s => (s || '')
+            .toString()
+            .normalize('NFD')
+            .replace(/\p{Diacritic}+/gu, '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
+          const teamAgents = new Set([
+            'irania serrano',
+            'giselle diaz',
+            'josue renderos',
+            'miguel nunez',
+            'roxana martinez',
+            'tatiana ayala'
+          ]);
+          const surnameToFull = new Map([
+            ['serrano', 'irania serrano'],
+            ['diaz', 'giselle diaz'],
+            ['renderos', 'josue renderos'],
+            ['nunez', 'miguel nunez'],
+            ['martinez', 'roxana martinez'],
+            ['ayala', 'tatiana ayala'],
+          ]);
+          const fullNames = Array.from(teamAgents);
+          const surnames = Array.from(surnameToFull.keys());
+          const teamCanon = [
+            'josue renderos',
+            'tatiana ayala',
+            'giselle diaz',
+            'miguel nunez',
+            'roxana martinez',
+            'irania serrano'
+          ];
+          const canonicalFromName = (name) => {
+            const n = norm(name);
+            if (!n) return '';
+            if (teamCanon.includes(n)) return n;
+            for (const c of teamCanon) {
+              const toks = c.split(' ');
+              if (toks.every(t => n.includes(t))) return c;
+            }
+            return '';
+          };
+          // Canonización por primer nombre (fallback) para TEAM IRANIA
+          const canonicalFromFirstName = (name) => {
+            const n = norm(name);
+            if (!n) return '';
+            const first = n.split(' ')[0];
+            const dict = new Map([
+              ['josue', 'josue renderos'],
+              ['tatiana', 'tatiana ayala'],
+              ['giselle', 'giselle diaz'],
+              ['miguel', 'miguel nunez'],
+              ['roxana', 'roxana martinez'],
+              ['irania', 'irania serrano'],
+            ]);
+            return dict.get(first) || '';
+          };
+          
+          const getAgentName = (l) => {
+            // 1) Campos comunes (priorizar 'agenteNombre') e incluir _raw.* del backend
+            const candidates = [
+              l?.agenteNombre,
+              l?.nombreAgente,
+              l?._raw?.agenteNombre,
+              l?._raw?.nombreAgente,
+              l?.agente, l?.Agente, l?.agent, l?.Agent, l?.vendedor, l?.seller,
+              l?._raw?.agente, l?._raw?.Agente, l?._raw?.agent, l?._raw?.Agent, l?._raw?.vendedor, l?._raw?.seller,
+              l?.nombre_agente, l?.agente_nombre, l?.agentName, l?.salesAgent,
+              l?._raw?.nombre_agente, l?._raw?.agente_nombre, l?._raw?.agentName, l?._raw?.salesAgent,
+              l?.asignadoA, l?.asignado_a, l?.assignedTo, l?.assigned_to,
+              l?._raw?.asignadoA, l?._raw?.asignado_a, l?._raw?.assignedTo, l?._raw?.assigned_to,
+              l?.usuario, l?.owner, l?.createdBy, l?.registeredBy,
+              l?._raw?.usuario, l?._raw?.owner, l?._raw?.createdBy, l?._raw?.registeredBy
+            ];
+            const foundDirect = candidates.find(v => v && v.toString().trim().length);
+            if (foundDirect) {
+              const n = norm(foundDirect);
+              // match por nombre completo primero
+              if (teamAgents.has(n)) return n;
+              // si no, intenta emparejar por apellido
+              const hit = surnames.find(sn => n.includes(sn));
+              if (hit) return surnameToFull.get(hit);
+            }
+            // 1a) Fallback por primer nombre si Team/supervisor indica TEAM IRANIA
+            try {
+              const eq = norm(l?.equipo || l?._raw?.equipo || l?.Team || l?.team || l?._raw?.Team || l?._raw?.team || '');
+              const sup = norm(l?.supervisor || l?._raw?.supervisor || '');
+              if (eq.includes('team irania') || sup.includes('team irania')) {
+                const nombreAg = l?.nombreAgente || l?._raw?.nombreAgente || '';
+                const byFirst = canonicalFromFirstName(nombreAg);
+                if (byFirst) return byFirst;
+              }
+            } catch(_) {}
+            // 2) Escaneo amplio: buscar cualquier string que contenga nombres/apellidos
+            try {
+              const scan = (obj) => {
+                for (const [k, v] of Object.entries(obj || {})) {
+                  if (v && typeof v === 'string') {
+                    const n = norm(v);
+                    const hitFull = fullNames.find(fn => n.includes(fn));
+                    if (hitFull) return hitFull;
+                    const hitSn = surnames.find(sn => n.includes(sn));
+                    if (hitSn) return surnameToFull.get(hitSn);
+                  }
+                }
+                return '';
+              };
+              const fromTop = scan(l || {});
+              if (fromTop) return fromTop;
+              const fromRaw = scan(l?._raw || {});
+              if (fromRaw) return fromRaw;
+            } catch(_) {}
+            return '';
+          };
+          // ordenAgentes ya fue declarado arriba
+
+          // Log de agentes detectados antes del filtro
+          try {
+            const agentesDetectados = Array.from(new Set((leadsArray||[]).map(getAgentName))).filter(Boolean);
+            console.log('[TEAM IRANIA] Agentes detectados (normalizados):', agentesDetectados);
+          } catch(_) {}
+          
+          // Construir mapa agenteId -> agente canónico (aceptar múltiples variantes de campo)
+          const getAgentId = (l) => {
+            const raw = (
+              l?.agenteId || l?._raw?.agenteId ||
+              l?.agente_id || l?._raw?.agente_id ||
+              l?.idAgente || l?._raw?.idAgente ||
+              l?.agentId || l?._raw?.agentId ||
+              l?.creadoPor || l?._raw?.creadoPor ||
+              l?.creado_por || l?._raw?.creado_por ||
+              l?.createdBy || l?._raw?.createdBy ||
+              l?.ownerId || l?._raw?.ownerId ||
+              l?.assignedId || l?._raw?.assignedId || ''
+            );
+            try {
+              if (raw && typeof raw === 'object') {
+                const maybe = raw.$oid || raw.id || raw._id || raw.value || (raw.toString ? raw.toString() : '');
+                return String(maybe || '').trim();
+              }
+              return String(raw || '').trim();
+            } catch(_) {
+              return String(raw || '').trim();
+            }
+          };
+          // 1) Mapa estático proporcionado (TEAM IRANIA)
+          const idToCanon = new Map([
+            ['68af44c3c61c405e2bb7b0cb', 'giselle diaz'],   // Giselle Diaz
+            ['68af457bc61c405e2bb7b0ce', 'roxana martinez'], // Roxana Martinez
+            ['68af453bc61c405e2bb7b0cd', 'miguel nunez'],    // Miguel Nunez
+            ['68af44efc61c405e2bb7b0cc', 'josue renderos'],  // Josue Renderos
+            ['68af4597c61c405e2bb7b0cf', 'tatiana ayala'],   // Tatiana Ayala
+          ]);
+          // 2) Enriquecer con un mapa dinámico usando los leads con nombre detectable
+          try {
+            (leadsArray||[]).forEach(l => {
+              const canon = canonicalFromName(getAgentName(l));
+              const aid = getAgentId(l);
+              if (canon && aid) idToCanon.set(aid, canon);
+            });
+            console.debug('[TEAM IRANIA] idToCanon generado:', Array.from(idToCanon.entries()));
+          } catch(_) {}
+          
+          // Filtro ESTRICTO con canonización: solo los agentes del TEAM IRANIA.
+          // Si no se detecta agente pero el lead pertenece al equipo TEAM IRANIA por campo `equipo`, NO lo descartamos para no perderlo.
+          const filteredStrict = leadsArray.filter(l => {
+            const agente = getAgentName(l);
+            const canon = canonicalFromName(agente);
+            if (canon) {
+              try { l.__agentCanon = canon; } catch(_) {}
+              return true;
+            }
+            // intentar por agenteId con el mapa dinamico
+            try {
+              const aid = getAgentId(l);
+              if (aid && idToCanon.has(aid)) {
+                const mcanon = idToCanon.get(aid);
+                try { l.__agentCanon = mcanon; } catch(_) {}
+                return true;
+              }
+            } catch(_) {}
+            // fallback por equipo/supervisor
+            try {
+              const eq = norm(l?.equipo || l?._raw?.equipo || '');
+              const sup = norm(l?.supervisor || l?._raw?.supervisor || '');
+              if (eq.includes('team irania') || sup.includes('team irania')) {
+                console.debug('[Filtro TEAM IRANIA] Manteniendo lead sin agente detectado por pertenecer al equipo/supervisor.', { eq, sup, leadId: (typeof getLeadId==='function')?getLeadId(l):undefined });
+                return true;
+              }
+            } catch(_) {}
+            return false;
+          });
+          leadsArray = filteredStrict;
+          console.log('[Filtro TEAM IRANIA - estricto] Leads tras filtro:', leadsArray.length);
+        }
+      } catch (e) {
+        console.warn('No se pudo aplicar el filtro de TEAM IRANIA:', e);
+      }
           
       console.log('Datos a renderizar (array):', leadsArray);
       
@@ -1609,19 +1829,7 @@
       tbody.innerHTML = '';
       console.log('Contenido de tbody limpiado');
 
-      // Si el usuario es supervisor, mostrar aviso y no renderizar datos
-      if (typeof esSupervisor === 'function' && esSupervisor()) {
-        console.log('[renderCostumerTable] Usuario con rol supervisor: mostrando aviso de permisos.');
-        const trMsg = document.createElement('tr');
-        trMsg.innerHTML = `
-          <td colspan="21" style="background:#fff7ed; color:#9a3412; padding:14px 16px; border:1px solid #fdba74; border-radius:8px; text-align:left;">
-            <i class="fas fa-info-circle" style="margin-right:8px;"></i>
-            No tiene permisos para ver la tabla de clientes.
-          </td>
-        `;
-        tbody.appendChild(trMsg);
-        return; // salimos sin renderizar filas
-      }
+      // Permitir que el rol supervisor vea la tabla (se removió el aviso de permisos)
       
       // Función interna para añadir una fila de lead manteniendo el orden y estilos
       function appendLeadRow(lead) {
@@ -1696,6 +1904,128 @@
           </td>
         `;
         tbody.appendChild(tr);
+      }
+
+      // Vista especial para SUPERVISORES: mostrar lista PLANA del propio TEAM con toolbar por agente
+      try {
+        // Detectar supervisor actual via Teams
+        const teamsApiRoot = (window && window.Teams) ? window.Teams : null;
+        const currentUserName = (typeof obtenerUsuarioActual === 'function') ? obtenerUsuarioActual() : '';
+        const currentCanon = teamsApiRoot && typeof teamsApiRoot.canonicalFromName === 'function'
+          ? teamsApiRoot.canonicalFromName(currentUserName)
+          : (currentUserName || '').toString().trim().toLowerCase();
+        const isSupervisorUser = !!(teamsApiRoot && typeof teamsApiRoot.isSupervisor === 'function' && teamsApiRoot.isSupervisor(currentCanon));
+        if (isSupervisorUser) {
+          // --- Toolbar de filtro por agente (TEAM IRANIA) ---
+          (function ensureIraniaAgentFilterToolbar(){
+            try {
+              const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+              // Obtener agentes del supervisor actual usando Teams
+              const teamsApi = (window && window.Teams) ? window.Teams : null;
+              const supervisorCanon = currentCanon;
+              const teamAgents = teamsApi ? (teamsApi.getAgentsBySupervisor(supervisorCanon) || []) : [];
+              const tbodyEl = document.getElementById('costumer-tbody');
+              if (!tbodyEl) return;
+              const tableEl = tbodyEl.closest('table');
+              const host = tableEl ? tableEl : tbodyEl;
+              let bar = document.getElementById('irania-agent-filter');
+              if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'irania-agent-filter';
+                bar.style.margin = '10px 0';
+                bar.style.display = 'flex';
+                bar.style.flexWrap = 'wrap';
+                bar.style.gap = '8px';
+                const container = host.parentElement || host;
+                // Crear/asegurar contenedor de scroll para que solo las filas se muevan
+                let scrollWrap = document.getElementById('clientes-scroll-container');
+                if (!scrollWrap) {
+                  scrollWrap = document.createElement('div');
+                  scrollWrap.id = 'clientes-scroll-container';
+                  scrollWrap.style.maxHeight = '70vh';
+                  scrollWrap.style.overflowY = 'auto';
+                  scrollWrap.style.position = 'relative';
+                  scrollWrap.style.background = '#ffffff';
+                  scrollWrap.style.border = '1px solid #e2e8f0';
+                  scrollWrap.style.borderRadius = '8px';
+                  scrollWrap.style.boxShadow = '0 1px 1px rgba(0,0,0,0.02)';
+                  // Insertar antes del host (tabla) para luego mover dentro barra y tabla
+                  container.insertBefore(scrollWrap, host);
+                }
+                // Insertar barra dentro del contenedor scroll
+                scrollWrap.appendChild(bar);
+                // Mover la tabla dentro del contenedor scroll si aún no está
+                if (host.parentElement !== scrollWrap) {
+                  scrollWrap.appendChild(host);
+                }
+                // Hacer barra sticky dentro del contenedor
+                bar.style.position = 'sticky';
+                bar.style.top = '0';
+                bar.style.zIndex = '10';
+                bar.style.background = '#ffffff';
+                bar.style.padding = '8px 8px';
+              }
+              // Limpiar y reconstruir botones
+              bar.innerHTML = '';
+              const mkBtn = (label, value) => {
+                const b = document.createElement('button');
+                b.textContent = label;
+                b.type = 'button';
+                b.style.padding = '6px 10px';
+                b.style.border = '1px solid #e2e8f0';
+                b.style.borderRadius = '999px';
+                b.style.background = '#ffffff';
+                b.style.cursor = 'pointer';
+                b.style.fontSize = '12px';
+                const active = (window.iraniaAgentFilter || null) === value;
+                if (active) {
+                  b.style.background = '#1d4ed8';
+                  b.style.color = '#ffffff';
+                  b.style.borderColor = '#1d4ed8';
+                }
+                b.addEventListener('click', () => {
+                  window.iraniaAgentFilter = value; // null = Todos
+                  // Re-render con la lista original para que no se encadene el filtro
+                  try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+                });
+                return b;
+              };
+              bar.appendChild(mkBtn('Todos', null));
+              teamAgents.forEach(a => {
+                const label = a.replace(/\b\w/g, c => c.toUpperCase());
+                bar.appendChild(mkBtn(label, a));
+              });
+              // Encabezado de columnas: sin comportamiento sticky (restaurado al estado original)
+            } catch(e) { console.warn('Toolbar TEAM IRANIA:', e); }
+          })();
+          // --- Aplicar filtro activo (si existe) y render plano  
+          const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+          const teamsApi2 = (window && window.Teams) ? window.Teams : null;
+          const teamCanon = teamsApi2 ? (teamsApi2.getAgentsBySupervisor(currentCanon) || []) : [];
+          const canonicalFromName = (name) => {
+            if (teamsApi2 && typeof teamsApi2.canonicalFromName === 'function') return teamsApi2.canonicalFromName(name);
+            const n = norm(name);
+            if (!n) return '';
+            if (teamCanon.includes(n)) return n;
+            for (const c of teamCanon) { const toks = c.split(' '); if (toks.every(t => n.includes(t))) return c; }
+            return '';
+          };
+          const getAgentCanon = (l) => {
+            if (l && l.__agentCanon) return l.__agentCanon;
+            const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+            return canonicalFromName(cand);
+          };
+          // Limitar a leads del TEAM del supervisor actual
+          let list = Array.isArray(leadsArray) ? leadsArray.filter(l => teamCanon.includes(getAgentCanon(l))) : [];
+          const selected = window.iraniaAgentFilter || null;
+          if (selected) {
+            list = list.filter(l => getAgentCanon(l) === selected);
+          }
+          list.forEach(appendLeadRow);
+          return; // retorno temprano para no pasar por otras agrupaciones
+        }
+      } catch (e) {
+        console.warn('No se pudo aplicar la vista plana para Irania:', e);
       }
 
       // Agrupar por supervisor solo para roles admin/backoffice
@@ -1985,6 +2315,71 @@
         console.log(`[DEBUG] ${message}`, data);
       } else {
         console.log(`[DEBUG] ${message}`);
+      }
+    }
+
+    // Logs de diagnóstico: conteo por TEAM y por agente (incluye "Sin asignar (TEAM IRANIA)")
+    function logDiagnosticoAsignacion(leads) {
+      try {
+        const norm = (s) => {
+          try {
+            return String(s || '')
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/\p{Diacritic}/gu, '')
+              .trim();
+          } catch { return ''; }
+        };
+
+        const getTeam = (l) => {
+          const t = l?.supervisor || l?.team || l?.Team || l?.equipo || l?._raw?.supervisor || l?._raw?.team || l?._raw?.equipo || '';
+          return t ? t.toString().trim() : '';
+        };
+        const getAgentSimple = (l) => {
+          const cand = [
+            l?.agenteNombre,
+            l?.nombreAgente,
+            l?.agente,
+            l?.agent,
+            l?._raw?.agenteNombre,
+            l?._raw?.nombreAgente,
+            l?._raw?.agente,
+            l?._raw?.agent
+          ];
+          const v = cand.find(x => x && String(x).trim().length);
+          return v ? String(v).trim() : '';
+        };
+
+        const perTeam = new Map(); // team -> Map(agentLabel -> count)
+        for (const l of Array.isArray(leads) ? leads : []) {
+          const team = getTeam(l);
+          const teamKey = team || '(Sin TEAM)';
+          const teamMap = perTeam.get(teamKey) || new Map();
+          let agent = getAgentSimple(l);
+          // Marcar sin asignar para TEAM IRANIA
+          if (!agent) {
+            const tnorm = norm(team);
+            if (tnorm.includes('team irania')) agent = 'Sin asignar (TEAM IRANIA)';
+            else agent = '(Sin agente)';
+          }
+          teamMap.set(agent, (teamMap.get(agent) || 0) + 1);
+          perTeam.set(teamKey, teamMap);
+        }
+
+        // Log general
+        const resumen = {};
+        for (const [team, m] of perTeam.entries()) {
+          resumen[team] = Object.fromEntries([...m.entries()].sort((a,b) => b[1]-a[1]));
+        }
+        console.log('[DIAGNÓSTICO ASIGNACIÓN] Conteo por TEAM y agente:', resumen);
+
+        // Log específico TEAM IRANIA
+        const keyIrania = [...perTeam.keys()].find(k => norm(k).includes('team irania'));
+        if (keyIrania) {
+          console.log(`[AGRUPACIÓN TEAM IRANIA] Conteo por agente:`, Object.fromEntries(perTeam.get(keyIrania).entries()));
+        }
+      } catch (e) {
+        console.warn('logDiagnosticoAsignacion: error al generar diagnóstico', e);
       }
     }
 

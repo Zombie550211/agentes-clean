@@ -764,6 +764,15 @@ app.get('/api/customers', async (req, res) => {
         // Información adicional
         autopago: customer.autopago || false,
         
+        // Exponer campos de agente (IDs y nombres) para permitir asignación en frontend
+        agenteId: customer.agenteId || customer.agente_id || customer.idAgente || customer.agentId || customer.createdBy || customer.creadoPor || customer.creado_por || customer.ownerId || customer.assignedId || '',
+        agenteNombre: customer.agenteNombre || customer.nombreAgente || customer.agente || customer.agent || customer.vendedor || customer.seller || customer.nombre_agente || customer.agente_nombre || customer.agentName || customer.salesAgent || customer.asignadoA || customer.asignado_a || customer.assignedTo || customer.assigned_to || customer.usuario || customer.owner || customer.registeredBy || '',
+        // También exponer variantes crudas útiles para diagnóstico
+        creadoPor: customer.creadoPor || customer.creado_por || '',
+        createdBy: customer.createdBy || '',
+        ownerId: customer.ownerId || '',
+        assignedId: customer.assignedId || '',
+        
         // Mantener el objeto original para referencia
         _raw: customer
       };
@@ -1454,13 +1463,19 @@ app.post('/api/leads', authenticateJWT, async (req, res) => {
 // Iniciar el servidor
 const server = app.listen(PORT, '0.0.0.0', async () => {
   await connectToMongoDB();
-  console.log(`\n=== Configuración del Servidor ===`);
-  console.log(`Servidor corriendo en el puerto: ${PORT}`);
-  console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`\n=== URLs de Acceso ===`);
-  console.log(`- Local: http://localhost:${PORT}`);
-  console.log(`- Red local: http://${getLocalIp()}:${PORT}`);
-  console.log('======================================');
+  const lines = [
+    '',
+    '=== Configuración del Servidor ===',
+    `Servidor corriendo en el puerto: ${PORT}`,
+    `Entorno: ${process.env.NODE_ENV || 'development'}`,
+    '',
+    '=== URLs de Acceso ===',
+    `- Local: http://localhost:${PORT}`,
+    `- Red local: http://${getLocalIp()}:${PORT}`,
+    '======================================',
+    ''
+  ];
+  process.stdout.write(lines.join('\n'));
 });
 
 // Función para obtener la IP local

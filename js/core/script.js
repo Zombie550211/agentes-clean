@@ -233,21 +233,36 @@ async function cargarDatosDesdeServidor() {
     
     // Obtener el token de autenticación del localStorage o sessionStorage
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const role = (getCurrentUserRole() || '').toLowerCase();
+    const isLocalUserBypass = isLocal && (role === 'user' || role === 'supervisor');
     
-    if (!token) {
+    if (!token && !isLocalUserBypass) {
       console.error('No se encontró token de autenticación. Redirigiendo a login...');
       window.location.href = '/login.html';
       return;
     }
     
-    // Configurar los headers con el token de autorización
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
+    // Configurar los headers. En local con rol user, no enviamos Authorization
+    const headers = isLocalUserBypass
+      ? { 'Content-Type': 'application/json' }
+      : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
     
-    console.log('Realizando petición a /api/customers con token:', token.substring(0, 10) + '...');
-    const res = await fetch("/api/customers", {
+    if (headers.Authorization) {
+      console.log('Realizando petición a /api/customers con token:', token.substring(0, 10) + '...');
+    } else {
+      console.log('Realizando petición a /api/customers en modo local sin token (bypass dev para rol user/supervisor)');
+    }
+    // Si el usuario es Irania, pedir más registros para evitar que la paginación oculte clientes de su team
+    let url = "/api/customers";
+    try {
+      const isIraniaUser = (typeof esIrania === 'function') && esIrania();
+      if (isIraniaUser) {
+        const qs = new URLSearchParams({ page: '1', limit: '1000', _t: String(Date.now()) }).toString();
+        url = `/api/customers?${qs}`;
+      }
+    } catch(_) {}
+    const res = await fetch(url, {
       method: 'GET',
       headers: headers
     });
