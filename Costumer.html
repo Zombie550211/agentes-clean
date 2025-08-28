@@ -853,6 +853,16 @@
         return false;
       } catch { return false; }
     }
+
+    // Helper: detectar si el usuario es supervisor
+    function esSupervisor() {
+      try {
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const roleRaw = (userData.role || userData?.usuario?.role || '').toString();
+        const role = roleRaw.toLowerCase().trim();
+        return role === 'supervisor';
+      } catch { return false; }
+    }
   
     // Funciones para el manejo de comentarios
     function abrirComentarios(leadId) {
@@ -1203,6 +1213,13 @@
       const supervisor = lead.supervisor ?? lead.SUPERVISOR ?? lead.team ?? '';
       const tipoServicio = lead.tipo_servicios ?? lead.tipo_servicio ?? lead.SERVICIO ?? lead.producto ?? '';
       const id = extractLeadId(lead);
+      // Intentar derivar "agente" desde varios posibles campos del backend
+      const agente = (
+        lead.agente ?? lead.AGENTE ?? lead.agent ?? lead.AGENT ??
+        lead.vendedor ?? lead.VENDEDOR ?? lead.asesor ?? lead.ASESOR ??
+        lead.owner ?? lead.OWNER ??
+        ((lead.createdBy && (lead.createdBy.name || lead.createdBy.username)) ?? '')
+      );
 
       return {
         // Campos de tabla esperados
@@ -1222,6 +1239,7 @@
         servicios: lead.servicios || lead.SERVICIOS || tipoServicio || '',
         mercado: lead.mercado || lead.MERCADO || '',
         supervisor: supervisor || '',
+        agente: agente || '',
         comentario: lead.comentario || lead.COMENTARIO || '',
         motivo_llamada: lead.motivo_llamada || lead.MOTIVO || '',
         zip_code: lead.zip_code || lead.ZIP || lead.cp || '',
@@ -1590,6 +1608,20 @@
       
       tbody.innerHTML = '';
       console.log('Contenido de tbody limpiado');
+
+      // Si el usuario es supervisor, mostrar aviso y no renderizar datos
+      if (typeof esSupervisor === 'function' && esSupervisor()) {
+        console.log('[renderCostumerTable] Usuario con rol supervisor: mostrando aviso de permisos.');
+        const trMsg = document.createElement('tr');
+        trMsg.innerHTML = `
+          <td colspan="21" style="background:#fff7ed; color:#9a3412; padding:14px 16px; border:1px solid #fdba74; border-radius:8px; text-align:left;">
+            <i class="fas fa-info-circle" style="margin-right:8px;"></i>
+            No tiene permisos para ver la tabla de clientes.
+          </td>
+        `;
+        tbody.appendChild(trMsg);
+        return; // salimos sin renderizar filas
+      }
       
       // Función interna para añadir una fila de lead manteniendo el orden y estilos
       function appendLeadRow(lead) {
@@ -1682,13 +1714,76 @@
         clavesOrdenadas.forEach(sup => {
           const headerTr = document.createElement('tr');
           const display = (typeof limpiarSupervisor === 'function') ? limpiarSupervisor(sup) : sup;
+          const count = (grupos.get(sup) || []).length;
+
+          // Encabezado de Supervisor
           headerTr.innerHTML = `
             <td colspan="21" style="background: #f0f4ff; color:#1f3a8a; font-weight:600; padding:10px 12px; border-top:2px solid #c7d2fe; border-bottom:1px solid #dbeafe;">
-              <i class="fas fa-user" style="margin-right:8px;"></i> Agente: ${escapeHtml ? escapeHtml(display) : display}
+              <i class="fas fa-user" style="margin-right:8px;"></i> Supervisor: ${escapeHtml ? escapeHtml(display) : display} (${count})
             </td>
           `;
           tbody.appendChild(headerTr);
-          grupos.get(sup).forEach(appendLeadRow);
+
+          const leadsGrupo = grupos.get(sup) || [];
+          const supNorm = (display || '').toString().trim().toLowerCase();
+
+          // Si el supervisor es Irania (team Irania), sub-agrupar por Agente con orden fijo
+          if (supNorm.includes('irania')) {
+            const ordenAgentes = [
+              'josue renderos',
+              'miguel nunez',
+              'roxana martinez',
+              'giselle diaz',
+              'tatiana ayala'
+            ];
+
+            // Normalizar nombre de agente para comparación
+            const norm = s => (s||'').toString().trim().toLowerCase();
+
+            // Construir buckets por agente
+            const buckets = new Map();
+            ordenAgentes.forEach(a => buckets.set(a, []));
+            const otros = [];
+
+            leadsGrupo.forEach(l => {
+              const a = norm(l.agente);
+              if (buckets.has(a)) {
+                buckets.get(a).push(l);
+              } else {
+                otros.push(l);
+              }
+            });
+
+            // Render por cada agente en el orden dado
+            ordenAgentes.forEach(a => {
+              const lista = buckets.get(a) || [];
+              if (!lista.length) return;
+              const agentHeader = document.createElement('tr');
+              const label = a.replace(/\b\w/g, c => c.toUpperCase());
+              agentHeader.innerHTML = `
+                <td colspan="21" style="background:#eef2ff; color:#1d4ed8; font-weight:600; padding:8px 12px; border-left:4px solid #93c5fd;">
+                  <i class="fas fa-user-circle" style="margin-right:8px;"></i> Agente: ${label} (${lista.length})
+                </td>
+              `;
+              tbody.appendChild(agentHeader);
+              lista.forEach(appendLeadRow);
+            });
+
+            // Render "Otros" si corresponde
+            if (otros.length) {
+              const othersHeader = document.createElement('tr');
+              othersHeader.innerHTML = `
+                <td colspan="21" style="background:#eef2ff; color:#1d4ed8; font-weight:600; padding:8px 12px; border-left:4px solid #93c5fd;">
+                  <i class="fas fa-user-circle" style="margin-right:8px;"></i> Agente: Otros (${otros.length})
+                </td>
+              `;
+              tbody.appendChild(othersHeader);
+              otros.forEach(appendLeadRow);
+            }
+          } else {
+            // Para otros supervisores, listar plano dentro del grupo
+            leadsGrupo.forEach(appendLeadRow);
+          }
         });
       } else {
         // Render plano por defecto
