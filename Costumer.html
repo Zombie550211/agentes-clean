@@ -1285,6 +1285,18 @@
       return `${y}-${m}-${d}`;
     }
 
+    // Wrapper: ISO YYYY-MM-DD usando la TZ de negocio definida (BUSINESS_TZ_OFFSET_MIN)
+    function toLocalISO(date) {
+      try {
+        if (!date) return '';
+        const d = date instanceof Date ? date : new Date(date);
+        if (isNaN(d)) return '';
+        return toISOInTZ(d, BUSINESS_TZ_OFFSET_MIN);
+      } catch (_) {
+        return '';
+      }
+    }
+
     // Helper: obtener fecha YYYY-MM-DD de un lead (usando TZ de negocio)
     function getDateFromLead(lead) {
       try {
@@ -1345,8 +1357,82 @@
           }
         }
 
-        const normalizedLeads = normalizeLeads(leadsRaw);
-        window.ultimaListaLeads = normalizedLeads;
+        let normalizedLeads = normalizeLeads(leadsRaw);
+
+    // Filtrar por agente si el usuario es role 'agent'
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+      const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+      if (role === 'agent') {
+        const norm = (s) => {
+          try { return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); } catch { return String(s || '').toLowerCase().trim(); }
+        };
+        const str = (v) => (v == null ? '' : String(v));
+        // Candidatos de ID del usuario actual
+        const myIds = [
+          userData.id, userData._id, userData.userId, userData.uid,
+          userData?.usuario?._id, userData?.usuario?.id,
+          userData?.user?._id, userData?.user?.id,
+          userData?.profile?._id, userData?.profile?.id
+        ].map(str).filter(x => x.trim().length);
+
+        // Candidatos de nombre del usuario actual
+        const myNames = [
+          userData.name, userData.nombre, userData.username, userData.email,
+          userData?.usuario?.name, userData?.usuario?.nombre, userData?.usuario?.username
+        ].map(str).filter(x => x.trim().length);
+
+        const getId = (l) => {
+          if (typeof getAgentId === 'function') return getAgentId(l);
+          const raw = (
+            l?.agenteId || l?._raw?.agenteId || l?.agente_id || l?._raw?.agente_id ||
+            l?.idAgente || l?._raw?.idAgente || l?.agentId || l?._raw?.agentId ||
+            l?.createdBy || l?.ownerId || l?.assignedId ||
+            l?._raw?.createdBy || l?._raw?.ownerId || l?._raw?.assignedId || ''
+          );
+          try {
+            if (raw && typeof raw === 'object') {
+              const maybe = raw.$oid || raw.id || raw._id || raw.value || (raw.toString ? raw.toString() : '');
+              return String(maybe || '').trim();
+            }
+            return String(raw || '').trim();
+          } catch { return String(raw || '').trim(); }
+        };
+        const getName = (l) => {
+          if (typeof getAgentName === 'function') return getAgentName(l);
+          const cand = [
+            l?.agenteNombre, l?.nombreAgente, l?.agente, l?.agent,
+            l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.agent
+          ];
+          const v = cand.find(x => x && String(x).trim().length);
+          return v ? String(v).trim() : '';
+        };
+
+        const myIdsNorm = new Set(myIds.map(x => norm(x)));
+        const myNamesNorm = new Set(myNames.map(x => norm(x)));
+
+        const beforeCount = normalizedLeads.length;
+        normalizedLeads = normalizedLeads.filter(l => {
+          const idMatch = (() => {
+            const lid = norm(getId(l));
+            if (!lid) return false;
+            return myIdsNorm.has(lid);
+          })();
+          if (idMatch) return true;
+          const nameMatch = (() => {
+            const lname = norm(getName(l));
+            if (!lname) return false;
+            return myNamesNorm.has(lname);
+          })();
+          return nameMatch;
+        });
+        console.log(`[Filtro rol=agent] ${beforeCount} -> ${normalizedLeads.length} leads para el usuario actual`);
+      }
+    } catch (e) {
+      console.warn('No se pudo aplicar filtro por agente:', e?.message);
+    }
+
+    window.ultimaListaLeads = normalizedLeads;
 
         // Actualizar la interfaz
         renderCostumerTable(normalizedLeads);
