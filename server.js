@@ -544,10 +544,12 @@ app.get('/api/customers', async (req, res) => {
       await connectToMongoDB();
     }
 
-    // Obtener los parámetros de paginación
+    // Obtener los parámetros de paginación y filtros
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
+    const fechaInicio = req.query.fechaInicio ? new Date(req.query.fechaInicio) : null;
+    const fechaFin = req.query.fechaFin ? new Date(req.query.fechaFin) : null;
 
     console.log(`Parámetros - Página: ${page}, Límite: ${limit}, Saltar: ${skip}`);
 
@@ -574,9 +576,10 @@ app.get('/api/customers', async (req, res) => {
     
     // Construir el filtro de consulta
     let query = {};
+    const forceAll = String(req.query.forceAll || 'false').toLowerCase() === 'true';
     
-    // Filtrar por usuario autenticado
-    if (req.user) {
+    // Filtrar por usuario autenticado (a menos que se fuerce ver todo)
+    if (req.user && !forceAll) {
       console.log(`[DEBUG] Usuario autenticado - ID: ${req.user.id}, Rol: ${req.user.role}`);
       
       // Si es agente, solo ver sus clientes (soportar ObjectId y string)
@@ -702,6 +705,19 @@ app.get('/api/customers', async (req, res) => {
       }
     }
 
+    // Aplicar filtro por rango de fechas si viene en la query (usar campo 'creadoEn')
+    if (fechaInicio || fechaFin) {
+      query.creadoEn = {};
+      if (fechaInicio) {
+        query.creadoEn.$gte = fechaInicio;
+      }
+      if (fechaFin) {
+        const finDia = new Date(fechaFin);
+        finDia.setHours(23, 59, 59, 999);
+        query.creadoEn.$lte = finDia;
+      }
+    }
+
     // Obtener el total de documentos para la paginación
     // Log detallado del query final y parámetros recibidos para diagnóstico
     try {
@@ -714,7 +730,7 @@ app.get('/api/customers', async (req, res) => {
     // Consulta con paginación y ordenados por fecha de creación descendente
     const customers = await customersCollection
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort({ creadoEn: -1 })
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -804,6 +820,7 @@ app.get('/api/customers', async (req, res) => {
       message: 'Datos de clientes cargados correctamente',
       debug: {
         collection: collectionName,
+        database: db.databaseName,
         totalDocuments: total,
         documentsReturned: mappedCustomers.length,
         availableCollections: collections.map(c => c.name)

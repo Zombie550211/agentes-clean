@@ -1270,7 +1270,22 @@
       return arr.map(normalizeLead);
     }
 
-    // Helper: obtener fecha YYYY-MM-DD de un lead para gráficas y conteos
+    // Zona horaria de negocio (UTC-6). Ajusta si tu operación usa otra TZ.
+    const BUSINESS_TZ_OFFSET_MIN = -6 * 60; // América Central (UTC-6)
+
+    // Helper: YYYY-MM-DD en TZ objetivo (no UTC/local del navegador)
+    function toISOInTZ(date, tzOffsetMinutes) {
+      // convertir 'date' a UTC ms
+      const utcMs = date.getTime() + (date.getTimezoneOffset() * 60000);
+      // aplicar offset de la TZ objetivo
+      const target = new Date(utcMs + tzOffsetMinutes * 60000);
+      const y = target.getUTCFullYear();
+      const m = String(target.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(target.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    // Helper: obtener fecha YYYY-MM-DD de un lead (usando TZ de negocio)
     function getDateFromLead(lead) {
       try {
         if (!lead) return '';
@@ -1278,12 +1293,12 @@
         if (!raw) return '';
         let d;
         if (raw instanceof Date) {
-          d = raw;
+          d = new Date(raw.getTime());
         } else if (typeof raw === 'string') {
-          // Si viene en formato YYYY-MM-DD, forzar a UTC para evitar desfases
+          // Si viene en formato YYYY-MM-DD, crear como fecha LOCAL y luego convertir a TZ negocio
           if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
             const [y, m, day] = raw.split('-').map(Number);
-            d = new Date(Date.UTC(y, m - 1, day));
+            d = new Date(y, m - 1, day);
           } else {
             d = new Date(raw);
           }
@@ -1291,9 +1306,7 @@
           d = new Date(String(raw));
         }
         if (isNaN(d)) return '';
-        // Normalizar a medianoche UTC para obtener YYYY-MM-DD estable
-        const iso = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
-        return iso.split('T')[0];
+        return toISOInTZ(d, BUSINESS_TZ_OFFSET_MIN);
       } catch {
         return '';
       }
@@ -1303,62 +1316,35 @@
     async function fetchLeadsAgente() {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) {
-          console.error('No se encontró el token de autenticación');
-          mostrarMensajeSinDatos();
-          return [];
-        }
-        
-        // Construir URL con filtro por agente para garantizar filtrado en backend
-        let url = '/api/customers';
-        try {
-          const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
-          if (userStr) {
-            const user = JSON.parse(userStr);
-            const params = new URLSearchParams();
-            // Si el usuario es agente, forzar su propio agenteId
-            if (user && user.role === 'agent') {
-              const uid = user.id || user._id || user.userId || user.uid;
-              if (uid) params.set('agenteId', uid.toString());
-              else {
-                const uname = user.username || user.name || user.fullName || user.nombre;
-                if (uname) params.set('agente', uname.toString());
-              }
-            }
-            // Para otros roles podríamos permitir filtros desde UI; por ahora no forzamos nada
-            const qs = params.toString();
-            if (qs) url = `/api/customers?${qs}`;
-          }
-        } catch (e) {
-          console.warn('No se pudo construir el filtro de agente:', e?.message);
-        }
-
-        // Hacer la petición al servidor (usar endpoint existente de customers)
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
+        // Nota: /api/customers es público; si no hay token, no abortar, solo omitir el header
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch('/api/customers', { headers });
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error al cargar los leads:', response.status, errorData);
-          throw new Error(`Error ${response.status}: ${errorData.message || 'Error al cargar los leads'}`);
+          console.warn('[fetchLeadsAgente] Respuesta no OK del backend:', response.status);
         }
-
-        const data = await response.json();
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.warn('[fetchLeadsAgente] No se pudo parsear JSON de respuesta:', e?.message);
+        }
         console.log('Datos de leads recibidos:', data);
+        let leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
 
-        // Aceptar tanto { leads: [] } como [] directamente
-        const leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
-        if (!Array.isArray(leadsRaw)) {
-          console.error('Formato de datos inesperado:', data);
-          throw new Error('Formato de datos inesperado del servidor');
+        // Fallback a mocks si no hay datos o la solicitud falló
+        if ((!Array.isArray(leadsRaw) || leadsRaw.length === 0) && typeof fetchCustomersData === 'function') {
+          try {
+            console.warn('[fetchLeadsAgente] Sin datos desde API. Intentando fallback a datos de prueba...');
+            const mock = await fetchCustomersData();
+            if (mock && mock.success && Array.isArray(mock.leads) && mock.leads.length > 0) {
+              leadsRaw = mock.leads;
+              console.log('[fetchLeadsAgente] Fallback a datos de prueba exitoso. Cantidad:', leadsRaw.length);
+            }
+          } catch (e) {
+            console.warn('[fetchLeadsAgente] Fallback a datos de prueba falló:', e?.message);
+          }
         }
 
-        // Normalizar y guardar los leads para uso posterior
         const normalizedLeads = normalizeLeads(leadsRaw);
         window.ultimaListaLeads = normalizedLeads;
 
@@ -1838,11 +1824,9 @@
       }
       
       tbody.innerHTML = '';
-      console.log('Contenido de tbody limpiado');
-
       // Permitir que el rol supervisor vea la tabla (se removió el aviso de permisos)
       
-      // Función interna para añadir una fila de lead manteniendo el orden y estilos
+      // Función interna para añadir una fila de lead manteniendo el orden y estilos 
       function appendLeadRow(lead) {
         const tr = document.createElement('tr');
         
@@ -1914,6 +1898,12 @@
             </button>
           </td>
         `;
+        // Obtener tbody localmente (evitar ReferenceError si no existe en el scope)
+        const tbody = document.getElementById('costumer-tbody');
+        if (!tbody) {
+          console.warn('[appendLeadRow] No se encontró #costumer-tbody en el DOM');
+          return;
+        }
         tbody.appendChild(tr);
       }
 
@@ -1948,28 +1938,9 @@
                 bar.style.flexWrap = 'wrap';
                 bar.style.gap = '8px';
                 const container = host.parentElement || host;
-                // Crear/asegurar contenedor de scroll para que solo las filas se muevan
-                let scrollWrap = document.getElementById('clientes-scroll-container');
-                if (!scrollWrap) {
-                  scrollWrap = document.createElement('div');
-                  scrollWrap.id = 'clientes-scroll-container';
-                  scrollWrap.style.maxHeight = '70vh';
-                  scrollWrap.style.overflowY = 'auto';
-                  scrollWrap.style.position = 'relative';
-                  scrollWrap.style.background = '#ffffff';
-                  scrollWrap.style.border = '1px solid #e2e8f0';
-                  scrollWrap.style.borderRadius = '8px';
-                  scrollWrap.style.boxShadow = '0 1px 1px rgba(0,0,0,0.02)';
-                  // Insertar antes del host (tabla) para luego mover dentro barra y tabla
-                  container.insertBefore(scrollWrap, host);
-                }
-                // Insertar barra dentro del contenedor scroll
-                scrollWrap.appendChild(bar);
-                // Mover la tabla dentro del contenedor scroll si aún no está
-                if (host.parentElement !== scrollWrap) {
-                  scrollWrap.appendChild(host);
-                }
-                // Hacer barra sticky dentro del contenedor
+                // Insertar barra ANTES de la tabla, sin contenedor con overflow
+                container.insertBefore(bar, host);
+                // Opcional: mantener sticky respecto al viewport principal
                 bar.style.position = 'sticky';
                 bar.style.top = '0';
                 bar.style.zIndex = '10';
@@ -2048,22 +2019,7 @@
           if (!tbodyEl) return;
           const tableEl = tbodyEl.closest('table');
           const host = tableEl ? tableEl : tbodyEl;
-
-          // Crear/asegurar contenedor de scroll (para que solo filas se desplacen)
-          let container = document.getElementById('clientes-scroll-container');
-          if (!container) {
-            container = document.createElement('div');
-            container.id = 'clientes-scroll-container';
-            container.style.maxHeight = '70vh';
-            container.style.overflowY = 'auto';
-            container.style.border = '1px solid #e5e7eb';
-            container.style.borderRadius = '10px';
-            container.style.background = '#fff';
-            container.style.padding = '8px';
-            const parent = host.parentElement || host;
-            parent.insertBefore(container, host);
-            container.appendChild(host);
-          }
+          const container = host.parentElement || host;
 
           // Crear/asegurar toolbar de TEAM
           let bar = document.getElementById('teams-filter-bar');
@@ -2074,9 +2030,9 @@
             bar.style.display = 'flex';
             bar.style.flexWrap = 'wrap';
             bar.style.gap = '8px';
-            const parent = container.parentElement || container;
-            parent.insertBefore(bar, container);
-            // sticky del toolbar
+            // Insertar la barra antes de la tabla directamente
+            container.insertBefore(bar, host);
+            // sticky del toolbar respecto al viewport principal
             bar.style.position = 'sticky';
             bar.style.top = '0';
             bar.style.zIndex = '10';
@@ -2104,17 +2060,17 @@
 
           // Render botones con conteo de ventas (status Completed)
           bar.innerHTML = '';
-          // Conteo total de ventas (todas los TEAM)
+          // Conteo total de clientes (TODOS los estados)
           try {
-            const totalVentas = (Array.isArray(leadsArray) ? leadsArray : []).reduce((acc, l) => acc + (normalizeStatusLabel(l.status) === 'Completed' ? 1 : 0), 0);
-            bar.appendChild(mkBtn(`Todos (${totalVentas})`, null));
+            const totalClientes = Array.isArray(leadsArray) ? leadsArray.length : 0;
+            bar.appendChild(mkBtn(`Todos (${totalClientes})`, null));
           } catch(_) {
             bar.appendChild(mkBtn('Todos', null));
           }
           teams.forEach(teamKey => {
             const def = teamsApi.getTeamDef(teamKey) || { displayName: teamKey };
             const label = def.displayName || teamKey;
-            // Calcular ventas del TEAM
+            // Calcular TOTAL de clientes del TEAM (sin filtrar por estado)
             let count = 0;
             try {
               const agentsCanon = teamsApi.getAgentsByTeam(teamKey) || [];
@@ -2124,8 +2080,7 @@
                   const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
                   return (teamsApi && typeof teamsApi.canonicalFromName === 'function') ? teamsApi.canonicalFromName(cand) : (cand||'').toString().trim().toLowerCase();
                 })());
-                const isVenta = normalizeStatusLabel(l.status) === 'Completed';
-                return acc + (isAgentTeam && isVenta ? 1 : 0);
+                return acc + (isAgentTeam ? 1 : 0);
               }, 0);
             } catch(_) { count = 0; }
             bar.appendChild(mkBtn(`${label} (${count})`, teamKey));
@@ -2147,10 +2102,12 @@
           let list = Array.isArray(leadsArray) ? leadsArray.slice() : [];
           if (selectedTeam) {
             const agentsCanon = teamsApi.getAgentsByTeam(selectedTeam) || [];
-            list = list.filter(l => agentsCanon.includes(getAgentCanon(l)) && normalizeStatusLabel(l.status) === 'Completed');
+            // Mostrar TODOS los leads del team seleccionado (sin restringir a 'Completed')
+            list = list.filter(l => agentsCanon.includes(getAgentCanon(l)));
           } else {
-            // En 'Todos' mostrar solo ventas (Completed) de todos los TEAM
-            list = list.filter(l => normalizeStatusLabel(l.status) === 'Completed');
+            // En 'Todos' mostrar TODOS los leads (sin restringir a 'Completed')
+            // Si se requiere un filtro por ventas, esto debería manejarse con un control separado
+            list = list;
           }
 
           // Render plano
@@ -2212,7 +2169,13 @@
             
             // Verificar fecha de venta
             if (lead.dia_venta) {
-              const fechaVenta = new Date(lead.dia_venta);
+              let fechaVenta;
+              if (typeof lead.dia_venta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lead.dia_venta)) {
+                const [y, m, d] = lead.dia_venta.split('-').map(Number);
+                fechaVenta = new Date(y, m - 1, d); // fecha local
+              } else {
+                fechaVenta = new Date(lead.dia_venta);
+              }
               
               // Verificar ventas de hoy
               if (fechaVenta.getDate() === diaActual && 
@@ -2283,18 +2246,20 @@
         console.log('Actualizado cancelados en el DOM');
       }
       
-      // Datos para el gráfico de ventas por semana
+      // Datos para el gráfico de ventas por semana (fechas locales)
       const ultimos7Dias = Array.from({ length: 7 }, (_, i) => {
         const fecha = new Date();
+        fecha.setHours(0,0,0,0);
         fecha.setDate(fecha.getDate() - (6 - i));
-        return fecha.toISOString().split('T')[0];
+        return toLocalISO(fecha);
       });
 
       // Etiquetas: días de la semana
       const diasSemanaEtiquetas = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
       const labelsDias = ultimos7Dias.map(f => {
-        const d = new Date(f + 'T12:00:00');
-        return diasSemanaEtiquetas[d.getDay()];
+        const [y, m, d] = f.split('-').map(Number);
+        const loc = new Date(y, m - 1, d);
+        return diasSemanaEtiquetas[loc.getDay()];
       });
 
       const ventasPorDia = ultimos7Dias.map(fechaISO => {
