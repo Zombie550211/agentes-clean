@@ -1330,7 +1330,26 @@
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         // Nota: /api/customers es público; si no hay token, no abortar, solo omitir el header
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const response = await fetch('/api/customers', { headers });
+
+        // Construir URL con parámetros cuando el usuario sea agente
+        let url = '/api/customers?page=1&limit=100';
+        try {
+          const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+          const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+          if (role === 'agent') {
+            const idCandidates = [userData._id, userData.id, userData.userId, userData.uid, userData?.usuario?._id, userData?.usuario?.id].map(v => v && String(v).trim()).filter(Boolean);
+            const nameCandidates = [userData.username, userData.name, userData.nombre, userData?.usuario?.username, userData?.usuario?.name, userData?.usuario?.nombre].map(v => v && String(v).trim()).filter(Boolean);
+            if (idCandidates.length) {
+              const agenteId = encodeURIComponent(idCandidates[0]);
+              url += `&agenteId=${agenteId}`;
+            } else if (nameCandidates.length) {
+              const agente = encodeURIComponent(nameCandidates[0]);
+              url += `&agente=${agente}`;
+            }
+          }
+        } catch(_) { /* noop */ }
+
+        const response = await fetch(url, { headers });
         if (!response.ok) {
           console.warn('[fetchLeadsAgente] Respuesta no OK del backend:', response.status);
         }
