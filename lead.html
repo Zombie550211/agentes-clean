@@ -1256,29 +1256,22 @@
         return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
       };
       
-      // Construir la URL de la API SIN parámetros de fecha
-      // Razón: el backend filtra por 'creadoEn' y muchos documentos pueden usar otros campos (createdAt, etc.)
-      // Filtramos los últimos 7 días en el frontend para no excluir datos válidos
-      let url = `/api/customers?limit=1000&page=1&forceAll=true`;
-      // Por defecto NO filtramos por agente para asegurar datos reales de toda la colección.
-      // Si deseas filtrar por el agente autenticado, define desde consola: window.__filtrarPorAgente = true
+      // Construir la URL del endpoint de leads con filtro por agente (backend lo soporta vía query "agente")
+      // Filtramos últimos 7 días en frontend; el backend devuelve los leads del agente solicitado
+      let url = '/api/leads';
       try {
         const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
         const user = JSON.parse(userStr);
-        if (globalThis.__filtrarPorAgente === true && user && user.role === 'agent') {
-          const posibleId = user.id || user._id || user.userId || user.uid;
-          if (posibleId) {
-            url += `&agenteId=${encodeURIComponent(posibleId.toString())}`;
-            console.info('[Filtro agente] Activado por __filtrarPorAgente. agenteId=', posibleId.toString());
-          } else if (nombreAgente && nombreAgente !== 'Usuario') {
-            url += `&agente=${encodeURIComponent(nombreAgente)}`;
-            console.info('[Filtro agente] Activado por __filtrarPorAgente. agente=', nombreAgente);
-          }
-        } else {
-          console.info('[Filtro agente] Desactivado (mostrando datos globales). Para activar: window.__filtrarPorAgente = true');
+        const agenteNombreQuery = (user && (user.username || user.name)) || nombreAgente || '';
+        const u = new URL(url, location.origin);
+        const params = new URLSearchParams(u.search);
+        if (agenteNombreQuery) {
+          params.set('agente', agenteNombreQuery);
         }
+        url = `${u.pathname}?${params.toString()}`;
+        console.info('[Filtro agente] Enviado en query a /api/leads:', agenteNombreQuery);
       } catch (e) {
-        console.warn('No se pudo evaluar filtro por agente:', e?.message);
+        console.warn('No se pudo construir la URL con filtro por agente:', e?.message);
       }
       console.log('Solicitando datos a:', url);
       
@@ -1448,8 +1441,8 @@
           // Elegir día de negocio priorizando dia_venta; si no, usar fechas de creación
           let fechaStr = '';
           const createdPaths = [
-            'creadoEn','fecha_creacion','fechaCreacion','createdAt','created_at','createdon','createdOn',
-            '_raw.creadoEn','_raw.fecha_creacion','_raw.fechaCreacion','_raw.createdAt','_raw.created_at',
+            'creadoEn','fecha_creacion','fechaCreacion','createdAt','created_at','createdon','createdOn','fecha',
+            '_raw.creadoEn','_raw.fecha_creacion','_raw.fechaCreacion','_raw.createdAt','_raw.created_at','_raw.fecha',
             'metadata.createdAt','audit.createdAt','timestamps.createdAt'
           ];
           const diaVentaPaths = ['dia_venta','diaVenta'];
