@@ -76,7 +76,11 @@ router.get('/leads', async (req, res) => {
     const datosGraficas = customers.map(customer => ({
       fecha: customer.fecha_creacion ? new Date(customer.fecha_creacion) : new Date(),
       producto: customer.tipo_servicio || 'Sin especificar',
-      puntaje: parseInt(customer.puntaje) || 0,
+      puntaje: (() => {
+        const v = customer.puntaje;
+        const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+        return isNaN(n) ? 0 : n;
+      })(),
       status: customer.status || 'PENDING',
       agente: customer.agenteNombre || customer.agente
     }));

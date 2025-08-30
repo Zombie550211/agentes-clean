@@ -1635,6 +1635,7 @@
     const ventasData = [];
     const puntajesData = [];
     const datosPorFecha = {};
+    const puntajesListaPorDia = {}; // depuración: lista de puntajes por día
     
     // Mapear datos por clave de día (YYYY-MM-DD en TZ negocio)
     for (const item of datosOrdenados) {
@@ -1648,14 +1649,14 @@
           isoDay = n.isoDay;
         }
         if (!datosPorFecha[isoDay]) {
-          datosPorFecha[isoDay] = { ventas: 0, puntaje: 0, count: 0, fecha: isoDay };
+          datosPorFecha[isoDay] = { ventas: 0, puntaje: 0, fecha: isoDay };
         }
-        datosPorFecha[isoDay].ventas += Number(item.ventas) || 0;
-        const puntaje = Number(item.puntaje) || 0;
-        if (puntaje > 0) {
-          datosPorFecha[isoDay].puntaje += puntaje;
-          datosPorFecha[isoDay].count += 1;
-        }
+        const ventasItem = Number(item.ventas) || 0;
+        const puntajeItem = Number(item.puntaje) || 0;
+        datosPorFecha[isoDay].ventas += ventasItem;
+        datosPorFecha[isoDay].puntaje += puntajeItem;
+        if (!puntajesListaPorDia[isoDay]) puntajesListaPorDia[isoDay] = [];
+        puntajesListaPorDia[isoDay].push(puntajeItem);
       } catch (e) {
         console.error('Error procesando item:', item, e);
       }
@@ -1680,20 +1681,17 @@
       labels.push(etiqueta);
       const claveDia = etiquetaISO; // usar día de negocio (UTC-6) como clave
       if (!datosPorFecha[claveDia]) {
-        datosPorFecha[claveDia] = { ventas: 0, puntaje: 0, count: 0 };
+        datosPorFecha[claveDia] = { ventas: 0, puntaje: 0 };
       }
       const datosDia = datosPorFecha[claveDia];
       ventasData.push(Number(datosDia.ventas) || 0);
-      // Usar promedio de puntaje por día (0-100) para evitar inflar valores
-      const promedioPuntaje = (Number(datosDia.count) > 0)
-        ? (Number(datosDia.puntaje) / Number(datosDia.count))
-        : 0;
-      puntajesData.push(promedioPuntaje);
+      // Puntaje diario como SUMA (no promedio)
+      const sumaPuntaje = Number(datosDia.puntaje) || 0;
+      puntajesData.push(sumaPuntaje);
       console.log(`Datos para ${claveDia} (${etiqueta}):`, {
         ventas: datosDia.ventas,
         puntaje_sum: datosDia.puntaje,
-        puntaje_avg: promedioPuntaje,
-        registros: datosDia.count
+        puntajes: puntajesListaPorDia[claveDia] || []
       });
     }
 
@@ -1704,6 +1702,7 @@
       g.__ventasGraf = ventasData.slice();
       g.__puntajeGraf = puntajesData.slice();
       g.__datosPorFechaGraf = { ...datosPorFecha };
+      g.__puntajesListaPorDia = { ...puntajesListaPorDia };
       // Tabla combinada día->ventas/puntaje para ver rápidamente desalineaciones
       console.table(labels.map((lbl, i) => ({
         idx: i,
@@ -1714,7 +1713,12 @@
       })));
     } catch (_) {}
     
-    // Configuración de la gráfica
+    // Calcular máximos para escalar ejes adecuadamente
+      const maxVentas = ventasData.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
+      const maxPuntaje = puntajesData.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
+      const maxBoth = Math.max(maxVentas, maxPuntaje);
+
+      // Configuración de la gráfica
       const config = {
         type: 'bar',
         data: {
@@ -1728,6 +1732,8 @@
               borderWidth: 1,
               borderRadius: 4,
               yAxisID: 'y',
+              categoryPercentage: 0.6,
+              barPercentage: 0.9,
               datalabels: {
                 anchor: 'end',
                 align: 'end',
@@ -1746,6 +1752,8 @@
               borderWidth: 1,
               borderRadius: 4,
               yAxisID: 'y1',
+              categoryPercentage: 0.6,
+              barPercentage: 0.9,
               datalabels: {
                 anchor: 'end',
                 align: 'end',
@@ -1755,7 +1763,8 @@
                 formatter: (v) => {
                   if (v == null || isNaN(v) || Number(v) === 0) return '';
                   const n = Number(v);
-                  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+                  // mostrar hasta 2 decimales, sin ceros a la derecha
+                  return n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
                 }
               }
             }
@@ -1790,7 +1799,13 @@
               beginAtZero: true,
               grid: { display: false },
               border: { display: false },
-              ticks: { display: false }
+              ticks: { display: false },
+              max: (() => {
+                const m = Number(maxBoth) || 0;
+                if (m <= 0) return 1;
+                if (m <= 5) return 5;
+                return Math.ceil(m * 1.2);
+              })()
             },
             y1: {
               type: 'linear',
@@ -1800,6 +1815,14 @@
               border: { display: false },
               title: { display: false, text: 'Puntaje' },
               beginAtZero: true,
+              min: 0,
+              // Usar el mismo max que el eje Y para que valores iguales tengan la misma altura visual
+              max: (() => {
+                const m = Number(maxBoth) || 0;
+                if (m <= 0) return 1;
+                if (m <= 5) return 5;         // mejor precisión visual en rangos pequeños
+                return Math.ceil(m * 1.2);    // margen de 20%
+              })(),
               ticks: { display: false }
             }
           },
@@ -1829,45 +1852,20 @@
         }
       };
 
-      // Si la gráfica ya existe, actualizar solo los datos
+      // Reconstruir la gráfica para evitar errores de actualización de ejes
+      const canvasEl = document.getElementById('ventasPuntajeChart');
+      if (!canvasEl) throw new Error('Canvas ventasPuntajeChart no encontrado');
+      const ctx = canvasEl.getContext('2d');
       if (ventasPuntajeChart) {
-        ventasPuntajeChart.data = config.data;
-        ventasPuntajeChart.options = config.options;
-      } else {
-        // Si no existe, crear una nueva
-        const ctx = document.getElementById('ventasPuntajeChart').getContext('2d');
-        ventasPuntajeChart = new Chart(ctx, config);
+        try { ventasPuntajeChart.destroy(); } catch (_) {}
+        ventasPuntajeChart = null;
       }
+      ventasPuntajeChart = new Chart(ctx, config);
       
       console.log('Configuración de la gráfica actualizada:', config);
       
-      // Actualizar la gráfica con manejo de errores
-      console.log('Actualizando gráfica...');
-      
-      try {
-        await ventasPuntajeChart.update('resize');
-        console.log('Gráfica actualizada exitosamente');
-        return true;
-      } catch (updateError) {
-        console.error('Error al actualizar con animación:', updateError);
-        
-        try {
-          await ventasPuntajeChart.update();
-          console.log('Gráfica actualizada sin animación');
-          return true;
-        } catch (simpleError) {
-          console.error('Error al actualizar sin animación:', simpleError);
-          
-          try {
-            await ventasPuntajeChart.update('none');
-            console.log('Gráfica actualizada en modo forzado');
-            return true;
-          } catch (e) {
-            console.error('Error al forzar actualización:', e);
-            throw new Error('No se pudo actualizar la gráfica');
-          }
-        }
-      }
+      // No es necesario llamar update después de crear
+      return true;
     } catch (error) {
       console.error('Error al procesar datos de la gráfica:', error);
       mostrarMensajeError('Error al procesar los datos de la gráfica');
