@@ -90,6 +90,14 @@
   margin-bottom: 8px;
 }
 
+/* Contenedor para nombre/rol: alinear y espaciar mejor */
+.sidebar.sidebar-inicio .user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .sidebar.sidebar-inicio .avatar {
   width: 72px;
   height: 72px;
@@ -103,14 +111,18 @@
   font-size: 2rem;
 }
 
-.sidebar.sidebar-inicio .user-name { font-weight: 700; color: #1f2937; }
+.sidebar.sidebar-inicio .user-name {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
 .sidebar.sidebar-inicio .user-role {
   display: inline-block;
-  margin-top: 4px;
-  font-size: .8rem;
+  margin-top: 2px;
+  font-size: .78rem;
   color: #fff;
   background: #64748b;
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
 }
 

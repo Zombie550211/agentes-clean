@@ -13,52 +13,13 @@
   <link rel="stylesheet" href="css/sidebar-inicio.css">
   <!-- Protección de autenticación en frontend -->
   <script src="agentes/js/auth-check.js"></script>
+  <script src="/js/logout-handler.js"></script>
+  <script src="/js/user-info.js"></script>
   <script src="js/sidebar-loader.js"></script>
   <style>
     /* Estilos del sidebar unificados en css/sidebar.css */
-    /* Estilos para la información del usuario en la barra lateral */
-    .user-info {
-      text-align: center;
-      margin-bottom: 30px;
-      width: 100%;
-      padding: 0 20px;
-    }
-    
-    .user-info .avatar {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: #f0f4f8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 15px;
-      font-size: 40px;
-      color: #4a5568;
-    }
-    
-    .user-details {
-      margin-top: 10px;
-    }
-    
-    .user-name {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: #2d3748;
-      font-size: 1.1em;
-    }
-    
-    .user-role {
-      display: inline-block;
-      font-size: 0.8em;
-      color: white;
-      background: #4a5568;
-      padding: 3px 12px;
-      border-radius: 12px;
-      margin-top: 5px;
-      font-weight: 500;
-    }
+    /* Nota: Estilos del bloque de usuario del sidebar se definen en css/sidebar-inicio.css
+       (clases: .sidebar.sidebar-inicio .user-info, .avatar, .user-name, .user-role). */
 
     /* Estilos generales */
     :root {
@@ -750,8 +711,6 @@
     });
   </script>
   <script src="js/core/script.js"></script>
-  <script src="/js/logout-handler.js"></script>
-  <script src="/js/user-info.js"></script>
   <!-- Eliminada la referencia a costumer-comments.js que no existe -->
   <script>
     // Inicialización de UI: toggle compacto y refrescar tabla

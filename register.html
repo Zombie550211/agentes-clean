@@ -27,6 +27,8 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/sidebar-inicio.css">
   <style>
     :root {
       --primary: #1976d2;
@@ -51,11 +53,11 @@
     body {
       background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
       min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       padding: 20px;
     }
+
+    /* Layout similar a otras páginas con sidebar */
+    .container { margin-left: 260px; padding: 24px; }
 
     .register-container {
       background: white;
@@ -253,20 +255,23 @@
   </style>
 </head>
 <body>
-  <div class="register-container">
-    <div class="register-header">
-      <div class="register-logo">
-        <i class="fas fa-user-shield"></i>
-      </div>
-      <h1 class="register-title">Crear Cuenta</h1>
-      <p class="register-subtitle">Regístrate para acceder al sistema</p>
-    </div>
+  <div class="layout">
+    <nav class="sidebar sidebar-inicio" data-active="register"></nav>
+    <main class="container">
+      <div class="register-container">
+        <div class="register-header">
+          <div class="register-logo">
+            <i class="fas fa-user-shield"></i>
+          </div>
+          <h1 class="register-title">Crear Cuenta</h1>
+          <p class="register-subtitle">Regístrate para acceder al sistema</p>
+        </div>
 
-    <div id="successMessage" class="success-message">
-      ¡Registro exitoso! Redirigiendo al inicio de sesión...
-    </div>
+        <div id="successMessage" class="success-message">
+          ¡Registro exitoso! Redirigiendo al inicio de sesión...
+        </div>
 
-    <form id="registerForm">
+        <form id="registerForm">
       <div class="form-group">
         <label for="username">Usuario (username)</label>
         <div class="input-icon">
@@ -347,8 +352,14 @@
     <div class="login-link">
       ¿Ya tienes una cuenta? <a href="login.html">Inicia sesión aquí</a>
     </div>
+      </div>
+    </main>
   </div>
 
+  <script src="agentes/js/auth-check.js"></script>
+  <script src="/js/logout-handler.js"></script>
+  <script src="/js/user-info.js"></script>
+  <script src="js/sidebar-loader.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const registerForm = document.getElementById('registerForm');

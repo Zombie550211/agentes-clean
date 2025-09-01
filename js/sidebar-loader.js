@@ -33,7 +33,8 @@
       const map = [
         { key: 'inicio', href: 'inicio.html' },
         { key: 'lead', href: 'lead.html' },
-        { key: 'costumer', href: 'Costumer.html' }
+        { key: 'costumer', href: 'Costumer.html' },
+        { key: 'register', href: 'register.html' }
       ];
       // 1) Prioridad: atributo data-active si viene de la página
       let target = null;
@@ -45,7 +46,8 @@
         const urlTarget = [
           { key: 'inicio', match: 'inicio.html' },
           { key: 'lead', match: 'lead.html' },
-          { key: 'costumer', match: 'costumer.html' }
+          { key: 'costumer', match: 'costumer.html' },
+          { key: 'register', match: 'register.html' }
         ].find(m => path.endsWith(m.match));
         if (urlTarget) target = map.find(m => m.key === urlTarget.key);
       }
@@ -62,7 +64,7 @@
   function applyAdminVisibility(nav){
     try {
       const role = decodeTokenRole();
-      const ids = ['#menu-create-account', '#menu-reset-password'];
+      const ids = ['#menu-create-account'];
       ids.forEach(sel => {
         const li = nav.querySelector(sel);
         if (li) li.style.display = role === 'admin' ? 'block' : 'none';
