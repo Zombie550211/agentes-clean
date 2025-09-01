@@ -5,22 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Registro - CRM Agente</title>
   <script>
-    // Protección de ruta: solo ADMIN puede acceder a register.html
-    (function() {
+    // Protección de ruta (server-side driven): solo ADMIN puede acceder a register.html
+    (async function() {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) {
+        const res = await fetch('/api/protected', { method: 'GET', credentials: 'include' });
+        if (!res.ok) {
+          // No autenticado
           window.location.href = 'login.html';
           return;
         }
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const role = (payload.role || '').toLowerCase();
+        const data = await res.json();
+        const role = ((data && data.user && data.user.role) || '').toLowerCase();
         if (role !== 'admin') {
+          // Autenticado pero sin rol
           window.location.href = 'inicio.html';
           return;
         }
+        // Autorizado: continuar
       } catch (e) {
-        console.error('Error validando acceso a register:', e);
+        console.error('Error validando acceso a register (cookie auth):', e);
         window.location.href = 'login.html';
       }
     })();
