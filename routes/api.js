@@ -175,33 +175,54 @@ router.get('/agente/costumer-metricas', async (req, res) => {
     const agenteIdParamRaw = (req.query.agenteId || '').toString().trim();
     let filtroBase = {};
     const { ObjectId } = require('mongodb');
-    if (usuarioAutenticado) {
-      const role = usuarioAutenticado.role;
-      const isPrivileged = ['admin', 'supervisor', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'].includes(role);
-      if (!isPrivileged && role === 'agent') {
-        // Filtrar por agenteId del usuario, soportando ObjectId y string
-        let oid = null;
-        try { if (/^[a-fA-F0-9]{24}$/.test(String(usuarioAutenticado.id))) oid = new ObjectId(String(usuarioAutenticado.id)); } catch {}
-        const bothTypes = oid ? { $in: [String(usuarioAutenticado.id), oid] } : String(usuarioAutenticado.id);
-        filtroBase.agenteId = bothTypes;
-      }
+
+    // Roles privilegiados: vista global
+    const role = (usuarioAutenticado?.role || '').toString().toLowerCase();
+    const isPrivileged = ['admin', 'supervisor', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'].includes(role);
+
+    if (!isPrivileged && role === 'agent') {
+      // Construir filtro robusto por múltiples campos de ID con fallback por nombre SOLO si faltan IDs
+      const currentUserId = String(usuarioAutenticado?.id || '').trim();
+      let oid = null; try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
+      const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
+
+      const agentFieldCandidates = [
+        'agenteId','agentId','createdBy','ownerId','assignedId','usuarioId','userId','registeredBy','asignadoId','asignadoAId'
+      ];
+      const idOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+
+      // Fallback por nombre si TODOS los campos de ID están vacíos/ausentes
+      const nameCandidatesRaw = [usuarioAutenticado?.username, usuarioAutenticado?.name, usuarioAutenticado?.email]
+        .filter(v => typeof v === 'string' && v.trim().length > 0)
+        .map(v => v.trim());
+      const nameRegexes = nameCandidatesRaw.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
+      const nameFields = ['agenteNombre','agente','agentName','nombreAgente','nombre_agente','agente_nombre','salesAgent','asignadoA','assignedTo','usuario','owner','registeredBy','seller','vendedor'];
+      const nameOrSimple = [];
+      nameFields.forEach(f => nameRegexes.forEach(rx => nameOrSimple.push({ [f]: rx })));
+      const idEmptyOrMissing = { $and: agentFieldCandidates.map(f => ({ $or: [ { [f]: { $exists: false } }, { [f]: null }, { [f]: '' } ] })) };
+      const nameAndIfNoIds = (nameOrSimple.length ? { $and: [ { $or: nameOrSimple }, idEmptyOrMissing ] } : null);
+
+      filtroBase = nameAndIfNoIds ? { $or: [...idOr, nameAndIfNoIds] } : { $or: [...idOr] };
     }
+
     // Si viene agenteId por query (para admin/supervisor/backoffice)
-    if (agenteIdParamRaw) {
+    if (isPrivileged && agenteIdParamRaw) {
       let oid = null;
       try { if (/^[a-fA-F0-9]{24}$/.test(agenteIdParamRaw)) oid = new ObjectId(agenteIdParamRaw); } catch {}
-      const bothTypes = oid ? { $in: [oid, agenteIdParamRaw] } : agenteIdParamRaw;
-      filtroBase.agenteId = bothTypes;
-    } else if (!agenteIdParamRaw && agenteQuery) {
-      // Filtro por nombre de agente (parcial, case-insensitive)
+      const bothTypes = oid ? { $in: [agenteIdParamRaw, oid] } : agenteIdParamRaw;
+      filtroBase = { agenteId: bothTypes };
+    } else if (isPrivileged && !agenteIdParamRaw && agenteQuery) {
+      // Admin/supervisor/backoffice: permitir filtro por nombre (parcial) si se especifica
       const safe = agenteQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const containsCI = new RegExp(safe, 'i');
-      filtroBase.$or = [
-        { agente: containsCI },
-        { agent: containsCI },
-        { agenteNombre: containsCI },
-        { agentName: containsCI }
-      ];
+      filtroBase = {
+        $or: [
+          { agente: containsCI },
+          { agent: containsCI },
+          { agenteNombre: containsCI },
+          { agentName: containsCI }
+        ]
+      };
     }
 
     // Obtener todos los costumers visibles para el usuario

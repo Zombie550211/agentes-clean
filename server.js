@@ -32,7 +32,7 @@ if (!process.env.JWT_SECRET) {
 const JWT_EXPIRES_IN = '24h'; // El token expira en 24 horas
 
 // Silenciar logs en producción (mantener warn/error)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' && process.env.DEBUG_LOGS !== '1') {
   console.log = () => {};
   console.info = () => {};
   console.debug = () => {};
@@ -628,11 +628,13 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       const role = (req.user.role || '').toLowerCase();
       console.log(`[DEBUG] Usuario autenticado - ID: ${currentUserId}, Rol: ${role}, forceAll=${forceAll}`);
 
-      // Lista de posibles campos de asignación de agente en los documentos
+      // Lista de posibles campos de asignación de agente en los documentos (IDs)
       const agentFieldCandidates = [
         'agenteId', 'agente_id', 'idAgente', 'agentId',
         'createdBy', 'creadoPor', 'creado_por',
-        'ownerId', 'assignedId'
+        'ownerId', 'owner_id',
+        'assignedId', 'assigned_to_id', 'assigned_toId',
+        'salesAgentId', 'registeredById'
       ];
 
       if (role === 'agent') {
@@ -695,14 +697,118 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
         console.log('[DEBUG] Rol agent: forceAll ignorado. Filtro por IDs aplicado en:', agentFieldCandidates, ' y fallback por nombre en campos:', textFields, ' names:', nameCandidates);
       } else if (role === 'supervisor') {
         // Ver solo los de su equipo (soportar ObjectId y string) SIEMPRE
-        const agentes = await db.collection('users').find({ supervisorId: currentUserId }).toArray();
+        // 1) Intentar por IDs de agentes que tengan supervisorId = currentUserId (string u ObjectId)
+        let supOid = null;
+        try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) supOid = new ObjectId(currentUserId); } catch {}
+        const agentes = await db.collection('users').find({
+          $or: [
+            { supervisorId: currentUserId },
+            ...(supOid ? [{ supervisorId: supOid }] : [])
+          ]
+        }).toArray();
         const agentesIds = agentes.map(a => a._id).filter(Boolean);
+        // Incluir también el propio ID del supervisor por si tiene asignaciones directas
         try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) agentesIds.push(new ObjectId(currentUserId)); } catch {}
         const bothTypesArray = [];
         agentesIds.forEach(id => { bothTypesArray.push(id, id.toString()); });
-        const inFilter = { $in: bothTypesArray };
-        query.$or = agentFieldCandidates.map(f => ({ [f]: inFilter }));
-        console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro por equipo aplicado en campos:', agentFieldCandidates, 'IDs:', bothTypesArray.map(x=>x.toString()))
+        const idInFilter = bothTypesArray.length ? { $in: bothTypesArray } : null;
+
+        // 2) Fallback adicional por campos de texto de supervisor y/o nombre del supervisor en documentos
+        //    Esto cubre casos donde los usuarios-agente no tienen supervisorId poblado en la colección users.
+        const supNameCandidatesRaw = [req.user?.username, req.user?.name, req.user?.nombre, req.user?.fullName]
+          .filter(v => typeof v === 'string' && v.trim().length > 0)
+          .map(v => v.trim());
+        const seenSup = new Set();
+        const supNameCandidates = supNameCandidatesRaw.filter(n => { const k = n.toLowerCase(); if (seenSup.has(k)) return false; seenSup.add(k); return true; });
+        const normalize = (s) => s.replace(/\s+/g, ' ').trim();
+        const supRegexes = supNameCandidates.map(n => {
+          try {
+            const escaped = normalize(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(escaped, 'i');
+          } catch { return null; }
+        }).filter(Boolean);
+        const supervisorTextFields = ['supervisor','team','teamName','supervisorName','supervisor_nombre','supervisorNombre'];
+        const supervisorTextOr = supRegexes.length ? supervisorTextFields.map(f => ({ [f]: { $in: supRegexes } })) : [];
+
+        // 2b) Fallback por NOMBRES DE LOS AGENTES DEL EQUIPO en campos de texto de agente
+        //     Útil cuando los documentos solo guardan nombre del agente y no ID.
+        const agentTextFields = [
+          'agente','agent','agenteNombre','agentName','nombre_agente','agente_nombre','createdByName',
+          'vendedor','seller','salesAgent','nombreAgente','ejecutivo',
+          'asignadoA','asignado_a','assignedTo','assigned_to',
+          'usuario','owner','registeredBy','ownerName'
+        ];
+        const agentNameCandidatesRaw = [];
+        try {
+          for (const a of agentes) {
+            const vals = [a?.username, a?.name, a?.nombre, a?.fullName].filter(v => typeof v === 'string' && v.trim());
+            vals.forEach(v => agentNameCandidatesRaw.push(v.trim()));
+          }
+        } catch {}
+        // Si no encontramos nombres por users, intentar derivarlos desde la colección costumers
+        if (agentNameCandidatesRaw.length === 0 && supRegexes.length) {
+          try {
+            const supOr = { $or: supervisorTextFields.map(f => ({ [f]: { $in: supRegexes } })) };
+            const namesFromCostumers = new Set();
+            for (const f of agentTextFields) {
+              try {
+                const vals = await db.collection('costumers').distinct(f, supOr);
+                (vals || []).forEach(v => { if (typeof v === 'string' && v.trim()) namesFromCostumers.add(v.trim()); });
+              } catch {}
+            }
+            if (namesFromCostumers.size) {
+              agentNameCandidatesRaw.push(...Array.from(namesFromCostumers));
+            }
+          } catch {}
+        }
+        const seenAgent = new Set();
+        const agentNameCandidates = agentNameCandidatesRaw.filter(n => { const k = normalize(n).toLowerCase(); if (seenAgent.has(k)) return false; seenAgent.add(k); return true; });
+        const agentNameRegexes = agentNameCandidates.map(n => {
+          try { return new RegExp(normalize(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); } catch { return null; }
+        }).filter(Boolean);
+        const agentNamesTextOr = agentNameRegexes.length ? agentTextFields.map(f => ({ [f]: { $in: agentNameRegexes } })) : [];
+
+        // 3) Construir query.$or combinando ID de agentes (si existe) y fallback por supervisor en texto (si existe)
+        const orConds = [];
+        // Diagnóstico: si ?debug=1, contar por sub-condición antes de fijar query.$or
+        const debugFlag = (req.query && (req.query.debug === '1' || req.query.debug === 'true'));
+        if (debugFlag) {
+          try {
+            const baseQuery = { ...query };
+            delete baseQuery.$or;
+            const col = db.collection('costumers');
+            console.log('[DEBUG] Supervisor diag - agentesIds (bothTypesArray):', (bothTypesArray||[]).map(x=>x.toString()));
+            console.log('[DEBUG] Supervisor diag - supNameCandidates:', supNameCandidates);
+            console.log('[DEBUG] Supervisor diag - agentNameCandidates:', agentNameCandidates);
+            if (idInFilter) {
+              const idsOr = agentFieldCandidates.map(f => ({ [f]: idInFilter }));
+              const c1 = await col.countDocuments({ ...baseQuery, $or: idsOr });
+              console.log('[DEBUG] Subcuenta supervisor - IDs de agentes coincide:', c1);
+            }
+            if (supervisorTextOr.length) {
+              const c2 = await col.countDocuments({ ...baseQuery, $or: supervisorTextOr });
+              console.log('[DEBUG] Subcuenta supervisor - Texto de supervisor coincide:', c2);
+            }
+            if (agentNamesTextOr.length) {
+              const c3 = await col.countDocuments({ ...baseQuery, $or: agentNamesTextOr });
+              console.log('[DEBUG] Subcuenta supervisor - Nombres de agentes coincide:', c3);
+            }
+          } catch (e) {
+            console.warn('[WARN] Error en diagnóstico supervisor (?debug=1):', e?.message);
+          }
+        }
+        if (idInFilter) {
+          orConds.push(...agentFieldCandidates.map(f => ({ [f]: idInFilter })));
+        }
+        if (supervisorTextOr.length) {
+          orConds.push(...supervisorTextOr);
+        }
+        if (agentNamesTextOr.length) {
+          orConds.push(...agentNamesTextOr);
+        }
+        // Si por algún motivo no hay condiciones, asegurar que no devuelva todo (forzar none)
+        query.$or = orConds.length ? orConds : [{ _id: null }];
+        console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro aplicado. IDs agentes:', bothTypesArray.map(x=>x.toString()), ' | Campos supervisor:', supervisorTextFields, ' | Nombres sup:', supNameCandidates, ' | Campos agente:', agentTextFields, ' | Nombres agentes:', agentNameCandidates);
       } else {
         // Solo roles privilegiados ven todo; para cualquier otro rol, filtrar por su propio ID
         const privileged = ['admin','backoffice','b:o','b.o','b-o','bo'];
@@ -1295,18 +1401,65 @@ app.post('/api/customers', protect, async (req, res) => {
     console.log('ID del usuario:', req.user?.id);
     console.log('Rol del usuario:', req.user?.role);
     
+    // Determinar ID del usuario autenticado en string y en ObjectId (con fallbacks robustos)
+    function getIdFromUser(u) {
+      if (!u) return null;
+      try { if (u._id && typeof u._id.toHexString === 'function') return u._id.toHexString(); } catch {}
+      try { if (u._id && typeof u._id.toString === 'function') return u._id.toString(); } catch {}
+      try { if (u.id) return String(u.id); } catch {}
+      return null;
+    }
+    let currentUserIdStr = getIdFromUser(req.user);
+    // Fallback: decodificar token si no se obtuvo del user
+    if (!currentUserIdStr) {
+      try {
+        const rawToken = (req.headers.authorization && req.headers.authorization.startsWith('Bearer'))
+          ? req.headers.authorization.split(' ')[1]
+          : (req.cookies && req.cookies.token) ? req.cookies.token : null;
+        if (rawToken && rawToken !== 'temp-token-dev') {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(rawToken, process.env.JWT_SECRET || 'tu_clave_secreta_super_segura');
+          currentUserIdStr = String(decoded.userId || decoded.id || '');
+        }
+      } catch (e) {
+        console.warn('[POST /api/customers] No se pudo extraer userId desde token:', e?.message);
+      }
+    }
+    // Normalizar valor vacío a null
+    if (!currentUserIdStr) currentUserIdStr = null;
+    // Fallback final: si no hay userId pero tenemos username, usar un marcador estable basado en username
+    if (!currentUserIdStr) {
+      const uname = (req.user?.username || req.user?.name || req.user?.nombre || '').toString().trim();
+      if (uname) {
+        currentUserIdStr = `user:${uname}`;
+        console.warn('[POST /api/customers] Fallback aplicado: usando agenteId string derivado de username:', currentUserIdStr);
+      } else {
+        currentUserIdStr = 'user:anonymous';
+        console.warn('[POST /api/customers] Fallback aplicado: username no disponible, usando agenteId="user:anonymous"');
+      }
+    }
+    let currentUserIdObj = null;
+    try { if (currentUserIdStr && /^[a-fA-F0-9]{24}$/.test(currentUserIdStr)) { currentUserIdObj = new ObjectId(currentUserIdStr); } } catch {}
+    console.log('[POST /api/customers] currentUserIdStr:', currentUserIdStr, ' | hasObjectId:', !!currentUserIdObj);
+
     const customerToSave = {
-      ...customerData,
+      nombre_cliente: customerData.nombre_cliente || 'Sin nombre',
+      telefono_principal: customerData.telefono_principal || '',
+      direccion: customerData.direccion || '',
+      tipo_servicio: customerData.tipo_servicio || 'desconocido',
       creadoEn: now,
       actualizadoEn: now,
-      status: customerData.status || 'activo',
-      mercado: customerData.mercado || 'residencial',
+      status: (customerData.status || 'Nuevo').toString(),
       puntaje: parseFloat(customerData.puntaje) || 0,
       autopago: customerData.autopago === 'true' || customerData.autopago === true,
-      // Asociar el cliente al usuario que lo crea
-      agenteId: req.user?.id || null,
-      creadoPor: req.user?.id || null,
-      agenteNombre: req.user?.username || 'Sistema',
+      // Asociar el cliente al usuario que lo crea (guardar ambos formatos: string y ObjectId)
+      agenteId: currentUserIdStr,
+      creadoPor: currentUserIdStr,
+      createdBy: currentUserIdStr,
+      ownerId: currentUserIdStr,
+      agentId: currentUserIdObj || undefined,
+      registeredById: currentUserIdObj || undefined,
+      agenteNombre: (req.user?.username || req.user?.name || req.user?.nombre || 'Sistema'),
       // Agregar un timestamp único para evitar conflictos
       timestampUnico: now.getTime() + Math.random().toString(36).substr(2, 9)
     };

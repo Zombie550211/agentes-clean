@@ -340,6 +340,14 @@ async function cargarDatosDesdeServidor() {
     }
 
     console.log('Leads a renderizar (combinados si aplica):', combinedLeads);
+    // Actualizar KPIs si la función está disponible en la página (Costumer.html)
+    try {
+      if (typeof updateSummaryCards === 'function') {
+        updateSummaryCards(combinedLeads);
+      }
+    } catch (e) {
+      console.warn('updateSummaryCards no disponible o falló:', e);
+    }
     renderCostumerTable(combinedLeads);
   } catch (error) {
     console.error('Error al cargar los datos:', error);

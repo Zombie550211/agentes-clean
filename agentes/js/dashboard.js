@@ -1,7 +1,9 @@
 // --- CONFIGURACIÓN AUTOMÁTICA DE URL DEL BACKEND ---
+// Ajuste: el servidor local corre en el puerto 3002 (según server.js),
+// por lo que en entorno local debemos apuntar a http://localhost:3002
 const API_URL =
   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://localhost:3000"
+    ? "http://localhost:3002"
     : "https://connecting-klf7.onrender.com"; // <-- Cambia esta URL por la tuya de Render
 
 // --- TAB NAVIGATION ---
@@ -171,15 +173,49 @@ async function cargarCostumerPanel() {
   ]);
 }
 
+// --- Helper de auth ---
+function getAuthHeaders() {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch (_) { return {}; }
+}
+
 // --- Métricas ---
 async function cargarCostumerMetricas() {
   const params = new URLSearchParams(costumerFiltro).toString();
-  const resp = await fetch(`${API_URL}/api/agente/costumer-metricas?` + params);
-  const m = await resp.json();
-  document.getElementById('ventasHoy').textContent = m.ventasHoy || 0;
-  document.getElementById('leadsPendientes').textContent = m.leadsPendientes || 0;
-  document.getElementById('clientesTotal').textContent = m.clientes || 0;
-  document.getElementById('ventasMes').textContent = m.ventasMes || 0;
+  try {
+    const resp = await fetch(`${API_URL}/api/agente/costumer-metricas?` + params, {
+      headers: { ...getAuthHeaders() },
+      credentials: 'include'
+    });
+    if (!resp.ok) {
+      console.warn('cargarCostumerMetricas: respuesta no OK', resp.status);
+      return;
+    }
+    const m = await resp.json();
+
+    const setKpi = (ids, value) => {
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = value ?? 0; return true; }
+      }
+      return false;
+    };
+
+    // Ventas Hoy
+    setKpi(['ventasHoy','costumer-ventas-hoy'], m.ventasHoy || 0);
+    // Ventas del Mes
+    setKpi(['ventasMes','costumer-ventas-mes'], m.ventasMes || 0);
+    // Pendientes
+    setKpi(['leadsPendientes','costumer-pendientes'], m.leadsPendientes || 0);
+    // Cancelados (antes no se actualizaba)
+    setKpi(['cancelados','costumer-cancelados'], m.cancelados || 0);
+    // Total clientes (si existe alguna tarjeta para esto)
+    setKpi(['clientesTotal','costumer-clientes-total'], m.clientes || 0);
+  } catch (e) {
+    console.error('Error en cargarCostumerMetricas:', e);
+  }
 }
 
 // --- Teams para filtro ---
