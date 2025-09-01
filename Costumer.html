@@ -2189,17 +2189,21 @@
         
         console.log('Fecha actual:', hoy.toLocaleDateString());
         
+        // Normalizar fechas con la misma lógica de las gráficas (zona horaria de negocio)
+        const todayISO = toISOInTZ(new Date(), BUSINESS_TZ_OFFSET_MIN); // YYYY-MM-DD
+        const [yNow, mNow] = todayISO.split('-').map(Number);
+
         // Procesar cada lead
         leads.forEach(lead => {
           try {
             // Verificar si el lead tiene status (normalizado)
             const status = normalizarTexto(lead.status || '');
-            
+
             // Contar pendientes
             if (status.includes('pendiente') || status.includes('pending')) {
               pendientes++;
             }
-            
+
             // Contar cancelados (soportar variantes y subcadenas)
             if (
               status.includes('cancel') ||    // engloba canceled/cancelled/cancelado
@@ -2208,29 +2212,15 @@
             ) {
               cancelados++;
             }
-            
-            // Verificar fecha de venta
-            if (lead.dia_venta) {
-              let fechaVenta;
-              if (typeof lead.dia_venta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lead.dia_venta)) {
-                const [y, m, d] = lead.dia_venta.split('-').map(Number);
-                fechaVenta = new Date(y, m - 1, d); // fecha local
-              } else {
-                fechaVenta = new Date(lead.dia_venta);
-              }
-              
-              // Verificar ventas de hoy
-              if (fechaVenta.getDate() === diaActual && 
-                  fechaVenta.getMonth() === mesActual && 
-                  fechaVenta.getFullYear() === añoActual) {
-                ventasHoy++;
-              }
-              
-              // Verificar ventas del mes
-              if (fechaVenta.getMonth() === mesActual && 
-                  fechaVenta.getFullYear() === añoActual) {
-                ventasMes++;
-              }
+
+            // Usar la misma extracción de fecha que el gráfico
+            const leadISO = getDateFromLead(lead); // YYYY-MM-DD en TZ de negocio
+            if (leadISO) {
+              // Ventas hoy
+              if (leadISO === todayISO) ventasHoy++;
+              // Ventas del mes
+              const [yL, mL] = leadISO.split('-').map(Number);
+              if (yL === yNow && mL === mNow) ventasMes++;
             }
           } catch (e) {
             console.error('Error procesando lead:', lead, e);

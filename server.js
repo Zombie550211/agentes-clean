@@ -607,25 +607,26 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
     
     // Filtrar por usuario autenticado (a menos que se fuerce ver todo)
     if (req.user && !forceAll) {
-      console.log(`[DEBUG] Usuario autenticado - ID: ${req.user.id}, Rol: ${req.user.role}`);
+      const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
+      console.log(`[DEBUG] Usuario autenticado - ID: ${currentUserId}, Rol: ${req.user.role}`);
       
       // Si es agente, solo ver sus clientes (soportar ObjectId y string)
       if (req.user.role === 'agent') {
         let oid = null;
-        try { if (/^[a-fA-F0-9]{24}$/.test(req.user.id)) oid = new ObjectId(req.user.id); } catch {}
-        const bothTypes = oid ? { $in: [req.user.id, oid] } : req.user.id;
+        try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
+        const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
         query.agenteId = bothTypes;
       } 
       // Si es supervisor, ver los de su equipo (soportar ObjectId y string)
       else if (req.user.role === 'supervisor') {
         // Obtener los IDs de los agentes que supervisa
         const agentes = await db.collection('users').find({ 
-          supervisorId: req.user.id 
+          supervisorId: currentUserId 
         }).toArray();
         // IDs base como ObjectId
         const agentesIds = agentes.map(a => a._id);
         // Incluir su propio ID como ObjectId si aplica
-        try { if (/^[a-fA-F0-9]{24}$/.test(req.user.id)) agentesIds.push(new ObjectId(req.user.id)); } catch {}
+        try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) agentesIds.push(new ObjectId(currentUserId)); } catch {}
         // Construir arreglo con ambos tipos por cada id
         const bothTypesArray = [];
         agentesIds.forEach(id => { bothTypesArray.push(id, id.toString()); });
@@ -642,7 +643,8 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       console.log('[DEBUG] Parámetro agenteId recibido:', agenteIdParamRaw);
       if (req.user && req.user.role === 'agent') {
         // Un agente siempre se filtra a sí mismo
-        query.agenteId = req.user.id;
+        const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
+        query.agenteId = currentUserId;
       } else {
         // Soportar ObjectId y string
         let oid = null;
@@ -667,7 +669,8 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       // Si el usuario autenticado es 'agent', forzamos su propio ID y omitimos el parámetro
       if (req.user && req.user.role === 'agent') {
         console.log('[DEBUG] Rol agent: ignorando parámetro agente y usando su propio ID');
-        query.agenteId = req.user.id;
+        const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
+        query.agenteId = currentUserId;
       } else {
         // Intentar resolver por ObjectId válido
         let resolvedId = null;
