@@ -61,7 +61,7 @@ function cookieOptionsForReq(req, baseOpts) {
   return defaultOpts;
 }
 
-// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS)
+// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + origen propio en Render
 const parseAllowedOrigins = (raw) => (raw || '')
   .split(',')
   .map(s => s.trim())
@@ -72,7 +72,13 @@ const defaultAllowed = [
   'http://127.0.0.1:3000',
   'http://127.0.0.1:10000'
 ];
+// Tomar el origen público si está configurado (Render expone RENDER_EXTERNAL_URL)
+const selfOriginRaw = (process.env.PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL || '').trim();
+const selfOrigin = selfOriginRaw ? selfOriginRaw.replace(/\/$/, '') : '';
 const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS) || [];
+if (selfOrigin && !allowedOrigins.includes(selfOrigin)) {
+  allowedOrigins.push(selfOrigin);
+}
 const whitelist = allowedOrigins.length ? allowedOrigins : defaultAllowed;
 const corsOptions = {
   origin: (origin, callback) => {
