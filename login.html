@@ -237,8 +237,9 @@
             
             try {
                 // Enviar credenciales al servidor
-                const response = await fetch('/api/login', {
+                const response = await fetch('/api/auth/login', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
                     },
@@ -251,20 +252,18 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    // Guardar el token JWT y la información del usuario en localStorage o sessionStorage según "Recordarme"
-                    if (rememberMe) {
-                        localStorage.setItem('token', data.token);
-                        localStorage.setItem('user', JSON.stringify({
-                            name: data.user.username,
-                            role: data.user.role || 'user'
-                        }));
-                    } else {
-                        sessionStorage.setItem('token', data.token);
-                        sessionStorage.setItem('user', JSON.stringify({
-                            name: data.user.username,
-                            role: data.user.role || 'user'
-                        }));
-                    }
+                    // Usar cookies HttpOnly: no guardar token. Solo persistir información básica del usuario si "Remember me".
+                    try {
+                        const userInfo = { name: data.user?.username, role: data.user?.role || 'user' };
+                        if (rememberMe) {
+                            localStorage.setItem('user', JSON.stringify(userInfo));
+                            // Limpieza opcional de tokens heredados
+                            localStorage.removeItem('token');
+                        } else {
+                            sessionStorage.setItem('user', JSON.stringify(userInfo));
+                            sessionStorage.removeItem('token');
+                        }
+                    } catch {}
                     
                     // Mostrar mensaje de éxito
                     messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
@@ -272,8 +271,9 @@
                     
                     // Redirigir a la página de inicio después de un breve retraso
                     setTimeout(() => {
-                        window.location.href = '/inicio';
-                    }, 1000);
+                        // Usar ruta explícita y reemplazo de historial para evitar bucles
+                        window.location.replace('/inicio.html');
+                    }, 800);
                     
                 } else {
                     // Mostrar mensaje de error

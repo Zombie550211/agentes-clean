@@ -4,6 +4,27 @@ const User = require('../models/User');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
+const isProd = process.env.NODE_ENV === 'production';
+const oneDayMs = 24 * 60 * 60 * 1000;
+const cookieOpts = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? 'none' : 'lax',
+  maxAge: oneDayMs,
+  path: '/'
+};
+
+// Ajuste dinámico para desarrollo local en http://localhost:10000 aun si NODE_ENV=production
+function cookieOptionsForReq(req) {
+  const proto = (req.headers && req.headers['x-forwarded-proto']) || (req.protocol);
+  const isHttps = (proto === 'https') || req.secure;
+  const host = (req.headers && req.headers.host) || '';
+  const isLocal10000 = /localhost:10000$/i.test(host);
+  if (isLocal10000 || !isHttps) {
+    return { ...cookieOpts, secure: false, sameSite: 'lax' };
+  }
+  return cookieOpts;
+}
 
 // Controlador para registrar un nuevo usuario
 exports.register = async (req, res) => {
@@ -38,6 +59,9 @@ exports.register = async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    // Establecer cookie HttpOnly con el token (ajuste dinámico para local http)
+    try { res.cookie && res.cookie('token', token, cookieOptionsForReq(req)); } catch {}
+
     // Enviar respuesta exitosa
     res.status(201).json({
       success: true,
@@ -55,6 +79,16 @@ exports.register = async (req, res) => {
       success: false,
       message: error.message || 'Error al registrar el usuario'
     });
+  }
+};
+
+// Logout: limpiar cookie del token
+exports.logout = async (req, res) => {
+  try {
+    try { res.clearCookie && res.clearCookie('token', { ...cookieOptionsForReq(req), maxAge: undefined }); } catch {}
+    return res.json({ success: true, message: 'Sesión cerrada' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error al cerrar sesión' });
   }
 };
 
@@ -119,12 +153,15 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Crear token JWT
+    // Crear token JWT (asegurar id como string)
     const token = jwt.sign(
-      { id: user._id, username: user.username, role: user.role },
+      { id: user._id?.toString(), username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    // Establecer cookie HttpOnly con el token (ajuste dinámico para local http)
+    try { res.cookie && res.cookie('token', token, cookieOptionsForReq(req)); } catch {}
 
     // Enviar respuesta exitosa
     res.json({

@@ -689,58 +689,45 @@
     }
   </style>
   <script>
-    // Verificar autenticación
-    document.addEventListener('DOMContentLoaded', function() {
-      // Verificar si ya estamos en la página de login para evitar bucle
-      if (window.location.pathname.endsWith('login.html')) {
-        return;
-      }
-
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      if (!token) {
-        // Solo redirigir si no estamos ya en la página de login
-        if (!window.location.pathname.endsWith('login.html')) {
-          window.location.href = 'login.html';
-        }
-        return;
-      }
-
-      // Decodificar el token para obtener información del usuario
+    // Verificar autenticación usando cookie HttpOnly y poblar datos de usuario
+    document.addEventListener('DOMContentLoaded', async function() {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        
+        const res = await fetch('/api/protected', { method: 'GET', credentials: 'include' });
+        if (!res.ok) {
+          window.location.href = 'login.html';
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const user = data?.user || {};
+
         // Mostrar nombre de usuario en el sidebar
         const welcomeMessage = document.getElementById('welcome-message');
         if (welcomeMessage) {
-          welcomeMessage.textContent = `Bienvenido/a, ${payload.username || 'Usuario'}`;
+          welcomeMessage.textContent = `Bienvenido/a, ${user.username || 'Usuario'}`;
         }
-        
+
         // Mostrar nombre de usuario en el perfil de usuario
         const userNameElement = document.getElementById('user-name');
         if (userNameElement) {
-          userNameElement.textContent = payload.username || 'Usuario';
+          userNameElement.textContent = user.username || 'Usuario';
         }
-        
+
         // Mostrar rol del usuario
         const userRoleElement = document.getElementById('user-role');
         if (userRoleElement) {
-          const role = payload.role || 'usuario';
+          const role = user.role || 'usuario';
           userRoleElement.textContent = role.charAt(0).toUpperCase() + role.slice(1);
         }
 
         // Mostrar opción de "Crear cuenta" solo si es ADMIN
         const createAccountItem = document.getElementById('menu-create-account');
         if (createAccountItem) {
-          const roleLower = (payload.role || '').toLowerCase();
+          const roleLower = (user.role || '').toLowerCase();
           createAccountItem.style.display = roleLower === 'admin' ? 'block' : 'none';
         }
-      } catch (error) {
-        console.error('Error al decodificar el token:', error);
-        // Si hay un error con el token, redirigir al login solo si no estamos ya ahí
-        if (!window.location.pathname.endsWith('login.html')) {
-          window.location.href = 'login.html';
-        }
+      } catch (e) {
+        console.error('Error verificando autenticación:', e);
+        window.location.href = 'login.html';
       }
     });
   </script>

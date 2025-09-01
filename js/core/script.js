@@ -120,13 +120,12 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log('Preparando para enviar datos a customers');
         const token = localStorage.getItem('token');
         console.log('Token de autenticación:', token ? 'Presente' : 'Ausente');
-        
+        const headersCustomer = { "Content-Type": "application/json" };
+        if (token) headersCustomer["Authorization"] = `Bearer ${token}`;
         const responseCustomer = await fetch("/api/customers", {
           method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem('token')}`
-          },
+          credentials: 'include',
+          headers: headersCustomer,
           body: JSON.stringify({
             ...lead,
             fecha_creacion: new Date().toISOString(),
@@ -201,17 +200,12 @@ function canEditStatus() {
 async function updateLeadStatus(leadId, newStatus) {
   try {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-      alert('No autenticado. Inicie sesión nuevamente.');
-      window.location.href = '/login.html';
-      return;
-    }
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
     const res = await fetch(`/api/leads/${leadId}/status`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
+      credentials: 'include',
+      headers,
       body: JSON.stringify({ status: newStatus })
     });
     const data = await res.json().catch(() => ({}));
@@ -237,16 +231,11 @@ async function cargarDatosDesdeServidor() {
     const role = (getCurrentUserRole() || '').toLowerCase();
     const isLocalUserBypass = isLocal && (role === 'user' || role === 'supervisor');
     
-    if (!token && !isLocalUserBypass) {
-      console.error('No se encontró token de autenticación. Redirigiendo a login...');
-      window.location.href = '/login.html';
-      return;
-    }
-    
     // Configurar los headers. En local con rol user, no enviamos Authorization
-    const headers = isLocalUserBypass
-      ? { 'Content-Type': 'application/json' }
-      : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    const headers = { 'Content-Type': 'application/json' };
+    if (!isLocalUserBypass && token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
     
     if (headers.Authorization) {
       console.log('Realizando petición a /api/customers con token:', token.substring(0, 10) + '...');
@@ -264,6 +253,7 @@ async function cargarDatosDesdeServidor() {
     } catch(_) {}
     const res = await fetch(url, {
       method: 'GET',
+      credentials: 'include',
       headers: headers
     });
     

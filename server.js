@@ -7,15 +7,28 @@ const { MongoClient, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
+// Carga condicional de Helmet y Rate Limit (si están instalados)
+let helmet = null;
+let rateLimit = null;
+try { helmet = require('helmet'); } catch { console.warn('[INIT] helmet no instalado, se recomienda instalarlo'); }
+try { rateLimit = require('express-rate-limit'); } catch { console.warn('[INIT] express-rate-limit no instalado, se recomienda instalarlo'); }
+// Carga condicional de cookie-parser (para soportar JWT en cookies si se usa)
+let cookieParser = null;
+try { cookieParser = require('cookie-parser'); } catch { console.warn('[INIT] cookie-parser no instalado (opcional si usas JWT en header)'); }
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
 const { connectToMongoDB, getDb } = require('./config/db');
+// Middleware de autenticación unificado
+const { protect, authorize } = require('./middleware/auth');
 
 // Configuración de JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
+if (!process.env.JWT_SECRET) {
+  console.warn('[WARN] JWT_SECRET no definido en variables de entorno. Usa un valor fuerte en producción.');
+}
 const JWT_EXPIRES_IN = '24h'; // El token expira en 24 horas
 
 // Silenciar logs en producción (mantener warn/error)
@@ -29,11 +42,50 @@ if (process.env.NODE_ENV === 'production') {
 const staticPath = path.join(__dirname, '/');
 const publicPath = path.join(__dirname, '/');
 
-// Configuración de CORS simplificada para desarrollo
+// Helper para opciones de cookie dinámicas según request (soporte localhost:10000 en HTTP)
+function cookieOptionsForReq(req, baseOpts) {
+  const defaultOpts = baseOpts || {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+  const proto = (req.headers && req.headers['x-forwarded-proto']) || req.protocol;
+  const isHttps = (proto === 'https') || req.secure;
+  const host = (req.headers && req.headers.host) || '';
+  const isLocal10000 = /localhost:10000$/i.test(host);
+  if (isLocal10000 || !isHttps) {
+    return { ...defaultOpts, secure: false, sameSite: 'lax' };
+  }
+  return defaultOpts;
+}
+
+// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS)
+const parseAllowedOrigins = (raw) => (raw || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+const defaultAllowed = [
+  'http://localhost:10000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:10000'
+];
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS) || [];
+const whitelist = allowedOrigins.length ? allowedOrigins : defaultAllowed;
 const corsOptions = {
-  origin: '*', // Permite cualquier origen
+  origin: (origin, callback) => {
+    // Permitir solicitudes sin origen (navegación directa) y orígenes en whitelist
+    if (!origin || whitelist.includes(origin)) {
+      return callback(null, true);
+    }
+    console.warn('[CORS] Origen no permitido:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
   optionsSuccessStatus: 200
 };
 
@@ -56,6 +108,19 @@ let db;
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+if (cookieParser) {
+  app.use(cookieParser());
+}
+// Helmet (si disponible)
+if (helmet) {
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
+}
+// Rate limiting (si disponible)
+const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
+const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
+const loginLimiter = makeLimiter({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Servir archivos estáticos
 app.use(express.static(staticPath, {
@@ -73,66 +138,19 @@ app.use(express.static(staticPath, {
 // Handle CORS preflight for all routes
 app.options('*', cors(corsOptions));
 
-// Usar rutas de autenticación
-app.use('/api/auth', authRoutes);
+// Usar rutas de autenticación (aplicar limiter suave al grupo si disponible)
+app.use('/api/auth', authLimiter, authRoutes);
 // Montar rutas de API públicas
 app.use('/api', apiRoutes);
 // Montar rutas de ranking
 app.use('/api', rankingRoutes);
 
-// Middleware para verificar el token JWT
-const authenticateJWT = (req, res, next) => {
-  console.log('=== MIDDLEWARE DE AUTENTICACIÓN JWT ===');
-  console.log('Headers de la petición:', JSON.stringify(req.headers, null, 2));
-  
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) {
-    console.log('No se proporcionó token de autenticación');
-    return res.status(401).json({ message: 'No autorizado - Token no proporcionado' });
-  }
-  
-  const token = authHeader.split(' ')[1];
-  
-  if (!token) {
-    console.log('Formato de token inválido');
-    return res.status(401).json({ message: 'No autorizado - Formato de token inválido' });
-  }
-  
-  console.log('Token recibido:', token ? 'PRESENTE' : 'AUSENTE');
-  
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
-    if (err) {
-      console.error('Error al verificar el token:', err);
-      if (err.name === 'TokenExpiredError') {
-        return res.status(401).json({ message: 'Token expirado' });
-      }
-      return res.status(403).json({ message: 'Token inválido' });
-    }
-    
-    console.log('Token decodificado exitosamente:', JSON.stringify(decoded, null, 2));
-    
-    // Aceptar tanto 'id' como 'userId' por compatibilidad
-    const uid = decoded?.id || decoded?.userId;
-    if (!decoded || !uid) {
-      console.log('ERROR: El token decodificado no contiene un ID de usuario (id|userId)');
-      return res.status(403).json({ message: 'Token inválido - Falta el ID de usuario' });
-    }
-    
-    // Asegurarse de que el objeto user tenga las propiedades esperadas
-    req.user = {
-      id: uid.toString(),  // Asegurar que sea string
-      username: decoded.username || 'Usuario desconocido',
-      role: decoded.role || 'user'
-    };
-    
-    console.log('Usuario autenticado:', JSON.stringify(req.user, null, 2));
-    next();
-  });
-};
+// Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)
+// Wrapper mínimo por compatibilidad con referencias existentes
+const authenticateJWT = (req, res, next) => protect(req, res, next);
 
 // Ruta protegida de ejemplo (requiere autenticación)
-app.get('/api/protected', authenticateJWT, (req, res) => {
+app.get('/api/protected', protect, (req, res) => {
   res.json({ message: 'Ruta protegida', user: req.user });
 });
 
@@ -141,46 +159,43 @@ app.get('/api/status', (req, res) => {
   res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
 });
 
-// Endpoint para crear un usuario administrador inicial (solo para desarrollo)
+// Endpoint para crear un usuario administrador inicial (solo desarrollo + secreto por .env)
 app.post('/api/create-admin', async (req, res) => {
   try {
-    const { username, password, secret } = req.body;
-    
-    // Verificar el secreto (solo para desarrollo)
-    if (secret !== 'admin123') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'No autorizado' 
-      });
+    // Bloquear en producción
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ success: false, message: 'No encontrado' });
     }
-    
+
+    const { username, password, secret } = req.body || {};
+    const SETUP_SECRET = process.env.ADMIN_SETUP_SECRET;
+    const headerSecret = req.headers['x-admin-setup-secret'];
+    const providedSecret = headerSecret || secret;
+
+    if (!SETUP_SECRET || !providedSecret || providedSecret !== SETUP_SECRET) {
+      return res.status(403).json({ success: false, message: 'No autorizado' });
+    }
+
     if (!username || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Usuario y contraseña son requeridos' 
-      });
+      return res.status(400).json({ success: false, message: 'Usuario y contraseña son requeridos' });
     }
-    
+
     // Verificar si la base de datos está conectada
     if (!db) {
       console.log('Base de datos no conectada, intentando conectar...');
-      await connectToMongoDB();
+      db = await connectToMongoDB();
     }
-    
+
     // Verificar si el usuario ya existe
     const existingUser = await db.collection('users').findOne({ username });
-    
     if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'El usuario ya existe' 
-      });
+      return res.status(400).json({ success: false, message: 'El usuario ya existe' });
     }
-    
+
     // Hashear la contraseña
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
+
     // Crear el usuario administrador
     const newUser = {
       username,
@@ -189,29 +204,20 @@ app.post('/api/create-admin', async (req, res) => {
       createdAt: new Date(),
       updatedAt: new Date()
     };
-    
-    const result = await db.collection('users').insertOne(newUser);
-    
+
+    await db.collection('users').insertOne(newUser);
     // No devolver la contraseña
     delete newUser.password;
-    
-    res.status(201).json({
-      success: true,
-      message: 'Usuario administrador creado exitosamente',
-      user: newUser
-    });
-    
+
+    return res.status(201).json({ success: true, message: 'Usuario administrador creado exitosamente', user: newUser });
   } catch (error) {
     console.error('Error al crear usuario administrador:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al crear el usuario administrador'
-    });
+    return res.status(500).json({ success: false, message: 'Error al crear el usuario administrador' });
   }
 });
 
 // Listar agentes desde la colección de usuarios (para hidratar sidebar)
-app.get('/api/users/agents', authenticateJWT, async (req, res) => {
+app.get('/api/users/agents', protect, async (req, res) => {
   try {
     if (!db) await connectToMongoDB();
     const usersColl = db.collection('users');
@@ -235,7 +241,8 @@ app.get('/api/users/agents', authenticateJWT, async (req, res) => {
 });
 
 // Endpoint para el login
-app.post('/api/login', async (req, res) => {
+// Endpoint para el login (aplicar rate limit si disponible)
+app.post('/api/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -283,6 +290,18 @@ app.post('/api/login', async (req, res) => {
       { expiresIn: JWT_EXPIRES_IN }
     );
     
+    // Establecer cookie HttpOnly con el token (compatibilidad con lecturas desde cookie)
+    try {
+      const opts = cookieOptionsForReq(req, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000,
+        path: '/',
+      });
+      res.cookie && res.cookie('token', token, opts);
+    } catch {}
+
     // Enviar respuesta exitosa sin la contraseña
     const { password: _, ...userWithoutPassword } = user;
     
@@ -360,7 +379,7 @@ app.get('/api/leads/:id/comentarios', async (req, res) => {
 });
 
 // Crear comentario
-app.post('/api/leads/:id/comentarios', authenticateJWT, async (req, res) => {
+app.post('/api/leads/:id/comentarios', protect, async (req, res) => {
   try {
     const leadId = req.params.id;
     const { texto, comentario, autor } = req.body || {};
@@ -388,7 +407,7 @@ app.post('/api/leads/:id/comentarios', authenticateJWT, async (req, res) => {
 });
 
 // Actualizar comentario
-app.put('/api/leads/:id/comentarios/:comentarioId', authenticateJWT, async (req, res) => {
+app.put('/api/leads/:id/comentarios/:comentarioId', protect, async (req, res) => {
   try {
     const { id, comentarioId } = req.params;
     const { texto } = req.body || {};
@@ -410,7 +429,7 @@ app.put('/api/leads/:id/comentarios/:comentarioId', authenticateJWT, async (req,
 });
 
 // Eliminar comentario
-app.delete('/api/leads/:id/comentarios/:comentarioId', authenticateJWT, async (req, res) => {
+app.delete('/api/leads/:id/comentarios/:comentarioId', protect, async (req, res) => {
   try {
     const { id, comentarioId } = req.params;
     if (!db) await connectToMongoDB();
@@ -426,7 +445,7 @@ app.delete('/api/leads/:id/comentarios/:comentarioId', authenticateJWT, async (r
 });
 
 // Actualizar el "status" de un lead/cliente
-app.put('/api/leads/:id/status', authenticateJWT, async (req, res) => {
+app.put('/api/leads/:id/status', protect, authorize('admin','backoffice','b:o','b.o','b-o','bo'), async (req, res) => {
   try {
     // Verificar conexión a BD
     if (!db) await connectToMongoDB();
@@ -535,8 +554,8 @@ app.put('/api/leads/:id/status', authenticateJWT, async (req, res) => {
   }
 });
 
-// Endpoint para obtener clientes desde la base de datos (público para dashboard sin login)
-app.get('/api/customers', async (req, res) => {
+// Endpoint para obtener clientes desde la base de datos (PROTEGIDO + RBAC)
+app.get('/api/customers', protect, authorize('admin','supervisor','agent'), async (req, res) => {
   try {
     console.log('Solicitud recibida en /api/customers');
     
@@ -548,7 +567,7 @@ app.get('/api/customers', async (req, res) => {
 
     // Obtener los parámetros de paginación y filtros
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const skip = (page - 1) * limit;
     const fechaInicio = req.query.fechaInicio ? new Date(req.query.fechaInicio) : null;
     const fechaFin = req.query.fechaFin ? new Date(req.query.fechaFin) : null;
@@ -781,18 +800,15 @@ app.get('/api/customers', async (req, res) => {
         
         // Información adicional
         autopago: customer.autopago || false,
-        
+
         // Exponer campos de agente (IDs y nombres) para permitir asignación en frontend
         agenteId: customer.agenteId || customer.agente_id || customer.idAgente || customer.agentId || customer.createdBy || customer.creadoPor || customer.creado_por || customer.ownerId || customer.assignedId || '',
         agenteNombre: customer.agenteNombre || customer.nombreAgente || customer.agente || customer.agent || customer.vendedor || customer.seller || customer.nombre_agente || customer.agente_nombre || customer.agentName || customer.salesAgent || customer.asignadoA || customer.asignado_a || customer.assignedTo || customer.assigned_to || customer.usuario || customer.owner || customer.registeredBy || '',
-        // También exponer variantes crudas útiles para diagnóstico
+        // También exponer variantes (no sensibles) útiles para diagnóstico limitado
         creadoPor: customer.creadoPor || customer.creado_por || '',
         createdBy: customer.createdBy || '',
         ownerId: customer.ownerId || '',
-        assignedId: customer.assignedId || '',
-        
-        // Mantener el objeto original para referencia
-        _raw: customer
+        assignedId: customer.assignedId || ''
       };
       
       // Asegurarse de que los valores booleanos se conviertan a string para la visualización
@@ -843,7 +859,7 @@ app.get('/api/customers', async (req, res) => {
 });
 
 // Resumen de agentes disponibles en la data de clientes (diagnóstico)
-app.get('/api/customers/agents-summary', authenticateJWT, async (req, res) => {
+app.get('/api/customers/agents-summary', protect, async (req, res) => {
   try {
     if (!db) await connectToMongoDB();
     const coll = db.collection('costumers');
@@ -1099,7 +1115,7 @@ async function removeUniqueIndexIfExists() {
 }
 
 // Endpoint para crear un nuevo cliente (customer)
-app.post('/api/customers', authenticateJWT, async (req, res) => {
+app.post('/api/customers', protect, async (req, res) => {
   // Configuración CORS
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -1385,7 +1401,7 @@ app.get('/api/leads', async (req, res) => {
 
 
 // Endpoint para crear un nuevo lead
-app.post('/api/leads', authenticateJWT, async (req, res) => {
+app.post('/api/leads', protect, async (req, res) => {
   // Set CORS headers
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
