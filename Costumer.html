@@ -1270,6 +1270,7 @@
 
         // Construir URL con parámetros cuando el usuario sea agente
         let url = '/api/customers?page=1&limit=100';
+        let alreadyFilteredByAgent = false;
         try {
           const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
           const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
@@ -1279,13 +1280,20 @@
             if (idCandidates.length) {
               const agenteId = encodeURIComponent(idCandidates[0]);
               url += `&agenteId=${agenteId}`;
+              alreadyFilteredByAgent = true;
+              console.log('[fetchLeadsAgente] Rol=agent. Usando agenteId para URL:', idCandidates[0]);
             } else if (nameCandidates.length) {
               const agente = encodeURIComponent(nameCandidates[0]);
               url += `&agente=${agente}`;
+              alreadyFilteredByAgent = true;
+              console.log('[fetchLeadsAgente] Rol=agent. Usando agente(nombre) para URL:', nameCandidates[0]);
             }
+          } else {
+            console.log('[fetchLeadsAgente] Rol detectado:', role || '(vacío)');
           }
         } catch(_) { /* noop */ }
 
+        console.log('[fetchLeadsAgente] URL solicitada:', url, 'alreadyFilteredByAgent=', alreadyFilteredByAgent);
         const response = await fetch(url, { headers });
         if (!response.ok) {
           console.warn('[fetchLeadsAgente] Respuesta no OK del backend:', response.status);
@@ -1296,7 +1304,10 @@
         } catch (e) {
           console.warn('[fetchLeadsAgente] No se pudo parsear JSON de respuesta:', e?.message);
         }
-        console.log('Datos de leads recibidos:', data);
+        console.log('[fetchLeadsAgente] Datos recibidos (resumen):', {
+          tipo: Array.isArray(data) ? 'array' : typeof data,
+          len: Array.isArray(data) ? data.length : (data && Array.isArray(data.leads) ? data.leads.length : 0)
+        });
         let leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
 
         // Fallback a mocks si no hay datos o la solicitud falló
@@ -1313,82 +1324,95 @@
           }
         }
 
+        console.log('[fetchLeadsAgente] leadsRaw.length =', (leadsRaw && leadsRaw.length) || 0);
         let normalizedLeads = normalizeLeads(leadsRaw);
+        console.log('[fetchLeadsAgente] normalizedLeads.length =', (normalizedLeads && normalizedLeads.length) || 0);
 
-    // Filtrar por agente si el usuario es role 'agent'
-    try {
-      const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-      const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
-      if (role === 'agent') {
-        const norm = (s) => {
-          try { return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); } catch { return String(s || '').toLowerCase().trim(); }
-        };
-        const str = (v) => (v == null ? '' : String(v));
-        // Candidatos de ID del usuario actual
-        const myIds = [
-          userData.id, userData._id, userData.userId, userData.uid,
-          userData?.usuario?._id, userData?.usuario?.id,
-          userData?.user?._id, userData?.user?.id,
-          userData?.profile?._id, userData?.profile?.id
-        ].map(str).filter(x => x.trim().length);
+    // Filtrar por agente si el usuario es role 'agent' SOLO si no se filtró ya en el backend
+    if (!alreadyFilteredByAgent) {
+      try {
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+        if (role === 'agent') {
+          const norm = (s) => {
+            try { return String(s || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'').trim(); } catch { return String(s || '').toLowerCase().trim(); }
+          };
+          const str = (v) => (v == null ? '' : String(v));
+          // Candidatos de ID del usuario actual
+          const myIds = [
+            userData.id, userData._id, userData.userId, userData.uid,
+            userData?.usuario?._id, userData?.usuario?.id,
+            userData?.user?._id, userData?.user?.id,
+            userData?.profile?._id, userData?.profile?.id
+          ].map(str).filter(x => x.trim().length);
 
-        // Candidatos de nombre del usuario actual
-        const myNames = [
-          userData.name, userData.nombre, userData.username, userData.email,
-          userData?.usuario?.name, userData?.usuario?.nombre, userData?.usuario?.username
-        ].map(str).filter(x => x.trim().length);
+          // Candidatos de nombre del usuario actual
+          const myNames = [
+            userData.name, userData.nombre, userData.username, userData.email,
+            userData?.usuario?.name, userData?.usuario?.nombre, userData?.usuario?.username
+          ].map(str).filter(x => x.trim().length);
 
-        const getId = (l) => {
-          if (typeof getAgentId === 'function') return getAgentId(l);
-          const raw = (
-            l?.agenteId || l?._raw?.agenteId || l?.agente_id || l?._raw?.agente_id ||
-            l?.idAgente || l?._raw?.idAgente || l?.agentId || l?._raw?.agentId ||
-            l?.createdBy || l?.ownerId || l?.assignedId ||
-            l?._raw?.createdBy || l?._raw?.ownerId || l?._raw?.assignedId || ''
-          );
-          try {
-            if (raw && typeof raw === 'object') {
-              const maybe = raw.$oid || raw.id || raw._id || raw.value || (raw.toString ? raw.toString() : '');
-              return String(maybe || '').trim();
-            }
-            return String(raw || '').trim();
-          } catch { return String(raw || '').trim(); }
-        };
-        const getName = (l) => {
-          if (typeof getAgentName === 'function') return getAgentName(l);
-          const cand = [
-            l?.agenteNombre, l?.nombreAgente, l?.agente, l?.agent,
-            l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.agent
-          ];
-          const v = cand.find(x => x && String(x).trim().length);
-          return v ? String(v).trim() : '';
-        };
+          const getId = (l) => {
+            if (typeof getAgentId === 'function') return getAgentId(l);
+            const raw = (
+              l?.agenteId || l?._raw?.agenteId || l?.agente_id || l?._raw?.agente_id ||
+              l?.idAgente || l?._raw?.idAgente || l?.agentId || l?._raw?.agentId ||
+              l?.createdBy || l?.ownerId || l?.assignedId ||
+              l?._raw?.createdBy || l?._raw?.ownerId || l?._raw?.assignedId || ''
+            );
+            try {
+              if (raw && typeof raw === 'object') {
+                const maybe = raw.$oid || raw.id || raw._id || raw.value || (raw.toString ? raw.toString() : '');
+                return String(maybe || '').trim();
+              }
+              return String(raw || '').trim();
+            } catch { return String(raw || '').trim(); }
+          };
+          const getName = (l) => {
+            if (typeof getAgentName === 'function') return getAgentName(l);
+            const cand = [
+              l?.agenteNombre, l?.nombreAgente, l?.agente, l?.agent,
+              l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.agent
+            ];
+            const v = cand.find(x => x && String(x).trim().length);
+            return v ? String(v).trim() : '';
+          };
 
-        const myIdsNorm = new Set(myIds.map(x => norm(x)));
-        const myNamesNorm = new Set(myNames.map(x => norm(x)));
+          const myIdsNorm = new Set(myIds.map(x => norm(x)));
+          const myNamesNorm = new Set(myNames.map(x => norm(x)));
 
-        const beforeCount = normalizedLeads.length;
-        normalizedLeads = normalizedLeads.filter(l => {
-          const idMatch = (() => {
-            const lid = norm(getId(l));
-            if (!lid) return false;
-            return myIdsNorm.has(lid);
-          })();
-          if (idMatch) return true;
-          const nameMatch = (() => {
-            const lname = norm(getName(l));
-            if (!lname) return false;
-            return myNamesNorm.has(lname);
-          })();
-          return nameMatch;
-        });
-        console.log(`[Filtro rol=agent] ${beforeCount} -> ${normalizedLeads.length} leads para el usuario actual`);
+          const beforeCount = normalizedLeads.length;
+          normalizedLeads = normalizedLeads.filter(l => {
+            const idMatch = (() => {
+              const lid = norm(getId(l));
+              if (!lid) return false;
+              return myIdsNorm.has(lid);
+            })();
+            if (idMatch) return true;
+            const nameMatch = (() => {
+              const lname = norm(getName(l));
+              if (!lname) return false;
+              return myNamesNorm.has(lname);
+            })();
+            return nameMatch;
+          });
+          console.log(`[Filtro rol=agent] ${beforeCount} -> ${normalizedLeads.length} leads para el usuario actual (frontend)`);
+        }
+      } catch (e) {
+        console.warn('No se pudo aplicar filtro por agente:', e?.message);
       }
-    } catch (e) {
-      console.warn('No se pudo aplicar filtro por agente:', e?.message);
     }
 
     window.ultimaListaLeads = normalizedLeads;
+    try {
+      const sample = (normalizedLeads || []).slice(0, 3).map(l => ({
+        _id: l._id || l.id,
+        agenteId: l.agenteId || l.agente_id || l.idAgente || l.agentId,
+        agente: l.agente || l.agent || l.agenteNombre || l.nombreAgente,
+        dia_venta: l.dia_venta || l.FECHA || l.fecha || l.fecha_venta
+      }));
+      console.log('[fetchLeadsAgente] Muestra post-filtrado:', sample);
+    } catch {}
 
         // Actualizar la interfaz
         renderCostumerTable(normalizedLeads);
