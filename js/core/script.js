@@ -242,15 +242,40 @@ async function cargarDatosDesdeServidor() {
     } else {
       console.log('Realizando petición a /api/customers en modo local sin token (bypass dev para rol user/supervisor)');
     }
+    // Construir URL con parámetros de la ubicación actual, respetando filtros
+    let base = "/api/customers";
+    const current = new URL(window.location.href);
+    const fromSearch = new URLSearchParams(current.search);
+    const params = new URLSearchParams();
+
+    // Pasar parámetros relevantes al backend
+    const passKeys = ['forceAll','agenteId','agente','fechaInicio','fechaFin','page','limit'];
+    passKeys.forEach(k => {
+      const v = fromSearch.get(k);
+      if (v !== null && v !== undefined && String(v).trim() !== '') {
+        params.set(k, String(v));
+      }
+    });
+
+    // Defaults para maximizar resultados visibles si no vienen en la URL
+    if (!params.has('page')) params.set('page', '1');
+    if (!params.has('limit')) params.set('limit', '200'); // máximo permitido por backend
+
     // Si el usuario es Irania, pedir más registros para evitar que la paginación oculte clientes de su team
-    let url = "/api/customers";
     try {
       const isIraniaUser = (typeof esIrania === 'function') && esIrania();
       if (isIraniaUser) {
-        const qs = new URLSearchParams({ page: '1', limit: '1000', _t: String(Date.now()) }).toString();
-        url = `/api/customers?${qs}`;
+        // Aumentar el límite solo si no está definido o es menor que 1000
+        const existingLimit = parseInt(params.get('limit') || '0', 10);
+        if (!existingLimit || existingLimit < 1000) params.set('limit', '1000');
       }
     } catch(_) {}
+
+    // Cache buster para evitar respuestas en caché durante depuración
+    params.set('_t', String(Date.now()));
+
+    const url = params.toString() ? `${base}?${params.toString()}` : base;
+
     const res = await fetch(url, {
       method: 'GET',
       credentials: 'include',
@@ -274,12 +299,48 @@ async function cargarDatosDesdeServidor() {
     
     const data = await res.json();
     console.log('Datos recibidos del servidor:', data);
-    
-    // Asegurarse de que data.leads existe, si no, usar data directamente
-    const leads = data.leads || data || [];
-    console.log('Leads a renderizar:', leads);
-    
-    renderCostumerTable(leads);
+
+    // Consolidar todas las páginas si existen
+    let combinedLeads = Array.isArray(data.leads) ? data.leads.slice() : (Array.isArray(data) ? data.slice() : []);
+    const total = parseInt(data.total || 0, 10);
+    const pages = parseInt(data.pages || 1, 10);
+    const currentPage = parseInt(data.page || 1, 10);
+    const usedLimit = parseInt((new URL(url, window.location.origin)).searchParams.get('limit') || '200', 10);
+
+    // Solo consolidar en roles restringidos (agent/supervisor) o cuando no haya forceAll
+    const roleForPages = (getCurrentUserRole() || '').toLowerCase();
+    const qp = new URL(url, window.location.origin).searchParams;
+    const forceAllActive = (qp.get('forceAll') === '1' || qp.get('forceAll') === 'true');
+    const shouldMergeAllPages = pages > 1 && (!forceAllActive) && (roleForPages === 'agent' || roleForPages === 'supervisor');
+
+    if (shouldMergeAllPages) {
+      console.log(`[Paginación] Detectadas ${pages} páginas. Consolidando todas las páginas (rol: ${roleForPages}).`);
+      try {
+        const baseUrl = new URL(url, window.location.origin);
+        for (let p = currentPage + 1; p <= pages; p++) {
+          baseUrl.searchParams.set('page', String(p));
+          // Mantener limit actual
+          baseUrl.searchParams.set('limit', String(usedLimit || 200));
+          // Cache buster distinto por página
+          baseUrl.searchParams.set('_t', String(Date.now() + p));
+          console.log('[Paginación] Fetch página:', p, baseUrl.toString());
+          const rp = await fetch(baseUrl.toString(), { method: 'GET', credentials: 'include', headers });
+          if (!rp.ok) {
+            console.warn('[Paginación] Respuesta no OK en página', p, rp.status);
+            continue;
+          }
+          const jd = await rp.json();
+          const arr = Array.isArray(jd.leads) ? jd.leads : (Array.isArray(jd) ? jd : []);
+          combinedLeads = combinedLeads.concat(arr);
+        }
+        console.log(`[Paginación] Consolidación completa. Total combinados: ${combinedLeads.length} (backend total: ${total}).`);
+      } catch (e) {
+        console.warn('[Paginación] Error al consolidar páginas:', e);
+      }
+    }
+
+    console.log('Leads a renderizar (combinados si aplica):', combinedLeads);
+    renderCostumerTable(combinedLeads);
   } catch (error) {
     console.error('Error al cargar los datos:', error);
     // Mostrar un mensaje más detallado en la consola

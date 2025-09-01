@@ -550,6 +550,10 @@
             <button id="refresh-table" class="action-btn" title="Refrescar">
               <i class="fas fa-sync-alt"></i>
             </button>
+            <!-- Botón para alternar ver todos/mis clientes (solo visible para admin/supervisor/backoffice) -->
+            <button id="toggle-forceall" class="action-btn" title="Ver todos" style="display:none">
+              <i class="fas fa-users"></i>
+            </button>
           </div>
         </div>
         
@@ -717,6 +721,7 @@
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.getElementById('toggle-compact');
       const refreshBtn = document.getElementById('refresh-table');
+      const forceAllBtn = document.getElementById('toggle-forceall');
 
       if (toggleBtn) {
         toggleBtn.addEventListener('click', function() {
@@ -730,10 +735,57 @@
           const icon = refreshBtn.querySelector('i');
           const prev = icon.className;
           icon.className = 'fas fa-spinner fa-spin';
-          try { await fetchLeadsAgente(); }
+          try {
+            if (typeof cargarDatosDesdeServidor === 'function') {
+              await cargarDatosDesdeServidor();
+            } else if (typeof fetchLeadsAgente === 'function') {
+              await fetchLeadsAgente();
+            }
+          }
           finally { icon.className = prev; }
         });
       }
+
+      // Conmutador Ver todos / Mis clientes
+      function getRole() {
+        try {
+          const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+          return (userData.role || userData?.usuario?.role || '').toString().toLowerCase().trim();
+        } catch { return ''; }
+      }
+      function getForceAll() {
+        const usp = new URLSearchParams(window.location.search);
+        const v = (usp.get('forceAll') || '').toString().toLowerCase();
+        return v === '1' || v === 'true' || v === 'yes';
+      }
+      function setForceAll(enabled) {
+        const url = new URL(window.location.href);
+        if (enabled) url.searchParams.set('forceAll', '1');
+        else url.searchParams.delete('forceAll');
+        window.location.href = url.toString();
+      }
+      // Mostrar botón solo para admin/supervisor/backoffice (no para agent)
+      const role = getRole();
+      // Solo admin/backoffice pueden ver el botón (supervisor ya queda restringido en backend)
+      const allowed = new Set(['admin','backoffice','b:o','b.o','b-o','bo']);
+      if (forceAllBtn) {
+        if (allowed.has(role)) {
+          forceAllBtn.style.display = 'inline-flex';
+          const isForceAll = getForceAll();
+          forceAllBtn.title = isForceAll ? 'Mis clientes' : 'Ver todos';
+          if (isForceAll) forceAllBtn.classList.add('active');
+          forceAllBtn.addEventListener('click', function() {
+            setForceAll(!getForceAll());
+          });
+        } else {
+          // Agente: oculto y aseguramos que no quede activo por URL
+          forceAllBtn.style.display = 'none';
+        }
+      }
+
+      // Resetear filtros residuales antes de cargar datos (evita listas reducidas por estados previos)
+      try { window.iraniaAgentFilter = null; } catch(_) {}
+      try { window.adminTeamFilter = null; } catch(_) {}
 
       // Cargar datos iniciales
       if (typeof cargarDatosIniciales === 'function') {
@@ -1271,10 +1323,12 @@
         // Construir URL con parámetros cuando el usuario sea agente
         let url = '/api/customers?page=1&limit=100';
         let alreadyFilteredByAgent = false;
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceAll = urlParams.get('forceAll') === '1' || urlParams.get('forceAll') === 'true';
         try {
           const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
           const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
-          if (role === 'agent') {
+          if (role === 'agent' && !forceAll) {
             const idCandidates = [userData._id, userData.id, userData.userId, userData.uid, userData?.usuario?._id, userData?.usuario?.id].map(v => v && String(v).trim()).filter(Boolean);
             const nameCandidates = [userData.username, userData.name, userData.nombre, userData?.usuario?.username, userData?.usuario?.name, userData?.usuario?.nombre].map(v => v && String(v).trim()).filter(Boolean);
             if (idCandidates.length) {
@@ -1293,7 +1347,8 @@
           }
         } catch(_) { /* noop */ }
 
-        console.log('[fetchLeadsAgente] URL solicitada:', url, 'alreadyFilteredByAgent=', alreadyFilteredByAgent);
+        if (forceAll) console.warn('[fetchLeadsAgente] forceAll=1 activo: NO se aplica filtrado por agente (backend ni frontend)');
+        console.log('[fetchLeadsAgente] URL solicitada:', url, 'alreadyFilteredByAgent=', alreadyFilteredByAgent, 'forceAll=', forceAll);
         const response = await fetch(url, { headers });
         if (!response.ok) {
           console.warn('[fetchLeadsAgente] Respuesta no OK del backend:', response.status);
@@ -1329,7 +1384,7 @@
         console.log('[fetchLeadsAgente] normalizedLeads.length =', (normalizedLeads && normalizedLeads.length) || 0);
 
     // Filtrar por agente si el usuario es role 'agent' SOLO si no se filtró ya en el backend
-    if (!alreadyFilteredByAgent) {
+    if (!alreadyFilteredByAgent && !forceAll) {
       try {
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
@@ -1459,19 +1514,25 @@
           console.log('[DEBUG] Mostrando indicador de carga');
           loadingIndicator.style.display = 'block';
         }
-        
-        // Cargar datos del servidor usando fetchLeadsAgente
-        console.log('[DEBUG] Llamando a fetchLeadsAgente...');
-        const leads = await fetchLeadsAgente();
-        console.log('[DEBUG] fetchLeadsAgente completado, leads:', leads);
-        
-        if (leads && leads.length > 0) {
-          console.log('[DEBUG] Datos de clientes cargados correctamente:', leads.length, 'registros');
-          console.log('[DEBUG] Primer lead de ejemplo:', JSON.stringify(leads[0], null, 2));
-          // No es necesario llamar a renderCostumerTable ni updateSummaryCards aquí
-          // porque ya se llaman dentro de fetchLeadsAgente
+        // Cargar datos del servidor usando la función unificada
+        console.log('[DEBUG] Llamando a cargarDatosDesdeServidor...');
+        if (typeof cargarDatosDesdeServidor === 'function') {
+          await cargarDatosDesdeServidor();
+          const arr = Array.isArray(window.ultimaListaLeads) ? window.ultimaListaLeads : [];
+          if (arr.length > 0) {
+            console.log('[DEBUG] Datos de clientes cargados correctamente:', arr.length, 'registros');
+            try { console.log('[DEBUG] Primer lead de ejemplo:', JSON.stringify(arr[0], null, 2)); } catch(_) {}
+          } else {
+            console.warn('[DEBUG] No se encontraron leads o el arreglo está vacío tras cargarDatosDesdeServidor');
+            mostrarMensajeSinDatos();
+          }
+        } else if (typeof fetchLeadsAgente === 'function') {
+          // Fallback por compatibilidad, pero preferimos la ruta unificada
+          console.log('[DEBUG] cargarDatosDesdeServidor no disponible, usando fallback fetchLeadsAgente');
+          const leads = await fetchLeadsAgente();
+          if (!leads || leads.length === 0) mostrarMensajeSinDatos();
         } else {
-          console.warn('[DEBUG] No se encontraron leads o el arreglo está vacío');
+          console.warn('[DEBUG] No hay función de carga disponible');
           mostrarMensajeSinDatos();
         }
       } catch (error) {
@@ -1664,9 +1725,18 @@
         : (leads && leads.leads && Array.isArray(leads.leads)) 
           ? leads.leads 
           : [];
+      // Guardar la última lista para re-renderizados por filtros/toolbar
+      try { window.ultimaListaLeads = leadsArray.slice(); } catch(_) {}
+      // Flag de depuración: si la URL contiene debugNoFilters=1, no aplicar filtros especiales ni vistas por TEAM
+      let __debugNoFilters = false;
+      try {
+        const usp = new URLSearchParams(window.location.search || '');
+        __debugNoFilters = (usp.get('debugNoFilters') === '1' || usp.get('debugNoFilters') === 'true');
+      } catch(_) { __debugNoFilters = false; }
       
       // Filtro especial: si el usuario es Irania Serrano, mostrar solo leads de su TEAM
       try {
+        if (__debugNoFilters) throw new Error('DEBUG: filtros desactivados');
         const isIraniaUser = (typeof esIrania === 'function') && esIrania();
         // No aplicar el filtro de TEAM IRANIA para roles admin o supervisor
         const __role = (typeof getUserRole_local === 'function') ? (getUserRole_local() || '') : '';
@@ -1975,6 +2045,7 @@
 
       // Vista especial para SUPERVISORES: mostrar lista PLANA del propio TEAM con toolbar por agente
       try {
+        if (__debugNoFilters) throw new Error('DEBUG: filtros desactivados');
         // Detectar supervisor actual via Teams
         const teamsApiRoot = (window && window.Teams) ? window.Teams : null;
         const currentUserName = (typeof obtenerUsuarioActual === 'function') ? obtenerUsuarioActual() : '';
@@ -2077,7 +2148,7 @@
       }
 
       // Vista ADMIN/BACKOFFICE: toolbar por TEAM y render plano filtrado por team
-      if (typeof esAdminOBackoffice === 'function' && esAdminOBackoffice()) {
+      if (!(__debugNoFilters) && typeof esAdminOBackoffice === 'function' && esAdminOBackoffice()) {
         try {
           const teamsApi = (window && window.Teams) ? window.Teams : null;
           const teams = teamsApi && typeof teamsApi.getAllTeams === 'function' ? teamsApi.getAllTeams() : [];

@@ -155,6 +155,19 @@ app.use('/api', rankingRoutes);
 // Wrapper mínimo por compatibilidad con referencias existentes
 const authenticateJWT = (req, res, next) => protect(req, res, next);
 
+// Favicon handler: servir un icono por defecto para evitar 404
+app.get('/favicon.ico', (req, res) => {
+  try {
+    const iconPathPng = path.join(__dirname, 'images', 'avatar.png');
+    if (fs.existsSync(iconPathPng)) {
+      res.type('png');
+      return res.sendFile(iconPathPng);
+    }
+  } catch {}
+  // Fallback vacío para no loguear 404
+  res.status(204).end();
+});
+
 // Ruta protegida de ejemplo (requiere autenticación)
 app.get('/api/protected', protect, (req, res) => {
   res.json({ message: 'Ruta protegida', user: req.user });
@@ -603,37 +616,111 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
     
     // Construir el filtro de consulta
     let query = {};
-    const forceAll = String(req.query.forceAll || 'false').toLowerCase() === 'true';
-    
-    // Filtrar por usuario autenticado (a menos que se fuerce ver todo)
-    if (req.user && !forceAll) {
+    const forceAllRaw = String(req.query.forceAll || 'false').toLowerCase();
+    const forceAll = forceAllRaw === 'true' || forceAllRaw === '1';
+
+    // Reglas de negocio de visibilidad:
+    // - Agent: NUNCA puede ver "todos". Ignorar forceAll y filtrar por su propio agenteId.
+    // - Supervisor: NUNCA puede ver "todos". Ignorar forceAll y filtrar por su equipo (agentes asignados a su supervisorId).
+    // - Admin/Backoffice: pueden ver todos (sin filtro) y no necesitan forceAll.
+    if (req.user) {
       const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
-      console.log(`[DEBUG] Usuario autenticado - ID: ${currentUserId}, Rol: ${req.user.role}`);
-      
-      // Si es agente, solo ver sus clientes (soportar ObjectId y string)
-      if (req.user.role === 'agent') {
+      const role = (req.user.role || '').toLowerCase();
+      console.log(`[DEBUG] Usuario autenticado - ID: ${currentUserId}, Rol: ${role}, forceAll=${forceAll}`);
+
+      // Lista de posibles campos de asignación de agente en los documentos
+      const agentFieldCandidates = [
+        'agenteId', 'agente_id', 'idAgente', 'agentId',
+        'createdBy', 'creadoPor', 'creado_por',
+        'ownerId', 'assignedId'
+      ];
+
+      if (role === 'agent') {
+        // Aplicar SIEMPRE filtro por su propio ID en múltiples variantes de campo
         let oid = null;
         try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
         const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
-        query.agenteId = bothTypes;
-      } 
-      // Si es supervisor, ver los de su equipo (soportar ObjectId y string)
-      else if (req.user.role === 'supervisor') {
-        // Obtener los IDs de los agentes que supervisa
-        const agentes = await db.collection('users').find({ 
-          supervisorId: currentUserId 
-        }).toArray();
-        // IDs base como ObjectId
-        const agentesIds = agentes.map(a => a._id);
-        // Incluir su propio ID como ObjectId si aplica
+        const idOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+
+        // Fallback adicional por nombres del agente en campos de texto (case-insensitive)
+        const nameCandidatesRaw = [req.user?.username, req.user?.name, req.user?.nombre, req.user?.fullName]
+          .filter(v => typeof v === 'string' && v.trim().length > 0)
+          .map(v => v.trim());
+        const seen = new Set();
+        const nameCandidates = nameCandidatesRaw.filter(n => { const k = n.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+        const normalize = (s) => s.replace(/\s+/g, ' ').trim();
+        const regexes = nameCandidates.map(n => {
+          try {
+            const escaped = normalize(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Coincidencia flexible (insensible a mayúsculas/minúsculas)
+            return new RegExp(escaped, 'i');
+          } catch { return null; }
+        }).filter(Boolean);
+        // Solo campos explícitos de agente para evitar sobre-inclusión
+        const textFields = [
+          'agente', 'agent', 'agenteNombre', 'agentName',
+          'nombre_agente', 'agente_nombre'
+        ];
+        // Además, recopilar nombres reales en documentos que ya coinciden por ID (distinct)
+        let dynamicNameRegexes = [];
+        try {
+          const baseMatch = { $or: idOr };
+          const distinctPromises = textFields.map(f => db.collection('costumers').distinct(f, baseMatch));
+          const distinctResults = await Promise.allSettled(distinctPromises);
+          const fromDb = [];
+          for (const r of distinctResults) {
+            if (r.status === 'fulfilled' && Array.isArray(r.value)) {
+              for (const v of r.value) {
+                if (typeof v === 'string' && v.trim()) fromDb.push(v.trim());
+              }
+            }
+          }
+          const merged = [...nameCandidates, ...fromDb];
+          const uniq = Array.from(new Set(merged.map(s => normalize(s).toLowerCase())));
+          dynamicNameRegexes = uniq.map(k => {
+            try { return new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'); } catch { return null; }
+          }).filter(Boolean);
+        } catch {}
+        const allRegexes = (dynamicNameRegexes.length ? dynamicNameRegexes : regexes);
+        const nameOrSimple = allRegexes.length ? textFields.map(f => ({ [f]: { $in: allRegexes } })) : [];
+
+        // Condición: solo aceptar coincidencia por NOMBRE si no hay IDs establecidos (evitar traer de otros agentes)
+        const idFields = ['agenteId','agente_id','idAgente','agentId','createdBy','creadoPor','creado_por','ownerId','assignedId'];
+        const idEmptyOrMissing = {
+          $and: idFields.map(f => ({ $or: [ { [f]: { $exists: false } }, { [f]: null }, { [f]: '' } ] }))
+        };
+        const nameAndIfNoIds = (nameOrSimple.length ? { $and: [ { $or: nameOrSimple }, idEmptyOrMissing ] } : null);
+
+        query.$or = nameAndIfNoIds ? [...idOr, nameAndIfNoIds] : [...idOr];
+        console.log('[DEBUG] Rol agent: forceAll ignorado. Filtro por IDs aplicado en:', agentFieldCandidates, ' y fallback por nombre en campos:', textFields, ' names:', nameCandidates);
+      } else if (role === 'supervisor') {
+        // Ver solo los de su equipo (soportar ObjectId y string) SIEMPRE
+        const agentes = await db.collection('users').find({ supervisorId: currentUserId }).toArray();
+        const agentesIds = agentes.map(a => a._id).filter(Boolean);
         try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) agentesIds.push(new ObjectId(currentUserId)); } catch {}
-        // Construir arreglo con ambos tipos por cada id
         const bothTypesArray = [];
         agentesIds.forEach(id => { bothTypesArray.push(id, id.toString()); });
-        query.agenteId = { $in: bothTypesArray };
+        const inFilter = { $in: bothTypesArray };
+        query.$or = agentFieldCandidates.map(f => ({ [f]: inFilter }));
+        console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro por equipo aplicado en campos:', agentFieldCandidates, 'IDs:', bothTypesArray.map(x=>x.toString()))
+      } else {
+        // Solo roles privilegiados ven todo; para cualquier otro rol, filtrar por su propio ID
+        const privileged = ['admin','backoffice','b:o','b.o','b-o','bo'];
+        if (privileged.includes(role)) {
+          console.log('[DEBUG] Rol privilegiado (admin/backoffice): sin filtro por agenteId');
+        } else {
+          // Filtro estricto por ID del usuario
+          let oid = null;
+          try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
+          const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
+          const agentFieldCandidates = [
+            'agenteId','agente_id','idAgente','agentId','createdBy','creadoPor','creado_por','ownerId','assignedId'
+          ];
+          query.$or = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+          console.log('[DEBUG] Rol no privilegiado: aplicando filtro propio por ID en campos:', agentFieldCandidates);
+        }
       }
-      // Admin puede ver todo, no se aplica filtro
-      
+
       console.log(`[DEBUG] Filtro aplicado:`, JSON.stringify(query, null, 2));
     }
     
@@ -642,22 +729,36 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
     if (agenteIdParamRaw) {
       console.log('[DEBUG] Parámetro agenteId recibido:', agenteIdParamRaw);
       if (req.user && req.user.role === 'agent') {
-        // Un agente siempre se filtra a sí mismo
+        // Un agente siempre se filtra a sí mismo 
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
-        query.agenteId = currentUserId;
+        // Mantener restricción propia, ignorando el parámetro explícito
+        let oid = null;
+        try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
+        const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
+        const agentFieldCandidates = ['agenteId', 'agente_id', 'idAgente', 'agentId', 'createdBy', 'creadoPor', 'creado_por', 'ownerId', 'assignedId'];
+        query.$or = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+        console.log('[DEBUG] Rol agent + agenteId param: se aplica filtro propio en múltiples campos');
       } else {
         // Soportar ObjectId y string
         let oid = null;
         try { if (/^[a-fA-F0-9]{24}$/.test(agenteIdParamRaw)) oid = new ObjectId(agenteIdParamRaw); } catch {}
         const bothTypes = oid ? { $in: [oid, agenteIdParamRaw] } : agenteIdParamRaw;
-        if (query.agenteId && query.agenteId.$in) {
-          // Intersecar con $in previo (supervisor)
-          const allowed = query.agenteId.$in.map(x => x.toString());
+        // Aplicar el filtro al conjunto de campos candidatos; si ya existe un $or previo, intentar intersección
+        const agentFieldCandidates = ['agenteId', 'agente_id', 'idAgente', 'agentId', 'createdBy', 'creadoPor', 'creado_por', 'ownerId', 'assignedId'];
+        const paramOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+        if (query.$or && Array.isArray(query.$or)) {
+          // Intersecar ambos $or aproximando: mantener condiciones que tengan solape en $in (si lo hay)
+          const allowed = [];
+          query.$or.forEach(cond => {
+            const k = Object.keys(cond)[0];
+            const v = cond[k];
+            if (v && v.$in) allowed.push(...v.$in.map(x=>x.toString()));
+          });
           const candidates = Array.isArray(bothTypes.$in) ? bothTypes.$in.map(x=>x.toString()) : [bothTypes.toString()];
           const overlap = candidates.some(x => allowed.includes(x));
-          query.agenteId = overlap ? bothTypes : new ObjectId('000000000000000000000000');
+          query.$or = overlap ? paramOr : [{ _id: new ObjectId('000000000000000000000000') }];
         } else {
-          query.agenteId = bothTypes;
+          query.$or = paramOr;
         }
       }
     }

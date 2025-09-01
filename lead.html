@@ -1300,7 +1300,7 @@
           const params2 = new URLSearchParams(u2.search);
           params2.set('limit', '500');
           // Para roles privilegiados pedir todo explícitamente
-          if (['admin','supervisor','backoffice'].includes(roleLower2)) {
+          if (['admin','backoffice'].includes(roleLower2)) {
             params2.set('forceAll', 'true');
           }
           const url2 = `${u2.pathname}?${params2.toString()}`;
