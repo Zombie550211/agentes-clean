@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/sidebar-inicio.css">
   <!-- Protección de autenticación en frontend -->
   <script src="agentes/js/auth-check.js"></script>
+  <script src="js/sidebar-loader.js"></script>
   <style>
     /* Estilos del sidebar unificados en css/sidebar.css */
     /* Estilos para la información del usuario en la barra lateral */
@@ -504,31 +505,8 @@
   </style>
 <body>
   <div class="layout">
-    <!-- SIDEBAR -->
-    <nav class="sidebar sidebar-inicio">
-      <!-- Información del Usuario -->
-      <div class="user-info">
-        <div class="avatar">
-          <i class="fas fa-user-circle"></i>
-        </div>
-        <div class="user-details">
-          <span id="user-name" class="user-name">Usuario</span>
-          <span id="user-role" class="user-role">Rol</span>
-        </div>
-      </div>
-      
-      <h3>Menú</h3>
-      <ul class="menu">
-        <li><a href="inicio.html" class="btn btn-sidebar"><i class="fas fa-home"></i> <span>Inicio</span></a></li>
-        <li><a href="lead.html" class="btn btn-sidebar"><i class="fas fa-user-plus"></i> <span>Nuevo Lead</span></a></li>
-        <li><a href="Costumer.html" class="btn btn-sidebar is-active"><i class="fas fa-users"></i> <span>Clientes</span></a></li>
-        <li>
-          <a href="#" id="logoutBtn" data-logout-button class="btn btn-sidebar btn-logout">
-            <i class="fas fa-sign-out-alt"></i> <span>Cerrar sesión</span>
-          </a>
-        </li>
-      </ul>
-    </nav>
+    <!-- SIDEBAR (cargado dinámicamente) -->
+    <nav class="sidebar sidebar-inicio" data-active="costumer"></nav>
 
     <!-- Main Content -->
     <div class="main-content">

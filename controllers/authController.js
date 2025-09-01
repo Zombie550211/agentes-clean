@@ -33,7 +33,7 @@ exports.register = async (req, res) => {
 
     // Crear token JWT
     const token = jwt.sign(
-      { id: user._id, username: user.username, role: user.role },
+      { id: user._id?.toString(), username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -55,6 +55,34 @@ exports.register = async (req, res) => {
       success: false,
       message: error.message || 'Error al registrar el usuario'
     });
+  }
+};
+
+// Controlador para restablecer la contraseña de un usuario (solo ADMIN)
+exports.resetPassword = async (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+
+    if (!username || !newPassword) {
+      return res.status(400).json({ success: false, message: 'username y newPassword son requeridos' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    const result = await User.updatePasswordByUsername(username, newPassword);
+    if (!result.updated) {
+      if (result.reason === 'not_found') {
+        return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+      }
+      return res.status(500).json({ success: false, message: 'No se pudo actualizar la contraseña' });
+    }
+
+    return res.json({ success: true, message: 'Contraseña restablecida correctamente' });
+  } catch (error) {
+    console.error('Error en resetPassword:', error);
+    return res.status(500).json({ success: false, message: 'Error al restablecer la contraseña' });
   }
 };
 

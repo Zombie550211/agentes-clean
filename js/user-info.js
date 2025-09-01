@@ -94,4 +94,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Exponer globalmente
   window.cargarInfoUsuario = cargarInfoUsuario;
+  // Volver a pintar cuando el sidebar compartido termine de inyectarse
+  document.addEventListener('sidebar:loaded', cargarInfoUsuario);
 });

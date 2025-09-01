@@ -64,7 +64,13 @@ class User {
   static async findById(id) {
     try {
       const db = await getDatabase();
-      const _id = typeof id === 'string' ? new ObjectId(id) : id;
+      // Convertir a ObjectId solo si es un string de 24 hex; de lo contrario usar el valor tal cual
+      let _id = id;
+      if (typeof id === 'string') {
+        if (/^[a-fA-F0-9]{24}$/.test(id)) {
+          try { _id = new ObjectId(id); } catch { _id = id; }
+        }
+      }
       return await db.collection('users').findOne({ _id });
     } catch (error) {
       console.error('Error al buscar usuario por ID:', error);
@@ -75,6 +81,28 @@ class User {
   // Método para verificar la contraseña
   async comparePassword(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
+  }
+
+  // Método estático para actualizar la contraseña por username
+  static async updatePasswordByUsername(username, newPassword) {
+    try {
+      const db = await getDatabase();
+      const users = db.collection('users');
+      const user = await users.findOne({ username });
+      if (!user) {
+        return { updated: false, reason: 'not_found' };
+      }
+      const salt = await bcrypt.genSalt(10);
+      const hashed = await bcrypt.hash(newPassword, salt);
+      const res = await users.updateOne(
+        { _id: user._id },
+        { $set: { password: hashed, updatedAt: new Date() } }
+      );
+      return { updated: res.matchedCount > 0 };
+    } catch (error) {
+      console.error('Error al actualizar contraseña por username:', error);
+      throw error;
+    }
   }
 }
 

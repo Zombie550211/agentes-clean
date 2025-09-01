@@ -268,6 +268,14 @@
 
     <form id="registerForm">
       <div class="form-group">
+        <label for="username">Usuario (username)</label>
+        <div class="input-icon">
+          <i class="fas fa-at"></i>
+          <input type="text" id="username" class="form-control" placeholder="Ej. jdoe" required>
+        </div>
+        <div id="usernameError" class="error-message">El usuario debe tener al menos 3 caracteres y solo puede contener letras, números, punto, guion y guion bajo</div>
+      </div>
+      <div class="form-group">
         <label for="fullName">Nombre completo</label>
         <div class="input-icon">
           <i class="fas fa-user"></i>
@@ -331,6 +339,9 @@
       <button type="submit" class="btn btn-primary">
         <i class="fas fa-user-plus"></i> Crear cuenta
       </button>
+      <div class="login-link" style="margin-top:10px;">
+        ¿Necesitas cambiar la contraseña de un usuario? <a href="reset-password.html">Restablecer usuario y contraseña</a>
+      </div>
     </form>
 
     <div class="login-link">
@@ -409,6 +420,7 @@
         });
         
         // Validar campos
+        const username = document.getElementById('username').value.trim();
         const fullName = document.getElementById('fullName').value.trim();
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
@@ -416,6 +428,13 @@
         
         let isValid = true;
         
+        // Validar username (3+ caracteres, sin espacios, solo a-z0-9._-)
+        const userRegex = /^[a-zA-Z0-9._-]{3,}$/;
+        if (!userRegex.test(username)) {
+          document.getElementById('usernameError').style.display = 'block';
+          isValid = false;
+        }
+
         // Validar nombre completo
         if (fullName.length < 3) {
           document.getElementById('fullNameError').style.display = 'block';
@@ -450,7 +469,7 @@
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              username: fullName,
+              username: username,
               password: password,
               role: userType
             })
@@ -476,11 +495,9 @@
           console.error('Error al registrar usuario:', error);
           showNotification(error.message || 'Error al registrar el usuario. Inténtalo de nuevo.', 'error');
         } finally {
-          // Restaurar el botón
-          if (!submitBtn.disabled) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-          }
+          // Restaurar el botón SIEMPRE
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalBtnText;
         }
       });
     });

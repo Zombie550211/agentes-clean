@@ -112,14 +112,16 @@ const authenticateJWT = (req, res, next) => {
     
     console.log('Token decodificado exitosamente:', JSON.stringify(decoded, null, 2));
     
-    if (!decoded || !decoded.userId) {
-      console.log('ERROR: El token decodificado no contiene un ID de usuario');
+    // Aceptar tanto 'id' como 'userId' por compatibilidad
+    const uid = decoded?.id || decoded?.userId;
+    if (!decoded || !uid) {
+      console.log('ERROR: El token decodificado no contiene un ID de usuario (id|userId)');
       return res.status(403).json({ message: 'Token inválido - Falta el ID de usuario' });
     }
     
     // Asegurarse de que el objeto user tenga las propiedades esperadas
     req.user = {
-      id: decoded.userId.toString(),  // Asegurar que sea string
+      id: uid.toString(),  // Asegurar que sea string
       username: decoded.username || 'Usuario desconocido',
       role: decoded.role || 'user'
     };
@@ -270,10 +272,10 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    // Generar token JWT
+    // Generar token JWT (usar clave 'id' de forma unificada)
     const token = jwt.sign(
       { 
-        userId: user._id, 
+        id: user._id?.toString(), 
         username: user.username,
         role: user.role || 'user'
       }, 
