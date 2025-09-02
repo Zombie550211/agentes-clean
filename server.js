@@ -875,9 +875,29 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       console.log('[DEBUG] Parámetro agente recibido:', agenteParam);
       // Si el usuario autenticado es 'agent', forzamos su propio ID y omitimos el parámetro
       if (req.user && req.user.role === 'agent') {
-        console.log('[DEBUG] Rol agent: ignorando parámetro agente y usando su propio ID');
+        console.log('[DEBUG] Rol agent: ignorando parámetro agente y usando su propio ID con filtro tolerante');
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
-        query.agenteId = currentUserId;
+        // Construir filtro robusto por múltiples campos de ID con soporte string y ObjectId
+        let oid = null;
+        try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
+        const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
+        const agentFieldCandidates = ['agenteId', 'agente_id', 'idAgente', 'agentId', 'createdBy', 'creadoPor', 'creado_por', 'ownerId', 'assignedId'];
+        const idOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
+
+        // Fallback por nombre SOLO si todos los campos de ID del documento están vacíos/ausentes
+        const nameCandidatesRaw = [req.user?.username, req.user?.name, req.user?.nombre, req.user?.email]
+          .filter(v => typeof v === 'string' && v.trim().length > 0)
+          .map(v => v.trim());
+        const unique = new Set();
+        const nameCandidates = nameCandidatesRaw.filter(n => { const k = n.toLowerCase(); if (unique.has(k)) return false; unique.add(k); return true; });
+        const regexes = nameCandidates.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
+        const textFields = ['agente', 'agent', 'agenteNombre', 'agentName'];
+        const nameOrSimple = regexes.length ? textFields.map(f => ({ [f]: { $in: regexes } })) : [];
+        const idEmptyOrMissing = { $and: agentFieldCandidates.map(f => ({ $or: [ { [f]: { $exists: false } }, { [f]: null }, { [f]: '' } ] })) };
+        const nameAndIfNoIds = (nameOrSimple.length ? { $and: [ { $or: nameOrSimple }, idEmptyOrMissing ] } : null);
+
+        query.$or = nameAndIfNoIds ? [...idOr, nameAndIfNoIds] : [...idOr];
+        console.log('[DEBUG] Filtro agent aplicado (IDs + fallback por nombre si faltan IDs)');
       } else {
         // Intentar resolver por ObjectId válido
         let resolvedId = null;
