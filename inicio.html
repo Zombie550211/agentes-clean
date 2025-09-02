@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Inicio</title>
+  <link rel="stylesheet" href="css/theme.css">
   
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -687,6 +688,317 @@
       font-size: 10px;
       font-weight: bold;
     }
+    
+    /* ==========================
+       Ranking v2 (solo CSS)
+       - Efecto glass + gradientes
+       - Animaciones suaves
+       - Sin cambios HTML/JS
+    =========================== */
+    .ranking-panel {
+      background: radial-gradient(1200px 600px at 80% -10%, rgba(14,165,233,.25) 0%, transparent 60%),
+                  radial-gradient(800px 400px at 0% 120%, rgba(16,185,129,.18) 0%, transparent 60%);
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.35);
+      box-shadow: 0 15px 40px rgba(2,132,199,.18);
+      backdrop-filter: blur(6px);
+    }
+
+    .ranking-header {
+      text-align: center;
+      padding: 56px 30px 32px;
+    }
+
+    .ranking-icon {
+      filter: drop-shadow(0 6px 18px rgba(251,191,36,.35));
+      transform: translateZ(0);
+      animation: trophyGlow 3.2s ease-in-out infinite;
+    }
+
+    .ranking-title {
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #0ea5e9 0%, #22c55e 50%, #f59e0b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 0 rgba(0,0,0,0);
+    }
+
+    .ranking-subtitle {
+      color: rgba(30,41,59,.8);
+    }
+
+    /* Podio circular modernizado */
+    .circular-podium {
+      gap: 100px;
+    }
+
+    .podium-item {
+      animation: floatY 6s ease-in-out infinite;
+    }
+    .podium-item.first-place { animation-delay: .2s; }
+    .podium-item.second-place { animation-delay: .4s; }
+    .podium-item.third-place { animation-delay: .6s; }
+
+    .podium-circle {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border: none;
+      position: relative;
+    }
+    .podium-circle::before{
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #22c55e, #0ea5e9, #f59e0b, #ef4444, #22c55e);
+      filter: blur(0.5px);
+      z-index: -1;
+      animation: rotateRing 12s linear infinite;
+    }
+
+    .position-badge{
+      box-shadow: 0 6px 12px rgba(0,0,0,.15);
+    }
+
+    /* Tarjetas del resto del ranking con glass effect */
+    .rank-item{
+      background: rgba(255,255,255,.7);
+      border: 1px solid rgba(255,255,255,.6);
+      backdrop-filter: blur(8px);
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    .rank-item:hover{
+      transform: translateY(-4px);
+      box-shadow: 0 14px 32px rgba(2,132,199,.18);
+    }
+
+    .points{
+      background: linear-gradient(90deg, #0ea5e9 0%, #22c55e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Animaciones */
+    @keyframes rotateRing {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes floatY {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes trophyGlow {
+      0%, 100% { filter: drop-shadow(0 6px 18px rgba(251,191,36,.25)); }
+      50% { filter: drop-shadow(0 10px 26px rgba(251,191,36,.45)); }
+    }
+    
+    /* ==========================
+       Ranking Neon Pop (overrides)
+       juvenil, vibrante, sin cambios HTML/JS
+    =========================== */
+    .ranking-panel{
+      background:
+        radial-gradient(900px 500px at 10% -10%, rgba(255,0,122,.18) 0%, transparent 60%),
+        radial-gradient(800px 480px at 110% 10%, rgba(0,200,255,.20) 0%, transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,.85) 0%, rgba(255,255,255,.75) 100%);
+      border: 2px solid rgba(0,0,0,.03);
+      box-shadow: 0 18px 40px rgba(0,0,0,.10);
+      backdrop-filter: blur(8px);
+    }
+
+    .ranking-title{
+      background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #5f27cd);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+    }
+    .ranking-subtitle{ color: #475569; opacity: .9; }
+
+    .circular-podium{ gap: 110px; }
+    .podium-item{ animation: bouncePop 5s ease-in-out infinite; }
+    .podium-item.first-place{ animation-delay: .1s; }
+    .podium-item.second-place{ animation-delay: .3s; }
+    .podium-item.third-place{ animation-delay: .5s; }
+
+    .podium-line{ height: 6px; border-radius: 999px; background: #e2e8f0; }
+    .second-place .podium-line{ background: linear-gradient(90deg,#60a5fa,#a78bfa); }
+    .first-place .podium-line{ background: linear-gradient(90deg,#22c55e,#10b981); }
+    .third-place .podium-line{ background: linear-gradient(90deg,#fb7185,#f59e0b); }
+
+    .podium-circle{
+      background: #fff;
+      border: none;
+      box-shadow: 0 12px 30px rgba(0,0,0,.10);
+    }
+    .podium-circle::before{
+      content: ""; position: absolute; inset: -10px; border-radius: 50%;
+      background: conic-gradient(from 0deg,
+        #ff6b6b 0%, #feca57 20%, #48dbfb 40%, #5f27cd 60%, #22c55e 80%, #ff6b6b 100%);
+      animation: spinNeon 8s linear infinite;
+      filter: saturate(120%);
+      z-index: -1;
+    }
+    .trophy-icon, .medal-icon{ color: #111827; filter: drop-shadow(0 4px 8px rgba(0,0,0,.15)); }
+
+    .position-badge{
+      background: #111827; color: #fff; border: 3px solid #fff;
+      box-shadow: 0 8px 14px rgba(0,0,0,.25);
+    }
+
+    .rank-item{
+      border-radius: 16px;
+      border: 1px solid rgba(0,0,0,.05);
+      background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.8));
+      transform: translateZ(0);
+    }
+    .rank-item:hover{ transform: translateY(-6px) rotate(-.25deg); }
+    .rank-number{ color: #475569; font-weight: 800; }
+    .agent-avatar{ background: linear-gradient(135deg,#5f27cd,#48dbfb); }
+    .agent-details h4{ color:#0f172a; }
+    .agent-details p{ background: rgba(99,102,241,.12); color:#3730a3; }
+    .points{ background: linear-gradient(90deg,#f472b6,#22d3ee); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+    @keyframes spinNeon { to { transform: rotate(360deg); } }
+    @keyframes bouncePop {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-10px) scale(1.02); }
+    }
+    
+    /* ==========================
+       Podio en bloques (overrides)
+       - Mantiene HTML/JS
+       - Cambia solo la presentación
+    =========================== */
+    .circular-podium{ gap: 90px; align-items: flex-end; }
+    .podium-item{ position: relative; padding-bottom: 60px; }
+
+    /* Quitar aro decorativo de la versión anterior */
+    .podium-circle{ width: 120px; height: 120px; border-radius: 18px; background: #ffffff; border: 2px solid rgba(15,23,42,.06); box-shadow: 0 10px 20px rgba(0,0,0,.08); }
+    .podium-circle::before{ content: none !important; }
+
+    /* Barra superior (corona) más delgada y vibrante */
+    .podium-line{ width: 120px; height: 6px; border-radius: 999px; margin-bottom: 14px; background: linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6); }
+
+    /* Pedestal en bloques por lugar usando pseudo-elemento */
+    .podium-item::after{
+      content: "";
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: -4px;
+      width: 150px;
+      height: var(--pedestal-h, 50px);
+      background: linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(248,250,252,.95) 100%);
+      border: 1px solid rgba(2,6,23,.06);
+      border-radius: 16px 16px 10px 10px;
+      box-shadow: 0 16px 30px rgba(2,132,199,.15), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    .podium-item.first-place{ --pedestal-h: 70px; }
+    .podium-item.second-place{ --pedestal-h: 55px; }
+    .podium-item.third-place{ --pedestal-h: 45px; }
+
+    /* Medalla/insignia más limpia sobre el círculo */
+    .position-badge{ background: #111827; color: #fff; border: 3px solid #fff; box-shadow: 0 8px 16px rgba(0,0,0,.25); }
+
+    /* Puntos con gradiente juvenil y compatibilidad de clip */
+    .points{
+      background: linear-gradient(90deg,#06b6d4,#a78bfa);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+  
+  
+  <style>
+    /* Overrides: quitar pedestales y corona del podio (sin tocar HTML/JS) */
+    .podium-item::after { content: none !important; }
+    .podium-item.first-place::before { content: none !important; }
+    .podium-item .podium-circle { animation: none !important; }
+  </style>
+  <style>
+    /* Podio: oro/plata/bronce + corona y animación (solo CSS) */
+    .podium-item.first-place{ --pedestal-h: 90px; }
+    .podium-item.second-place{ --pedestal-h: 60px; }
+    .podium-item.third-place{ --pedestal-h: 45px; }
+
+    .podium-item.first-place::after{
+      background: linear-gradient(180deg, #fff8e1 0%, #fde68a 100%);
+      border-color: rgba(202,138,4,.25);
+      box-shadow: 0 22px 40px rgba(202,138,4,.25), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    .podium-item.second-place::after{
+      background: linear-gradient(180deg, #f8fafc 0%, #e5e7eb 100%);
+      border-color: rgba(107,114,128,.25);
+      box-shadow: 0 18px 34px rgba(107,114,128,.22), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    .podium-item.third-place::after{
+      background: linear-gradient(180deg, #fff7ed 0%, #fdba74 100%);
+      border-color: rgba(180,83,9,.25);
+      box-shadow: 0 18px 34px rgba(180,83,9,.22), inset 0 1px 0 rgba(255,255,255,.9);
+    }
+
+    /* Corona para el primer lugar */
+    .podium-item.first-place::before{
+      content: "👑";
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 26px;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.15));
+      animation: crownFloat 3.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    /* Círculo protagonista con “respiración” y glow dorado */
+    .podium-item.first-place .podium-circle{
+      box-shadow: 0 10px 26px rgba(234,179,8,.25);
+      animation: breathe 4s ease-in-out infinite;
+    }
+    .podium-item.first-place .trophy-icon{ color: #ca8a04; }
+
+    @keyframes breathe{
+      0%,100%{ transform: scale(1); }
+      50%{ transform: scale(1.035); }
+    }
+    @keyframes crownFloat{
+      0%,100%{ transform: translate(-50%,0); }
+      50%{ transform: translate(-50%,-6px); }
+    }
+  </style>
+  <style>
+    /* Overrides: quitar contenedor visual del ranking sin tocar HTML/JS */
+    .ranking-panel{
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      border-radius: 0 !important;
+    }
+    .ranking-header{
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+    .ranking-content{
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+  </style>
+  <style>
+    /* Override: ocultar el ícono de trofeo del header */
+    .ranking-icon { display: none !important; }
+  </style>
+  <style>
+    /* Overrides: ocultar título y subtítulo del ranking */
+    .ranking-title, .ranking-subtitle { display: none !important; }
+    .ranking-header { padding-top: 8px !important; padding-bottom: 8px !important; }
+  </style>
+  <style>
+    /* Overrides: ocultar etiquetas de rol bajo los nombres */
+    .podium-item .agent-info p,
+    .rank-list .agent-details p { display: none !important; }
   </style>
   <script>
     // Verificar autenticación usando cookie HttpOnly y poblar datos de usuario
