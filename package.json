@@ -17,7 +17,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "check:form": "node scripts/check_form_integrity.js",
     "start": "node server.js",
+    "start:strict": "CHECK_STRICT=1 node scripts/check_form_integrity.js && node server.js",
     "dev": "nodemon server.js",
     "backfill:agenteId:dry": "node scripts/backfill_agenteId_from_nombre.js --dry-run",
     "backfill:agenteId:commit": "node scripts/backfill_agenteId_from_nombre.js --commit"

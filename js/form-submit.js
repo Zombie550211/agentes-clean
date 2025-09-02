@@ -28,15 +28,24 @@ async function handleFormSubmit(e) {
     const leadData = {
       nombre_cliente: formValues['nombre-cliente'] || '',
       telefono_principal: formValues['telefono-principal'] || '',
-      telefono_alterno: formValues['telefono-secundario'] || '',
+      // usar el id correcto del input
+      telefono_alterno: formValues['telefono-alterno'] || '',
+      // enviar numero de cuenta si existe en el formulario
+      numero_cuenta: formValues['numero-cuenta'] || '',
+      // enviar autopago para poblar la columna correspondiente
+      autopago: formValues['autopago'] || '',
       email: formValues['email'] || '',
       direccion: formValues['direccion'] || '',
       ciudad: formValues['ciudad'] || '',
       estado: formValues['estado'] || '',
       zip_code: formValues['zip-code'] || '',
-      tipo_servicio: formValues['tipo-servicio'] || 'INTERNET',
+      // alinear con la tabla que espera tipo_servicios (plural)
+      tipo_servicios: formValues['tipo-servicio'] || 'INTERNET',
       producto: formValues['producto'] || '',
+      // incluir servicios seleccionados si aplica
+      servicios: formValues['servicios'] || '',
       sistema: sistemaValue ? sistemaValue.toUpperCase() : '',
+      riesgo: (formValues['riesgo'] || '').toString().toUpperCase(),
       supervisor: formValues['supervisor'] || '',
       agente: formValues['agente'] || '',
       mercado: formValues['mercado'] || 'residencial',
@@ -45,7 +54,8 @@ async function handleFormSubmit(e) {
       comentario: formValues['comentario'] || '',
       motivo_llamada: formValues['motivo-llamada'] || '',
       dia_venta: formValues['dia-venta'] || new Date().toISOString().split('T')[0],
-      dia_instalacion: formValues['fecha-instalacion'] || '',
+      // usar el id correcto del input
+      dia_instalacion: formValues['dia-instalacion'] || '',
       creadoEn: new Date().toISOString(),
       actualizadoEn: new Date().toISOString()
     };
@@ -53,7 +63,8 @@ async function handleFormSubmit(e) {
     console.log('Datos del formulario preparados:', leadData);
 
     // Validar campos requeridos
-    const requiredFields = ['nombre_cliente', 'telefono_principal', 'direccion', 'tipo_servicio', 'sistema'];
+    // validar con claves alineadas a renderizado (incluye tipo_servicios y autopago)
+    const requiredFields = ['nombre_cliente', 'telefono_principal', 'direccion', 'tipo_servicios', 'sistema', 'autopago'];
     const missingFields = requiredFields.filter(field => !leadData[field]);
     
     if (missingFields.length > 0) {

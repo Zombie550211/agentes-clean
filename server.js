@@ -1667,11 +1667,35 @@ app.post('/api/customers', protect, async (req, res) => {
       telefono_principal: customerData.telefono_principal || '',
       direccion: customerData.direccion || '',
       tipo_servicio: customerData.tipo_servicio || 'desconocido',
+      // Alias de compatibilidad para el frontend que usa 'tipo_servicios'
+      tipo_servicios: customerData.tipo_servicios || customerData.tipo_servicio || customerData.servicios_texto || customerData.servicios || 'desconocido',
       creadoEn: now,
       actualizadoEn: now,
       status: (customerData.status || 'Nuevo').toString(),
       puntaje: parseFloat(customerData.puntaje) || 0,
       autopago: customerData.autopago === 'true' || customerData.autopago === true,
+      // Campos adicionales provenientes del formulario (mantener nombres esperados por el frontend)
+      producto: customerData.producto || customerData.producto_contratado || '',
+      servicios: customerData.servicios || '',
+      servicios_texto: customerData.servicios_texto || '',
+      sistema: (customerData.sistema || '').toString().trim().toUpperCase(),
+      mercado: (customerData.mercado || '').toString().trim().toUpperCase(),
+      riesgo: (customerData.riesgo || '').toString().trim().toUpperCase(),
+      motivo_llamada: customerData.motivo_llamada || '',
+      comentario: customerData.comentario || '',
+      numero_cuenta: customerData.numero_cuenta || customerData.numeroCuenta || '',
+      // zip puede llegar como zip o zip_code; unificar en zip_code
+      zip_code: customerData.zip_code || customerData.zip || '',
+      // Supervisor/equipo (aceptar variantes)
+      supervisor: customerData.supervisor || customerData.team || customerData.equipo || '',
+      team: customerData.team || customerData.supervisor || customerData.equipo || '',
+      agente: customerData.agente || customerData.agenteNombre || undefined,
+      // Información de fechas (aceptar equivalentes)
+      dia_instalacion: customerData.dia_instalacion || customerData.fecha_instalacion || '',
+      fecha_contratacion: customerData.fecha_contratacion || customerData.dia_venta || undefined,
+      // Datos de contacto adicionales
+      telefono_alterno: customerData.telefono_alterno || '',
+      email: customerData.email || '',
       // Asociar el cliente al usuario que lo crea (guardar ambos formatos: string y ObjectId)
       agenteId: currentUserIdStr,
       creadoPor: currentUserIdStr,
