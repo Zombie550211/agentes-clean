@@ -997,45 +997,222 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       console.log('Primer documento de ejemplo:', JSON.stringify(customers[0], null, 2));
     }
 
+    // Helpers de enriquecimiento
+    const norm = (s) => {
+      try { return String(s || '').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');} catch { return ''; }
+    };
+    const AGENT_TO_SUP = new Map([
+      // TEAM IRANIA
+      ['josue renderos','irania serrano'],
+      ['tatiana ayala','irania serrano'],
+      ['giselle diaz','irania serrano'],
+      ['miguel nunez','irania serrano'],
+      ['roxana martinez','irania serrano'],
+      ['irania serrano','irania serrano'],
+      // TEAM BRYAN PLEITEZ
+      ['abigail galdamez','bryan pleitez'],
+      ['alexander rivera','bryan pleitez'],
+      ['diego mejia','bryan pleitez'],
+      ['evelin garcia','bryan pleitez'],
+      ['fabricio panameno','bryan pleitez'],
+      ['luis chavarria','bryan pleitez'],
+      ['steven varela','bryan pleitez'],
+      // TEAM ROBERTO VELASQUEZ
+      ['cindy flores','roberto velasquez'],
+      ['daniela bonilla','roberto velasquez'],
+      ['francisco aguilar','roberto velasquez'],
+      ['levy ceren','roberto velasquez'],
+      ['lisbeth cortez','roberto velasquez'],
+      ['lucia ferman','roberto velasquez'],
+      ['nelson ceren','roberto velasquez'],
+      // TEAM RANDAL MARTINEZ
+      ['anderson guzman','randal martinez'],
+      ['carlos grande','randal martinez'],
+      ['guadalupe santana','randal martinez'],
+      ['julio chavez','randal martinez'],
+      ['priscila hernandez','randal martinez'],
+      ['riquelmi torres','randal martinez']
+    ]);
+    const inferSupervisorByAgent = (agentName) => {
+      const key = norm(agentName);
+      return key ? (AGENT_TO_SUP.get(key) || '') : '';
+    };
+    const extractZipFromAddress = (addr) => {
+      try {
+        const s = String(addr || '');
+        const m = s.match(/\b(\d{5})(?:-\d{4})?\b(?!.*\b\d{5}\b)/); // último ZIP de 5 dígitos
+        return m ? m[1] : '';
+      } catch { return ''; }
+    };
+
+    // Flag de enriquecimiento opcional (solo si el cliente lo solicita)
+    const enrichMode = (req.query.enrich === '1' || req.query.enrich === 'true');
+
     // Mapear los campos según lo que espera el frontend
     const mappedCustomers = customers.map(customer => {
       // Mapeo completo basado en la estructura que espera el frontend
       const mapped = {
         // Información básica
         _id: customer._id ? customer._id.toString() : 'sin-id',
-        nombre_cliente: customer.nombre_cliente || customer.nombre || customer.name || 'Sin nombre',
-        telefono_principal: customer.telefono || customer.phone || 'Sin teléfono',
-        telefono_alterno: customer.telefono_alterno || customer.telefono_secundario || '',
-        numero_cuenta: customer.numero_cuenta || customer.cuenta || '',
+        nombre_cliente: customer.nombre_cliente || customer.nombre || customer.name || '',
+        telefono_principal: (
+          customer.telefono_principal ||
+          customer.telefono ||
+          customer.phone ||
+          customer.celular ||
+          customer.mobile ||
+          customer.phone1 ||
+          (customer._raw && (customer._raw.telefono_principal || customer._raw.telefono || customer._raw.phone || customer._raw.celular || customer._raw.mobile || customer._raw.phone1)) ||
+          ''
+        ),
+        telefono_alterno: (
+          customer.telefono_alterno ||
+          customer.telefono_secundario ||
+          customer.telefono2 ||
+          customer.phone2 ||
+          customer.secondary_phone ||
+          (customer._raw && (customer._raw.telefono_alterno || customer._raw.telefono_secundario || customer._raw.telefono2 || customer._raw.phone2 || customer._raw.secondary_phone)) ||
+          ''
+        ),
+        numero_cuenta: (
+          customer.numero_cuenta ||
+          customer.numeroCuenta ||
+          customer.cuenta ||
+          customer.account_number ||
+          customer.accountNumber ||
+          (customer._raw && (customer._raw.numero_cuenta || customer._raw.numeroCuenta || customer._raw.cuenta || customer._raw.account_number || customer._raw.accountNumber)) ||
+          ''
+        ),
         
         // Dirección y ubicación
-        direccion: customer.direccion || 'Sin dirección',
-        zip_code: customer.zip_code || customer.zip || customer.codigo_postal || '',
+        direccion: (
+          customer.direccion ||
+          customer.direccion_completa ||
+          customer.address ||
+          customer.address_line ||
+          customer.addressLine ||
+          (customer._raw && (customer._raw.direccion || customer._raw.direccion_completa || customer._raw.address || customer._raw.address_line || customer._raw.addressLine)) ||
+          'Sin dirección'
+        ),
+        zip_code: (
+          customer.zip_code ||
+          customer.zip ||
+          customer.codigo_postal ||
+          customer.postal_code ||
+          customer.postalCode ||
+          customer.zipcode ||
+          customer.cp ||
+          customer.codigoPostal ||
+          (customer._raw && (customer._raw.zip_code || customer._raw.zip || customer._raw.codigo_postal || customer._raw.postal_code || customer._raw.postalCode || customer._raw.zipcode || customer._raw.cp || customer._raw.codigoPostal)) ||
+          ''
+        ),
         
         // Información del servicio
-        tipo_servicios: customer.tipo_servicio || customer.producto_contratado || customer.servicios || 'Sin servicio',
-        servicios: customer.servicios || customer.tipo_servicio || customer.producto_contratado || 'Sin servicio',
-        sistema: customer.sistema || '',
-        riesgo: customer.riesgo || 'bajo',
+        tipo_servicios: (
+          customer.tipo_servicio ||
+          customer.tipo_servicios ||
+          customer.tipoServicio ||
+          customer.tipoServicios ||
+          customer.producto_contratado ||
+          customer.producto ||
+          customer.product ||
+          customer.servicio ||
+          customer.servicios ||
+          (customer._raw && (customer._raw.tipo_servicio || customer._raw.tipo_servicios || customer._raw.tipoServicio || customer._raw.tipoServicios || customer._raw.producto_contratado || customer._raw.producto || customer._raw.product || customer._raw.servicio || customer._raw.servicios)) ||
+          ''
+        ),
+        servicios: customer.servicios || customer.tipo_servicio || customer.producto_contratado || customer.producto || customer.product || '',
+        sistema: (
+          customer.sistema ||
+          customer.system ||
+          customer.sistema_operativo ||
+          customer.platform ||
+          customer.plataforma ||
+          (customer._raw && (customer._raw.sistema || customer._raw.system || customer._raw.sistema_operativo || customer._raw.platform || customer._raw.plataforma)) ||
+          ''
+        ),
+        riesgo: (
+          customer.riesgo ||
+          customer.nivel_riesgo ||
+          customer.risk ||
+          customer.risk_level ||
+          (customer._raw && (customer._raw.riesgo || customer._raw.nivel_riesgo || customer._raw.risk || customer._raw.risk_level)) ||
+          ''
+        ),
         
         // Fechas importantes
-        dia_venta: customer.dia_venta || customer.fecha_contratacion || '',
-        dia_instalacion: customer.dia_instalacion || '',
+        dia_venta: (
+          customer.dia_venta ||
+          customer.fecha_contratacion ||
+          customer.diaVenta ||
+          customer.fecha_venta ||
+          customer.fechaVenta ||
+          (customer._raw && (customer._raw.dia_venta || customer._raw.fecha_contratacion || customer._raw.diaVenta || customer._raw.fecha_venta || customer._raw.fechaVenta)) ||
+          ''
+        ),
+        dia_instalacion: (
+          customer.dia_instalacion ||
+          customer.fecha_instalacion ||
+          customer.fecha_instalación ||
+          customer.diaInstalacion ||
+          customer.installation_date ||
+          customer.installationDate ||
+          customer.install_date ||
+          customer.installDate ||
+          customer.fecha_instalacion_programada ||
+          customer.installationScheduled ||
+          customer.installation_schedule ||
+          (customer._raw && (customer._raw.dia_instalacion || customer._raw.fecha_instalacion || customer._raw.fecha_instalación || customer._raw.diaInstalacion || customer._raw.installation_date || customer._raw.installationDate || customer._raw.install_date || customer._raw.installDate || customer._raw.fecha_instalacion_programada || customer._raw.installationScheduled || customer._raw.installation_schedule)) ||
+          ''
+        ),
         
         // Estado y puntuación
-        status: customer.status || 'activo',
+        status: customer.status || '',
         puntaje: typeof customer.puntaje === 'number' ? customer.puntaje : 0,
         
         // Información de equipo
-        supervisor: customer.supervisor || '',
-        mercado: customer.mercado || 'residencial',
+        supervisor: (
+          customer.supervisor ||
+          customer.supervisorName ||
+          customer.supervisor_nombre ||
+          customer.supervisorNombre ||
+          customer.team ||
+          customer.teamName ||
+          (customer._raw && (customer._raw.supervisor || customer._raw.supervisorName || customer._raw.supervisor_nombre || customer._raw.supervisorNombre || customer._raw.team || customer._raw.teamName)) ||
+          ''
+        ),
+        mercado: customer.mercado || '',
         
         // Comentarios
-        comentario: customer.comentario || customer.comentarios || '',
-        motivo_llamada: customer.motivo_llamada || '',
+        comentario: (
+          customer.comentario ||
+          customer.comentarios ||
+          customer.comment ||
+          customer.comments ||
+          customer.nota ||
+          customer.notas ||
+          customer.notes ||
+          customer.observaciones ||
+          (customer._raw && (customer._raw.comentario || customer._raw.comentarios || customer._raw.comment || customer._raw.comments || customer._raw.nota || customer._raw.notas || customer._raw.notes || customer._raw.observaciones)) ||
+          ''
+        ),
+        motivo_llamada: (
+          customer.motivo_llamada ||
+          customer.motivo ||
+          customer.motivoLlamada ||
+          customer.reason ||
+          customer.call_reason ||
+          (customer._raw && (customer._raw.motivo_llamada || customer._raw.motivo || customer._raw.motivoLlamada || customer._raw.reason || customer._raw.call_reason)) ||
+          ''
+        ),
         
         // Información adicional
-        autopago: customer.autopago || false,
+        autopago: (
+          (customer.autopago !== undefined ? customer.autopago :
+            (customer.auto_pago !== undefined ? customer.auto_pago :
+              (customer.autopay !== undefined ? customer.autopay :
+                (customer.autoPay !== undefined ? customer.autoPay : false))))
+        ),
 
         // Exponer campos de agente (IDs y nombres) para permitir asignación en frontend
         agenteId: customer.agenteId || customer.agente_id || customer.idAgente || customer.agentId || customer.createdBy || customer.creadoPor || customer.creado_por || customer.ownerId || customer.assignedId || '',
@@ -1062,9 +1239,27 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
         }
       }
       
+      // Enriquecimientos finales opcionales (solo si enrich=1)
+      if (enrichMode) {
+        if ((!mapped.supervisor || mapped.supervisor === '') && mapped.agenteNombre) {
+          const sup = inferSupervisorByAgent(mapped.agenteNombre);
+          if (sup) mapped.supervisor = sup;
+        }
+        if ((!mapped.zip_code || mapped.zip_code === '') && mapped.direccion) {
+          const zip = extractZipFromAddress(mapped.direccion);
+          if (zip) mapped.zip_code = zip;
+        }
+      }
+
       return mapped;
     });
     
+    // Construir respuesta (con debug opcional enriquecido)
+    const debugMode = (req.query.debug === '1' || req.query.debug === 'true');
+    const sampleCount = Math.min(mappedCustomers.length, 3);
+    const samples = debugMode ? customers.slice(0, sampleCount) : [];
+    const enrich = (req.query.enrich === '1' || req.query.enrich === 'true');
+
     const response = {
       success: true,
       leads: mappedCustomers,
@@ -1072,13 +1267,18 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
       page,
       pages: Math.ceil(total / limit),
       message: 'Datos de clientes cargados correctamente',
-      debug: {
+      debug: debugMode ? {
         collection: collectionName,
         database: db.databaseName,
         totalDocuments: total,
         documentsReturned: mappedCustomers.length,
-        availableCollections: collections.map(c => c.name)
-      }
+        availableCollections: collections.map(c => c.name),
+        sampleOriginalKeys: samples.map((s, i) => ({ idx: i, keys: Object.keys(s) })),
+        sampleMappedKeys: mappedCustomers.slice(0, sampleCount).map((m, i) => ({ idx: i, keys: Object.keys(m) })),
+        sampleOriginalDocs: samples,
+        sampleMappedDocs: mappedCustomers.slice(0, sampleCount),
+        enrich
+      } : undefined
     };
     
     console.log('Enviando respuesta con', mappedCustomers.length, 'clientes');
