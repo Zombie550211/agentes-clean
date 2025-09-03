@@ -1524,7 +1524,9 @@ app.post('/api/customers', protect, async (req, res) => {
       agente: customerData.agente || customerData.agenteNombre || undefined,
       // Información de fechas (aceptar equivalentes)
       dia_instalacion: customerData.dia_instalacion || customerData.fecha_instalacion || '',
+      // Guardar ambas representaciones para compatibilidad con la UI
       fecha_contratacion: customerData.fecha_contratacion || customerData.dia_venta || undefined,
+      dia_venta: customerData.dia_venta || customerData.fecha_contratacion || '',
       // Datos de contacto adicionales
       telefono_alterno: customerData.telefono_alterno || '',
       email: customerData.email || '',

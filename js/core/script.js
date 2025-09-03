@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         dia_venta: formData.get('dia-venta') || '',
         dia_instalacion: formData.get('dia-instalacion') || '',
         status: formData.get('status') || '',
-        servicios: formData.get('servicio') || '',
+        servicios: formData.get('servicios') || '',
         mercado: formData.get('mercado') || '',
         supervisor: formData.get('supervisor') || '',
         comentario: formData.get('comentario') || '',
