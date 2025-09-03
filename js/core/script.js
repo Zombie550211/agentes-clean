@@ -388,7 +388,82 @@ function renderCostumerTable(leads) {
     tbody.innerHTML = `<tr><td colspan="21" style="text-align:center;padding:2em;">No hay registros para mostrar.</td></tr>`;
     return;
   }
-  leads.forEach((lead, idx) => {
+  // Helpers para agrupar por mes
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  // Helpers para obtener propiedades anidadas y probar varias rutas
+  function getByPath(obj, path) {
+    try { return path.split('.').reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj); } catch { return undefined; }
+  }
+  function firstOf(obj, paths) {
+    for (const p of paths) { const v = getByPath(obj, p); if (v !== undefined && v !== null && v !== '') return v; }
+    return undefined;
+  }
+  function parseDateFlexible(v) {
+    if (!v) return null;
+    try {
+      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+      const s = String(v).trim();
+      // Intento directo
+      const d1 = new Date(s);
+      if (!isNaN(d1.getTime())) return d1;
+      // dd/mm/yyyy o mm/dd/yyyy (desambiguar por rangos)
+      const m = s.match(/^([0-3]?\d)[\/.-]([0-1]?\d)[\/.-](\d{4})$/);
+      if (m) {
+        let a = parseInt(m[1], 10), b = parseInt(m[2], 10), yy = parseInt(m[3], 10);
+        let dd, mm;
+        if (a > 12 && b >= 1 && b <= 12) { // 31/08/2025 -> dd/mm/yyyy
+          dd = a; mm = b - 1;
+        } else if (b > 12 && a >= 1 && a <= 12) { // 08/31/2025 -> mm/dd/yyyy
+          dd = b; mm = a - 1;
+        } else if (a <= 12 && b <= 12) {
+          // Ambiguo: por defecto asumir dd/mm/yyyy si a > b, si no mm/dd/yyyy
+          if (a > b) { dd = a; mm = b - 1; } else { dd = b; mm = a - 1; }
+        } else {
+          dd = a; mm = b - 1;
+        }
+        const d2 = new Date(yy, mm, dd);
+        return isNaN(d2.getTime()) ? null : d2;
+      }
+      return null;
+    } catch { return null; }
+  }
+  function getLeadDate(lead) {
+    // Solo considerar fecha de venta/contratación en múltiples rutas posibles (planas o anidadas)
+    const candidate = firstOf(lead, [
+      'dia_venta','diaVenta',
+      'dia_contratacion','diaContratacion',
+      'fecha_contratacion','fechaContratacion',
+      '_raw.dia_venta','_raw.diaVenta',
+      '_raw.dia_contratacion','_raw.diaContratacion',
+      '_raw.fecha_contratacion','_raw.fechaContratacion'
+    ]);
+    return parseDateFlexible(candidate);
+  }
+  let lastMonthKey = '';
+
+  // Ordenar por fecha descendente para agrupar correctamente por mes
+  const sortedLeads = (Array.isArray(leads) ? leads.slice() : []).sort((a, b) => {
+    const da = getLeadDate(a); const db = getLeadDate(b);
+    const ta = da ? da.getTime() : 0; const tb = db ? db.getTime() : 0;
+    return tb - ta; // descendente
+  });
+
+  // Mantener sincronizada la referencia global con el orden actual
+  window.ultimaListaLeads = sortedLeads;
+
+  let sepCount = 0;
+  sortedLeads.forEach((lead, idx) => {
+    // Insertar separador mensual cuando cambia el mes (YYYY-MM)
+    const d = getLeadDate(lead);
+    const key = d ? `${d.getFullYear()}-${('0'+(d.getMonth()+1)).slice(-2)}` : 'Sin fecha';
+    if (key !== lastMonthKey) {
+      lastMonthKey = key;
+      const title = d ? `${monthNames[d.getMonth()]} ${d.getFullYear()} — Clientes` : 'Sin fecha — Clientes';
+      tbody.innerHTML += `
+        <tr class="costumer-month-separator"><td colspan="21" style="background:#e2e8f0;font-weight:700;border-left:4px solid #1976d2;padding:12px 18px;color:#0f172a;">${title}</td></tr>
+      `;
+      sepCount++;
+    }
     const rowClass = idx % 2 === 0 ? 'costumer-row-striped' : '';
     const editable = canEditStatus();
     const statusValue = (lead.status || '').toString();
@@ -412,8 +487,8 @@ function renderCostumerTable(leads) {
         <td class="td-nowrap" title="${lead.autopago || ''}">${lead.autopago || ''}</td>
         <td class="td-ellipsis" title="${lead.direccion || ''}">${lead.direccion || ''}</td>
         <td class="td-ellipsis" title="${lead.tipo_servicios || ''}">${lead.tipo_servicios || ''}</td>
-        <td class="td-ellipsis" title="${lead.sistema || ''}">${lead.sistema || ''}</td>
-        <td class="td-nowrap" title="${lead.riesgo || ''}">${lead.riesgo || ''}</td>
+        <td class="td-ellipsis" title="${(function(){ const v = firstOf(lead, ['sistema','system','plataforma','platform','_raw.sistema','_raw.system']); return v ?? 'N/A'; })()}">${(function(){ const v = firstOf(lead, ['sistema','system','plataforma','platform','_raw.sistema','_raw.system']); return v ?? 'N/A'; })()}</td>
+        <td class="td-nowrap" title="${(function(){ const v = firstOf(lead, ['riesgo','risk','nivel_riesgo','_raw.riesgo','_raw.risk']); return v ?? 'N/A'; })()}">${(function(){ const v = firstOf(lead, ['riesgo','risk','nivel_riesgo','_raw.riesgo','_raw.risk']); return v ?? 'N/A'; })()}</td>
         <td class="td-nowrap" title="${lead.dia_venta || ''}">${lead.dia_venta || ''}</td>
         <td class="td-nowrap" title="${lead.dia_instalacion || ''}">${lead.dia_instalacion || ''}</td>
         <td class="td-nowrap">${statusCellHtml}</td>

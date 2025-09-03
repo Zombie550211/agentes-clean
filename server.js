@@ -1044,201 +1044,33 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
         return m ? m[1] : '';
       } catch { return ''; }
     };
-
-    // Flag de enriquecimiento opcional (solo si el cliente lo solicita)
+    const getByPath = (obj, path) => {
+      try { return path.split('.').reduce((o, k) => (o && o[k] !== undefined && o[k] !== null) ? o[k] : undefined, obj); } catch { return undefined; }
+    };
+    const firstOf = (obj, paths) => {
+      for (const p of paths) {
+        const v = p.includes('.') ? getByPath(obj, p) : (obj ? obj[p] : undefined);
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+      return undefined;
+    };
     const enrichMode = (req.query.enrich === '1' || req.query.enrich === 'true');
 
-    // Mapear los campos según lo que espera el frontend
     const mappedCustomers = customers.map(customer => {
-      // Mapeo completo basado en la estructura que espera el frontend
+      const sistemaVal = firstOf(customer, [
+        'sistema','system','sistema_operativo','platform','plataforma',
+        '_raw.sistema','_raw.system','_raw.platform','_raw.plataforma'
+      ]);
       const mapped = {
-        // Información básica
-        _id: customer._id ? customer._id.toString() : 'sin-id',
-        nombre_cliente: customer.nombre_cliente || customer.nombre || customer.name || '',
-        telefono_principal: (
-          customer.telefono_principal ||
-          customer.telefono ||
-          customer.phone ||
-          customer.celular ||
-          customer.mobile ||
-          customer.phone1 ||
-          (customer._raw && (customer._raw.telefono_principal || customer._raw.telefono || customer._raw.phone || customer._raw.celular || customer._raw.mobile || customer._raw.phone1)) ||
-          ''
-        ),
-        telefono_alterno: (
-          customer.telefono_alterno ||
-          customer.telefono_secundario ||
-          customer.telefono2 ||
-          customer.phone2 ||
-          customer.secondary_phone ||
-          (customer._raw && (customer._raw.telefono_alterno || customer._raw.telefono_secundario || customer._raw.telefono2 || customer._raw.phone2 || customer._raw.secondary_phone)) ||
-          ''
-        ),
-        numero_cuenta: (
-          customer.numero_cuenta ||
-          customer.numeroCuenta ||
-          customer.cuenta ||
-          customer.account_number ||
-          customer.accountNumber ||
-          (customer._raw && (customer._raw.numero_cuenta || customer._raw.numeroCuenta || customer._raw.cuenta || customer._raw.account_number || customer._raw.accountNumber)) ||
-          ''
-        ),
-        
-        // Dirección y ubicación
-        direccion: (
-          customer.direccion ||
-          customer.direccion_completa ||
-          customer.address ||
-          customer.address_line ||
-          customer.addressLine ||
-          (customer._raw && (customer._raw.direccion || customer._raw.direccion_completa || customer._raw.address || customer._raw.address_line || customer._raw.addressLine)) ||
-          'Sin dirección'
-        ),
-        zip_code: (
-          customer.zip_code ||
-          customer.zip ||
-          customer.codigo_postal ||
-          customer.postal_code ||
-          customer.postalCode ||
-          customer.zipcode ||
-          customer.cp ||
-          customer.codigoPostal ||
-          (customer._raw && (customer._raw.zip_code || customer._raw.zip || customer._raw.codigo_postal || customer._raw.postal_code || customer._raw.postalCode || customer._raw.zipcode || customer._raw.cp || customer._raw.codigoPostal)) ||
-          ''
-        ),
-        
-        // Información del servicio
-        tipo_servicios: (
-          customer.tipo_servicio ||
-          customer.tipo_servicios ||
-          customer.tipoServicio ||
-          customer.tipoServicios ||
-          customer.producto_contratado ||
-          customer.producto ||
-          customer.product ||
-          customer.servicio ||
-          customer.servicios ||
-          (customer._raw && (customer._raw.tipo_servicio || customer._raw.tipo_servicios || customer._raw.tipoServicio || customer._raw.tipoServicios || customer._raw.producto_contratado || customer._raw.producto || customer._raw.product || customer._raw.servicio || customer._raw.servicios)) ||
-          ''
-        ),
-        servicios: customer.servicios || customer.tipo_servicio || customer.producto_contratado || customer.producto || customer.product || '',
-        sistema: (
-          customer.sistema ||
-          customer.system ||
-          customer.sistema_operativo ||
-          customer.platform ||
-          customer.plataforma ||
-          (customer._raw && (customer._raw.sistema || customer._raw.system || customer._raw.sistema_operativo || customer._raw.platform || customer._raw.plataforma)) ||
-          ''
-        ),
-        riesgo: (
-          customer.riesgo ||
-          customer.nivel_riesgo ||
-          customer.risk ||
-          customer.risk_level ||
-          (customer._raw && (customer._raw.riesgo || customer._raw.nivel_riesgo || customer._raw.risk || customer._raw.risk_level)) ||
-          ''
-        ),
-        
-        // Fechas importantes
-        dia_venta: (
-          customer.dia_venta ||
-          customer.fecha_contratacion ||
-          customer.diaVenta ||
-          customer.fecha_venta ||
-          customer.fechaVenta ||
-          (customer._raw && (customer._raw.dia_venta || customer._raw.fecha_contratacion || customer._raw.diaVenta || customer._raw.fecha_venta || customer._raw.fechaVenta)) ||
-          ''
-        ),
-        dia_instalacion: (
-          customer.dia_instalacion ||
-          customer.fecha_instalacion ||
-          customer.fecha_instalación ||
-          customer.diaInstalacion ||
-          customer.installation_date ||
-          customer.installationDate ||
-          customer.install_date ||
-          customer.installDate ||
-          customer.fecha_instalacion_programada ||
-          customer.installationScheduled ||
-          customer.installation_schedule ||
-          (customer._raw && (customer._raw.dia_instalacion || customer._raw.fecha_instalacion || customer._raw.fecha_instalación || customer._raw.diaInstalacion || customer._raw.installation_date || customer._raw.installationDate || customer._raw.install_date || customer._raw.installDate || customer._raw.fecha_instalacion_programada || customer._raw.installationScheduled || customer._raw.installation_schedule)) ||
-          ''
-        ),
-        
-        // Estado y puntuación
-        status: customer.status || '',
-        puntaje: typeof customer.puntaje === 'number' ? customer.puntaje : 0,
-        
-        // Información de equipo
-        supervisor: (
-          customer.supervisor ||
-          customer.supervisorName ||
-          customer.supervisor_nombre ||
-          customer.supervisorNombre ||
-          customer.team ||
-          customer.teamName ||
-          (customer._raw && (customer._raw.supervisor || customer._raw.supervisorName || customer._raw.supervisor_nombre || customer._raw.supervisorNombre || customer._raw.team || customer._raw.teamName)) ||
-          ''
-        ),
-        mercado: customer.mercado || '',
-        
-        // Comentarios
-        comentario: (
-          customer.comentario ||
-          customer.comentarios ||
-          customer.comment ||
-          customer.comments ||
-          customer.nota ||
-          customer.notas ||
-          customer.notes ||
-          customer.observaciones ||
-          (customer._raw && (customer._raw.comentario || customer._raw.comentarios || customer._raw.comment || customer._raw.comments || customer._raw.nota || customer._raw.notas || customer._raw.notes || customer._raw.observaciones)) ||
-          ''
-        ),
-        motivo_llamada: (
-          customer.motivo_llamada ||
-          customer.motivo ||
-          customer.motivoLlamada ||
-          customer.reason ||
-          customer.call_reason ||
-          (customer._raw && (customer._raw.motivo_llamada || customer._raw.motivo || customer._raw.motivoLlamada || customer._raw.reason || customer._raw.call_reason)) ||
-          ''
-        ),
-        
-        // Información adicional
-        autopago: (
-          (customer.autopago !== undefined ? customer.autopago :
-            (customer.auto_pago !== undefined ? customer.auto_pago :
-              (customer.autopay !== undefined ? customer.autopay :
-                (customer.autoPay !== undefined ? customer.autoPay : false))))
-        ),
-
-        // Exponer campos de agente (IDs y nombres) para permitir asignación en frontend
-        agenteId: customer.agenteId || customer.agente_id || customer.idAgente || customer.agentId || customer.createdBy || customer.creadoPor || customer.creado_por || customer.ownerId || customer.assignedId || '',
-        agenteNombre: customer.agenteNombre || customer.nombreAgente || customer.agente || customer.agent || customer.vendedor || customer.seller || customer.nombre_agente || customer.agente_nombre || customer.agentName || customer.salesAgent || customer.asignadoA || customer.asignado_a || customer.assignedTo || customer.assigned_to || customer.usuario || customer.owner || customer.registeredBy || '',
-        // También exponer variantes (no sensibles) útiles para diagnóstico limitado
-        creadoPor: customer.creadoPor || customer.creado_por || '',
-        createdBy: customer.createdBy || '',
-        ownerId: customer.ownerId || '',
-        assignedId: customer.assignedId || ''
+        ...customer,
+        sistema: (sistemaVal && String(sistemaVal).trim()) ? sistemaVal : 'N/A'
       };
-      
-      // Asegurarse de que los valores booleanos se conviertan a string para la visualización
+
+      // Normalizar booleanos para visualización
       if (typeof mapped.autopago === 'boolean') {
         mapped.autopago = mapped.autopago ? 'Sí' : 'No';
       }
-      
-      // Convertir fechas a formato ISO si es necesario
-      if (mapped.fecha_creacion && !(mapped.fecha_creacion instanceof Date)) {
-        try {
-          mapped.fecha_creacion = new Date(mapped.fecha_creacion).toISOString();
-        } catch (e) {
-          console.error('Error al formatear fecha:', e);
-          mapped.fecha_creacion = new Date().toISOString();
-        }
-      }
-      
+
       // Enriquecimientos finales opcionales (solo si enrich=1)
       if (enrichMode) {
         if ((!mapped.supervisor || mapped.supervisor === '') && mapped.agenteNombre) {
