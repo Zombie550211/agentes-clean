@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (userStr) {
         user = JSON.parse(userStr) || {};
       } else {
-        // Fallback: intentar obtener desde el token JWT como en inicio.html
+        // Fallback: 1) intentar obtener desde el token JWT (modo legacy)
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (token && token.split('.').length === 3) {
           try {
@@ -24,10 +24,54 @@ document.addEventListener('DOMContentLoaded', function() {
               role: payload.role || payload.rol || 'usuario'
             };
           } catch (e) {
-            console.warn('No se pudo decodificar el token para cargar usuario');
+            console.info('No se pudo decodificar el token para cargar usuario (se intentará cookie)');
           }
-        } else {
-          console.warn('No se encontró información del usuario en el almacenamiento local ni token');
+        }
+
+        // Fallback: 2) si no hubo user ni token válido, intentar vía cookie HttpOnly
+        if (!user || Object.keys(user).length === 0) {
+          // Nota: esta llamada solo rellena UI; no impone redirecciones
+          // y es segura para páginas con sidebar.
+          // Se guarda en sessionStorage para evitar nuevas llamadas en la sesión.
+          // Si el backend no está disponible o no hay sesión, simplemente
+          // se mostrará el estado por defecto.
+          try {
+            // fetch con credenciales para que el servidor lea la cookie de sesión
+            fetch('/api/protected', { method: 'GET', credentials: 'include' })
+              .then(r => r.ok ? r.json() : null)
+              .then(data => {
+                const apiUser = (data && data.user) || null;
+                if (!apiUser) return; // sin sesión por cookie
+                const normalized = {
+                  name: apiUser.username || apiUser.name || 'Usuario',
+                  role: (apiUser.role || 'usuario')
+                };
+                try { sessionStorage.setItem('user', JSON.stringify(normalized)); } catch {}
+                // Pintar inmediatamente con los datos recibidos
+                try {
+                  const userNameElement = document.getElementById('user-name');
+                  if (userNameElement) userNameElement.textContent = normalized.name;
+                  const userRoleElement = document.getElementById('user-role');
+                  if (userRoleElement) {
+                    const raw = (normalized.role || '').toString().toLowerCase().trim();
+                    const roleMap = { admin:'Administrador', supervisor:'Supervisor', agent:'Agente', backoffice:'Backoffice', 'b:o':'Backoffice', 'b.o':'Backoffice', 'b-o':'Backoffice', bo:'Backoffice' };
+                    userRoleElement.textContent = roleMap[raw] || (raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Usuario');
+                  }
+                  const userAvatar = document.querySelector('.user-info .user-avatar i') || document.querySelector('.user-info .avatar i');
+                  if (userAvatar) {
+                    const raw = (normalized.role || '').toString().toLowerCase().trim();
+                    const roleIcons = { admin:'user-shield', supervisor:'user-tie', agent:'user', backoffice:'user-shield' };
+                    userAvatar.className = `fas fa-${(roleIcons[raw] || 'user-circle')}`;
+                  }
+                } catch {}
+              })
+              .catch(() => {
+                // Evitar ruido en consola si no hay cookie o el endpoint no responde
+                console.info('No hay información de usuario en Storage y no se obtuvo sesión por cookie');
+              });
+          } catch (_) {
+            console.info('No hay información de usuario en Storage y no se obtuvo sesión por cookie');
+          }
         }
       }
 

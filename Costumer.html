@@ -778,8 +778,8 @@
       }
       // Mostrar botón solo para admin/supervisor/backoffice (no para agent)
       const role = getRole();
-      // Solo admin/backoffice pueden ver el botón (supervisor ya queda restringido en backend)
-      const allowed = new Set(['admin','backoffice','b:o','b.o','b-o','bo']);
+      // admin/backoffice/supervisor pueden ver el botón
+      const allowed = new Set(['admin','supervisor','backoffice','b:o','b.o','b-o','bo']);
       if (forceAllBtn) {
         if (allowed.has(role)) {
           forceAllBtn.style.display = 'inline-flex';
@@ -1206,14 +1206,95 @@
       }
     }
 
+    // Helper: obtener propiedad por nombre (case-insensitive) desde obj y su _raw
+    function getPropCI(obj, propName) {
+      try {
+        if (!obj || !propName) return undefined;
+        const p = String(propName);
+        if (p in obj) return obj[p];
+        const lower = p.toLowerCase();
+        const keys = Object.keys(obj || {});
+        const hit = keys.find(k => k.toLowerCase() === lower);
+        if (hit) return obj[hit];
+        return undefined;
+      } catch { return undefined; }
+    }
+    // Helper: búsqueda profunda por clave (case-insensitive). Escanea objetos/arrays.
+    function deepFindByKey(obj, candidates, opts = {}) {
+      const MAX_DEPTH = typeof opts.maxDepth === 'number' ? opts.maxDepth : 4;
+      const seen = new WeakSet();
+      const candSet = new Set((candidates || []).map(c => String(c).toLowerCase()));
+      function matchKey(k) {
+        const kl = String(k).toLowerCase();
+        if (candSet.has(kl)) return true;
+        // También coincide si la variante upper/lower/cap es igual
+        for (const c of candSet) {
+          if (kl === c || kl === c.toUpperCase() || kl === c.toLowerCase()) return true;
+        }
+        return false;
+      }
+      function dfs(node, depth) {
+        if (!node || depth > MAX_DEPTH) return undefined;
+        if (typeof node !== 'object') return undefined;
+        if (seen.has(node)) return undefined;
+        seen.add(node);
+        if (Array.isArray(node)) {
+          for (const it of node) {
+            const r = dfs(it, depth + 1);
+            if (r != null && String(r).trim() !== '') return r;
+          }
+          return undefined;
+        }
+        // node es objeto
+        for (const [k, v] of Object.entries(node)) {
+          if (matchKey(k)) {
+            if (v != null && String(v).trim() !== '') return v;
+          }
+        }
+        for (const [, v] of Object.entries(node)) {
+          const r = dfs(v, depth + 1);
+          if (r != null && String(r).trim() !== '') return r;
+        }
+        return undefined;
+      }
+      return dfs(obj, 0);
+    }
+    function pickField(obj, candidates) {
+      try {
+        const tryList = [];
+        (candidates || []).forEach(n => {
+          tryList.push(n, String(n).toUpperCase(), String(n).toLowerCase(), n && (String(n).charAt(0).toUpperCase() + String(n).slice(1).toLowerCase()));
+        });
+        // Explorar objeto directo y su _raw si existe
+        for (const name of tryList) {
+          const v = getPropCI(obj, name);
+          if (v != null && String(v).trim() !== '') return v;
+        }
+        if (obj && obj._raw) {
+          for (const name of tryList) {
+            const v = getPropCI(obj._raw, name);
+            if (v != null && String(v).trim() !== '') return v;
+          }
+        }
+        // Búsqueda profunda como último recurso (obj y _raw)
+        const deep1 = deepFindByKey(obj, candidates);
+        if (deep1 != null && String(deep1).trim() !== '') return deep1;
+        if (obj && obj._raw) {
+          const deep2 = deepFindByKey(obj._raw, candidates);
+          if (deep2 != null && String(deep2).trim() !== '') return deep2;
+        }
+        return '';
+      } catch { return ''; }
+    }
+
     function normalizeLead(raw) {
       const lead = raw || {};
       // Mapear campos comunes provenientes del backend en MAYÚSCULAS u otras variantes
-      const fechaVenta = lead.dia_venta || lead.FECHA || lead.fecha_venta || lead.fecha || '';
-      const fechaInst = lead.dia_instalacion || lead.FECHA_INSTALACION || lead.fecha_instalacion || '';
-      const puntaje = lead.puntaje ?? lead.PUNTAJE ?? lead.score ?? 0;
-      const supervisor = lead.supervisor ?? lead.SUPERVISOR ?? lead.team ?? '';
-      const tipoServicio = lead.tipo_servicios ?? lead.tipo_servicio ?? lead.SERVICIO ?? lead.producto ?? '';
+      const fechaVenta = pickField(lead, ['dia_venta','FECHA','fecha_venta','fecha']);
+      const fechaInst = pickField(lead, ['dia_instalacion','FECHA_INSTALACION','fecha_instalacion']);
+      const puntaje = pickField(lead, ['puntaje','PUNTAJE','score']) || 0;
+      const supervisor = pickField(lead, ['supervisor','SUPERVISOR','team','Team']);
+      const tipoServicio = pickField(lead, ['tipo_servicios','tipo_servicio','SERVICIO','producto']);
       const id = extractLeadId(lead);
       // Intentar derivar "agente" desde varios posibles campos del backend
       const agente = (
@@ -1232,14 +1313,14 @@
         numero_cuenta: lead.numero_cuenta || lead.CUENTA || lead.account || '',
         autopago: lead.autopago ?? lead.AUTOPAGO ?? '',
         direccion: lead.direccion || lead.DIRECCION || lead.address || '',
-        tipo_servicios: tipoServicio || '',
-        sistema: lead.sistema || lead.SISTEMA || '',
-        riesgo: lead.riesgo || lead.RIESGO || '',
+        tipo_servicios: (tipoServicio || ''),
+        sistema: (pickField(lead, ['sistema','Sistema','SISTEMA','system','System']) || ''),
+        riesgo: (pickField(lead, ['riesgo','Riesgo','RIESGO','risk','RISK']) || ''),
         dia_venta: fechaVenta ? toISODateString(fechaVenta) : '',
         dia_instalacion: fechaInst ? toISODateString(fechaInst) : '',
         status: lead.status || lead.STATUS || lead.estado || 'N/A',
         servicios: lead.servicios || lead.SERVICIOS || tipoServicio || '',
-        mercado: lead.mercado || lead.MERCADO || '',
+        mercado: (pickField(lead, ['mercado','Mercado','MERCADO','market','MARKET']) || ''),
         supervisor: supervisor || '',
         agente: agente || '',
         comentario: lead.comentario || lead.COMENTARIO || '',
@@ -1467,6 +1548,38 @@
         }
       } catch (e) {
         console.warn('No se pudo aplicar filtro por agente:', e?.message);
+      }
+    }
+
+    // Filtrar por equipo si el usuario es 'supervisor' y NO está activo forceAll
+    if (!forceAll) {
+      try {
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+        if (role === 'supervisor' && window.Teams) {
+          const supName = (userData.name || userData.nombre || userData.username || userData?.usuario?.name || userData?.usuario?.nombre || '').toString();
+          const agents = (window.Teams.getAgentsBySupervisor && window.Teams.getAgentsBySupervisor(supName)) || [];
+          const norm = window.Teams.norm || ((s)=>String(s||'').toLowerCase().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim());
+          if (Array.isArray(agents) && agents.length) {
+            const teamAgents = new Set(agents.map(a => norm(a)));
+            const getName = (l) => {
+              if (typeof getAgentName === 'function') return getAgentName(l);
+              const cand = [
+                l?.agenteNombre, l?.nombreAgente, l?.agente, l?.agent,
+                l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.agent
+              ];
+              const v = cand.find(x => x && String(x).trim().length);
+              return v ? String(v).trim() : '';
+            };
+            const before = normalizedLeads.length;
+            normalizedLeads = normalizedLeads.filter(l => teamAgents.has(norm(getName(l))));
+            console.log(`[Filtro rol=supervisor] ${before} -> ${normalizedLeads.length} leads del equipo de`, supName);
+          } else {
+            console.warn('[Filtro rol=supervisor] No se encontraron agentes para el supervisor:', supName);
+          }
+        }
+      } catch (e) {
+        console.warn('[Filtro rol=supervisor] No se pudo aplicar filtro por equipo:', e?.message);
       }
     }
 

@@ -34,7 +34,8 @@
         { key: 'inicio', href: 'inicio.html' },
         { key: 'lead', href: 'lead.html' },
         { key: 'costumer', href: 'Costumer.html' },
-        { key: 'register', href: 'register.html' }
+        { key: 'register', href: 'register.html' },
+        { key: 'facturacion', href: 'facturacion.html' }
       ];
       // 1) Prioridad: atributo data-active si viene de la página
       let target = null;
@@ -47,7 +48,8 @@
           { key: 'inicio', match: 'inicio.html' },
           { key: 'lead', match: 'lead.html' },
           { key: 'costumer', match: 'costumer.html' },
-          { key: 'register', match: 'register.html' }
+          { key: 'register', match: 'register.html' },
+          { key: 'facturacion', match: 'facturacion.html' }
         ].find(m => path.endsWith(m.match));
         if (urlTarget) target = map.find(m => m.key === urlTarget.key);
       }
@@ -91,16 +93,31 @@
   }
 
   async function loadSidebar(){
-    const nav = document.querySelector('nav.sidebar.sidebar-inicio');
+    const nav = document.querySelector('nav.sidebar');
     if (!nav) return;
     try {
       // Ocultar temporalmente para evitar flicker hasta aplicar activo
       const prevVisibility = nav.style.visibility;
       nav.style.visibility = 'hidden';
       const desiredKey = nav.getAttribute('data-active');
-      // Usar caché del navegador para acelerar navegación entre páginas
-      const resp = await fetch('components/sidebar.html', { cache: 'force-cache' });
-      if (!resp.ok) throw new Error('No se pudo cargar sidebar.html');
+      // Intentar múltiples rutas para mayor robustez según basePath
+      async function fetchFirstOk(urls){
+        let lastErr = null;
+        for (const u of urls) {
+          try {
+            const r = await fetch(u, { cache: 'no-store' });
+            if (r && r.ok) return r;
+          } catch (e) { lastErr = e; }
+        }
+        if (lastErr) throw lastErr;
+        throw new Error('Ninguna ruta de sidebar.html respondió OK');
+      }
+      const candidates = [
+        '/components/sidebar.html',
+        'components/sidebar.html',
+        './components/sidebar.html'
+      ];
+      const resp = await fetchFirstOk(candidates);
       const html = await resp.text();
       nav.innerHTML = html;
       // post-setup
@@ -115,6 +132,9 @@
       nav.style.visibility = prevVisibility || '';
     } catch (e) {
       console.error('Error cargando el sidebar compartido:', e);
+      try {
+        console.warn('Diagnóstico: intentando acceder a rutas absolutas/relativas de sidebar.html falló');
+      } catch {}
       // Asegurar que no quede oculto en caso de error
       try { nav.style.visibility = ''; } catch {}
     }

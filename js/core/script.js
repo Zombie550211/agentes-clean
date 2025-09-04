@@ -24,28 +24,168 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Obtener datos del formulario
       const formData = new FormData(form);
+      // Helpers para selects: priorizar el texto visible del option seleccionado
+      const getSelectText = (name) => {
+        try {
+          const el = form.elements[name];
+          if (!el) return '';
+          if (el.tagName && el.tagName.toUpperCase() === 'SELECT') {
+            const opt = el.selectedOptions && el.selectedOptions[0];
+            return (opt && typeof opt.text === 'string') ? opt.text.trim() : '';
+          }
+          return '';
+        } catch { return ''; }
+      };
+      const normUpper = (v) => (v == null ? '' : String(v).trim().toUpperCase());
+      const withDefault = (v, def = 'N/A') => {
+        const s = (v == null ? '' : String(v).trim());
+        return s.length ? s : def;
+      };
+      // Helpers visuales de error por campo
+      const showFieldError = (name, message) => {
+        const el = form.elements[name];
+        if (!el) return;
+        const group = el.closest && el.closest('.form-group');
+        if (group) group.classList.add('has-error');
+        try { el.setAttribute('aria-invalid', 'true'); } catch {}
+        let hint = group ? group.querySelector(`.error-text[data-error-for="${name}"]`) : null;
+        if (!hint && group) {
+          hint = document.createElement('small');
+          hint.className = 'error-text';
+          hint.setAttribute('data-error-for', name);
+          group.appendChild(hint);
+        }
+        if (hint) {
+          hint.textContent = message || 'Este campo es obligatorio';
+          hint.style.display = 'block';
+        }
+      };
+      const clearFieldError = (name) => {
+        const el = form.elements[name];
+        if (!el) return;
+        const group = el.closest && el.closest('.form-group');
+        if (group) group.classList.remove('has-error');
+        try { el.removeAttribute('aria-invalid'); } catch {}
+        const hint = group ? group.querySelector(`.error-text[data-error-for="${name}"]`) : null;
+        if (hint) hint.style.display = 'none';
+      };
+      // Requerir inputs/fechas obligatorios con validación dura
+      const requireInput = (name, label) => {
+        const el = form.elements[name];
+        const val = el && el.value ? String(el.value).trim() : '';
+        if (!val) {
+          showFieldError(name, `Este campo es obligatorio: ${label}`);
+          alert(`Completa ${label} antes de guardar.`);
+          if (el && el.focus) el.focus();
+          throw new Error(`Campo requerido vacío: ${name}`);
+        }
+        clearFieldError(name);
+        return val;
+      };
+      // Requerir selects obligatorios con validación dura
+      const requireSelect = (name, label) => {
+        const el = form.elements[name];
+        const val = el && el.value ? String(el.value).trim() : '';
+        if (!val) {
+          showFieldError(name, `Debes seleccionar ${label}.`);
+          alert(`Selecciona ${label} antes de guardar.`);
+          if (el && el.focus) el.focus();
+          throw new Error(`Campo requerido vacío: ${name}`);
+        }
+        const txt = getSelectText(name) || val;
+        clearFieldError(name);
+        return normUpper(txt);
+      };
+      // Requerir radios obligatorios (uno seleccionado)
+      const requireRadio = (name, label) => {
+        const nodes = form.querySelectorAll(`input[type=radio][name="${name}"]`);
+        let checked = '';
+        nodes.forEach(n => { if (n.checked) checked = n.value; });
+        if (!checked) {
+          // Mensaje visual en el grupo del primer radio
+          const first = nodes && nodes[0];
+          if (first) {
+            const group = first.closest && first.closest('.form-group');
+            if (group) {
+              let hint = group.querySelector(`.error-text[data-error-for="${name}"]`);
+              if (!hint) {
+                hint = document.createElement('small');
+                hint.className = 'error-text';
+                hint.setAttribute('data-error-for', name);
+                group.appendChild(hint);
+              }
+              group.classList.add('has-error');
+              hint.textContent = `Debes seleccionar ${label}.`;
+              hint.style.display = 'block';
+            }
+          }
+          alert(`Selecciona ${label} antes de guardar.`);
+          if (first && first.focus) first.focus();
+          throw new Error(`Campo radio requerido vacío: ${name}`);
+        }
+        // limpiar error si estaba
+        const first = nodes && nodes[0];
+        if (first) {
+          const group = first.closest && first.closest('.form-group');
+          if (group) {
+            const hint = group.querySelector(`.error-text[data-error-for="${name}"]`);
+            group.classList.remove('has-error');
+            if (hint) hint.style.display = 'none';
+          }
+        }
+        return normUpper(checked);
+      };
+
+      // Limpiar mensajes de error al cambiar/tipear
+      try {
+        Array.from(form.elements).forEach(el => {
+          const name = el && el.name;
+          if (!name) return;
+          const ev = (el.tagName && el.tagName.toUpperCase() === 'SELECT') || el.type === 'radio' ? 'change' : 'input';
+          el.addEventListener(ev, () => clearFieldError(name));
+        });
+      } catch {}
       
       // Mapeo de campos del formulario a los nombres esperados por el backend
-      const lead = {
-        nombre_cliente: formData.get('nombre-cliente') || '',
-        telefono_principal: formData.get('telefono-principal') || '',
-        telefono_alterno: formData.get('telefono-alterno') || '',
-        numero_cuenta: formData.get('numero-cuenta') || '',
-        autopago: formData.get('autopago') || '',
-        direccion: formData.get('direccion') || '',
-        tipo_servicios: formData.get('tipo-servicio') || '',
-        sistema: formData.get('sistema') || '',
-        riesgo: formData.get('riesgo') || '',
-        dia_venta: formData.get('dia-venta') || '',
-        dia_instalacion: formData.get('dia-instalacion') || '',
-        status: formData.get('status') || '',
-        servicios: formData.get('servicios') || '',
-        mercado: formData.get('mercado') || '',
-        supervisor: formData.get('supervisor') || '',
-        comentario: formData.get('comentario') || '',
-        motivo_llamada: formData.get('motivo-llamada') || '',
-        zip_code: formData.get('zip-code') || ''
-      };
+      let lead;
+      try {
+        // Validación dura: TODOS los campos de opciones deben estar seleccionados
+        const autopagoReq = requireSelect('autopago', 'Autopago');
+        const tipoServicioReq = requireSelect('tipo-servicio', 'Tipo de servicios');
+        const sistemaReq = requireSelect('sistema', 'un Sistema');
+        const riesgoReq = requireSelect('riesgo', 'un Riesgo');
+        const serviciosReq = requireSelect('servicios', 'Servicios');
+        const mercadoReq = requireSelect('mercado', 'Mercado');
+        const supervisorReq = requireSelect('supervisor', 'Supervisor');
+        const comentarioReq = requireSelect('comentario', 'Comentario');
+        const statusReq = requireRadio('status', 'un Status');
+        const motivoReq = requireRadio('motivo-llamada', 'un Motivo de llamada');
+
+        lead = {
+        nombre_cliente: requireInput('nombre-cliente','Nombre del cliente'),
+        telefono_principal: requireInput('telefono-principal','Teléfono principal'),
+        telefono_alterno: requireInput('telefono-alterno','Teléfono alterno'),
+        numero_cuenta: requireInput('numero-cuenta','Número de cuenta'),
+        autopago: autopagoReq,
+        direccion: requireInput('direccion','Dirección'),
+        tipo_servicios: tipoServicioReq,
+        // Sistema y Riesgo obligatorios, normalizados en mayúsculas
+        sistema: sistemaReq,
+        riesgo: riesgoReq,
+        dia_venta: requireInput('dia-venta','Día de venta'),
+        dia_instalacion: requireInput('dia-instalacion','Día de instalación'),
+        status: statusReq,
+        servicios: serviciosReq,
+        mercado: mercadoReq,
+        supervisor: supervisorReq,
+        comentario: comentarioReq,
+        motivo_llamada: motivoReq,
+        zip_code: requireInput('zip-code','ZIP Code')
+        };
+      } catch (hardErr) {
+        console.warn('Validación dura falló:', hardErr?.message || hardErr);
+        return; // no continuar con envío
+      }
 
       // Asignar automáticamente el TEAM según SUPERVISOR
       const supervisor = lead.supervisor ? lead.supervisor.trim().toUpperCase() : '';
@@ -63,23 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-      // Validar que todos los campos requeridos del formulario estén presentes
-      const camposRequeridos = [
-        'nombre_cliente', 'telefono_principal', 'telefono_alterno', 'numero_cuenta',
-        'autopago', 'direccion', 'tipo_servicios', 'sistema', 'riesgo',
-        'dia_venta', 'dia_instalacion', 'status', 'servicios', 'mercado',
-        'supervisor', 'comentario', 'motivo_llamada', 'zip_code'
-      ];
-      let camposFaltantes = [];
-      camposRequeridos.forEach(campo => {
-        if (!lead[campo] || lead[campo].toString().trim() === '') {
-          camposFaltantes.push(campo.replace(/_/g, ' '));
-        }
-      });
-      if (camposFaltantes.length > 0) {
-        alert('Faltan campos obligatorios: ' + camposFaltantes.join(', '));
-        return;
-      }
+      // (Se reemplaza por validación dura por campo más abajo)
 
       // Validar puntaje antes de enviar
       if (team === 'Team Lineas') {
