@@ -17,31 +17,37 @@
       telefono_principal: { visible: true, required: true, label: 'Teléfono Principal', type: 'tel' },
       numero_cuenta: { visible: true, required: true, label: 'Número de Cuenta', type: 'text' },
       autopay: { visible: true, required: true, label: 'Autopay', type: 'select', options: ['si', 'no'], placeholder: 'Seleccione' },
-      pin_seguridad: { visible: true, required: true, label: 'PIN de Seguridad', type: 'text' },
+      // Oculto globalmente
+      pin_seguridad: { visible: false, required: false, label: 'PIN de Seguridad', type: 'text' },
       direccion: { visible: true, required: true, label: 'Dirección', type: 'text' },
-      servicios: { visible: true, required: true, label: 'Servicios', type: 'checkboxes', options: ['INTERNET', 'TV', 'TELEFONIA'] },
+      // Oculto globalmente
+      servicios: { visible: false, required: false, label: 'Servicios', type: 'checkboxes', options: ['INTERNET', 'TV', 'TELEFONIA'] },
       dia_venta: { visible: true, required: true, label: 'Día de venta', type: 'date' },
       dia_instalacion: { visible: true, required: true, label: 'Día de instalación', type: 'date' },
       status: { visible: true, required: true, label: 'Status', type: 'select', options: ['PENDING', 'REPRO'] },
-      cantidad_lineas: { visible: true, required: true, label: 'Cantidad de Líneas', type: 'select', options: ['1','2','3','4','5'] },
-      telefonos: { visible: true, required: true, label: 'Teléfonos', type: 'tel[]', max: 5 },
-      ID: { visible: true, required: true, label: 'ID', type: 'text' },
+      // Oculto globalmente
+      cantidad_lineas: { visible: false, required: false, label: 'Cantidad de Líneas', type: 'select', options: ['1','2','3','4','5'] },
+      // Oculto globalmente (grupo dinámica de teléfonos adicionales)
+      telefonos: { visible: false, required: false, label: 'Teléfonos', type: 'tel[]', max: 5 },
+      // Oculto globalmente
+      ID: { visible: false, required: false, label: 'ID', type: 'text' },
       mercado: { visible: true, required: true, label: 'Mercado', type: 'select', options: ['BAMO', 'ICON'] },
-      supervisor: { visible: true, required: true, label: 'Supervisor', type: 'select', options: ['JONATHAN', 'DIEGO'] }
+      // Oculto globalmente
+      supervisor: { visible: false, required: false, label: 'Supervisor', type: 'select', options: ['JONATHAN', 'DIEGO'] }
     }
   };
 
   const TEAM_LINEAS = {
     key: 'team lineas',
     fields: {
-      // Overrides específicos si aplica, si no hereda de DEFAULTS
-      servicios: { visible: true, required: true, label: 'Servicios (múltiple)', type: 'checkboxes', options: ['INTERNET', 'TV', 'TELEFONIA'] },
+      // Mantener ocultos también para Team Líneas
+      servicios: { visible: false, required: false, label: 'Servicios (múltiple)', type: 'checkboxes', options: ['INTERNET', 'TV', 'TELEFONIA'] },
       status: { visible: true, required: true, label: 'Status', type: 'select', options: ['PENDING', 'REPRO'] },
-      supervisor: { visible: true, required: true, label: 'Supervisor', type: 'select', options: ['JONATHAN', 'DIEGO'] },
+      supervisor: { visible: false, required: false, label: 'Supervisor', type: 'select', options: ['JONATHAN', 'DIEGO'] },
       mercado: { visible: true, required: true, label: 'Mercado', type: 'select', options: ['BAMO', 'ICON'] },
-      cantidad_lineas: { visible: true, required: true, label: 'Cantidad de Líneas', type: 'select', options: ['1','2','3','4','5'] },
-      telefonos: { visible: true, required: true, label: 'Teléfonos (según cantidad)', type: 'tel[]', max: 5 },
-      ID: { visible: true, required: true, label: 'ID', type: 'text' }
+      cantidad_lineas: { visible: false, required: false, label: 'Cantidad de Líneas', type: 'select', options: ['1','2','3','4','5'] },
+      telefonos: { visible: false, required: false, label: 'Teléfonos (según cantidad)', type: 'tel[]', max: 5 },
+      ID: { visible: false, required: false, label: 'ID', type: 'text' }
     }
   };
 
