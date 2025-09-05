@@ -13,18 +13,29 @@
   }
 
   function decodeTokenRole() {
+    // Intenta obtener el rol desde el JWT; si no existe, cae a user en storage
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token || token.split('.').length !== 3) return '';
-      const payloadStr = base64UrlDecode(token.split('.')[1]);
-      const payload = JSON.parse(payloadStr || '{}');
-      return (payload.role || payload.rol || payload.userRole || '').toString().toLowerCase();
-    } catch {
-      try {
-        const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-        return (user.role || user?.usuario?.role || '').toString().toLowerCase();
-      } catch { return ''; }
-    }
+      if (token && token.split('.').length === 3) {
+        const payloadStr = base64UrlDecode(token.split('.')[1]);
+        const payload = JSON.parse(payloadStr || '{}');
+        const roleFromToken = (payload.role || payload.rol || payload.userRole || '').toString().toLowerCase();
+        if (roleFromToken) return roleFromToken;
+      }
+    } catch { /* ignorar y continuar al fallback */ }
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+      return (user.role || user?.usuario?.role || '').toString().toLowerCase();
+    } catch { return ''; }
+  }
+
+  // Normaliza distintos alias a un rol canónico
+  function normalizeRole(raw){
+    try {
+      const r = (raw || '').toString().toLowerCase().trim();
+      const map = { 'administrador': 'admin', 'admin': 'admin' };
+      return map[r] || r;
+    } catch { return ''; }
   }
 
   function setActive(nav, preferKey){
@@ -65,12 +76,19 @@
 
   function applyAdminVisibility(nav){
     try {
-      const role = decodeTokenRole();
+      const role = normalizeRole(decodeTokenRole());
+      // 1) Mostrar/ocultar items exclusivamente de admin por ID conocido
       const ids = ['#menu-create-account'];
       ids.forEach(sel => {
         const li = nav.querySelector(sel);
         if (li) li.style.display = role === 'admin' ? 'block' : 'none';
       });
+      // 2) Ocultar el enlace de Facturación si no es admin (sin modificar el componente)
+      const factLink = nav.querySelector('a[href$="facturacion.html"]');
+      const factLi = factLink ? (factLink.closest('li') || factLink.parentElement) : null;
+      if (factLi) {
+        factLi.style.display = role === 'admin' ? '' : 'none';
+      }
     } catch(e){ console.warn('sidebar admin visibility error', e); }
   }
 

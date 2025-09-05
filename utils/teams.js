@@ -7,8 +7,23 @@
         .replace(/\p{Diacritic}+/gu, '')
         .trim()
         .toLowerCase()
+        // eliminar signos de puntuación y separadores no alfanuméricos (conservar espacios)
+        .replace(/[^a-z0-9 ]+/g, '')
         .replace(/\s+/g, ' ');
     } catch { return ''; }
+  };
+
+  // Alias conocidos para canonización (variantes históricas -> canónico actual)
+  const ALIASES = {
+    'eduardor': 'eduardo rivas'
+  };
+
+  // Overrides de nombres para visualización en UI
+  const DISPLAY_NAME_OVERRIDES = {
+    // Compatibilidad con nombre previo
+    'eduardor': 'Eduardo R.',
+    // Nombre nuevo solicitado: Eduardo Rivas
+    'eduardo rivas': 'Eduardo Rivas'
   };
 
   // Definición inicial de equipos (seed). Expandir aquí según crezcan los equipos.
@@ -49,7 +64,9 @@
         'jonathan morales',
         'katerine gomez',
         'kimberly iglesias',
-        'stefani martinez'
+        'stefani martinez',
+        // Agente actualizado: Eduardo Rivas
+        'eduardo rivas'
       ]
     },
     // TEAM ROBERTO VELASQUEZ
@@ -77,6 +94,19 @@
         'julio chavez',
         'priscila hernandez',
         'riquelmi torres'
+      ]
+    },
+    // TEAM LINEAS (registrado desde requerimiento del usuario)
+    'team lineas': {
+      displayName: 'TEAM LINEAS',
+      supervisor: 'jonathan figueroa',
+      agents: [
+        'lineas-carlos',
+        'lineas-cristian r',
+        'lineas-edward',
+        'lineas-jocelyn',
+        'lineas-luis g',
+        'lineas-oscar r'
       ]
     }
   };
@@ -117,11 +147,23 @@
   const canonicalFromName = (name) => {
     const n = norm(name);
     if (!n) return '';
+    if (ALIASES[n]) return ALIASES[n];
+    const nCollapsed = n.replace(/\s+/g, '');
     if (canonicalNames.has(n)) return n;
-    // Match por tokens: todos los tokens del canónico existen en n
+    // Igualdad por forma "colapsada" (sin espacios)
+    for (const c of canonicalNames) {
+      const cCollapsed = c.replace(/\s+/g, '');
+      if (nCollapsed === cCollapsed) return c;
+    }
+    // Inclusión por tokens (todas las palabras del canónico presentes en n)
     for (const c of canonicalNames) {
       const toks = c.split(' ');
       if (toks.every(t => n.includes(t))) return c;
+    }
+    // Inclusión por forma colapsada (p.ej. "eduardor" dentro de "eduardor")
+    for (const c of canonicalNames) {
+      const cCollapsed = c.replace(/\s+/g, '');
+      if (nCollapsed.includes(cCollapsed)) return c;
     }
     return '';
   };
@@ -139,6 +181,27 @@
   const getSupervisorByAgent = (agentName) => {
     const team = getTeamByAgent(agentName);
     return team ? (getTeamDef(team)?.supervisor || '') : '';
+  };
+
+  // Convierte a Title Case simple
+  const toTitle = (s) => String(s || '')
+    .split(' ')
+    .map(w => w ? w[0].toUpperCase() + w.slice(1) : '')
+    .join(' ');
+
+  // Obtiene nombre para mostrar en UI con overrides
+  const getDisplayName = (name) => {
+    const c = canonicalFromName(name);
+    if (!c) return toTitle(name || '');
+    if (DISPLAY_NAME_OVERRIDES[c]) return DISPLAY_NAME_OVERRIDES[c];
+    return toTitle(c);
+  };
+
+  // Lista de agentes de un team con nombres listos para UI
+  const getAgentsDisplayByTeam = (teamKey) => {
+    const def = getTeamDef(teamKey);
+    const list = (def?.agents || []);
+    return list.map(a => getDisplayName(a));
   };
 
   // Deducción de team por usuario actual (si hay objeto usuario)
@@ -170,6 +233,8 @@
     getAgentsByTeam,
     getAgentsBySupervisor,
     getSupervisorByAgent,
-    getTeamForUser
+    getTeamForUser,
+    getDisplayName,
+    getAgentsDisplayByTeam
   };
 })();

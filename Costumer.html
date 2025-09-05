@@ -17,6 +17,8 @@
   <script src="/js/logout-handler.js"></script>
   <script src="/js/user-info.js"></script>
   <script src="js/sidebar-loader.js"></script>
+  <!-- Teams API: definición de equipos, supervisores y agentes -->
+  <script src="utils/teams.js?v=20250904"></script>
   <style>
     /* Estilos del sidebar unificados en css/sidebar.css */
     /* Nota: Estilos del bloque de usuario del sidebar se definen en css/sidebar-inicio.css
@@ -679,6 +681,106 @@
 
   <!-- Scripts -->
   <script>
+    // Helper: obtener leads por agentId desde backend (fallback para vista Supervisor)
+    // Cache global de leads por agente para evitar reconsultas
+    if (!window.__agentLeadsCache) window.__agentLeadsCache = new Map();
+    let __currentFetchController = null;
+    async function fetchLeadsByAgentId(agentId) {
+      try {
+        if (!agentId) return [];
+        // Cache inmediato
+        if (window.__agentLeadsCache.has(agentId)) {
+          const cached = window.__agentLeadsCache.get(agentId);
+          console.debug('[fetchLeadsByAgentId] usando cache para', agentId, 'items=', cached.length);
+          return cached.slice();
+        }
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        // Solo las claves robustas que el backend soporta de forma directa
+        const qParams = [
+          ['agenteId', agentId],
+          ['agentId', agentId]
+        ];
+        const normalizeId = (v) => {
+          if (!v) return '';
+          if (typeof v === 'object') return String(v.$oid||v.id||v._id||v.value||'');
+          const s = String(v); const m = s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s;
+        };
+        // Abort de fetches previos si el usuario cambia de chip rápidamente
+        if (__currentFetchController) { try { __currentFetchController.abort(); } catch(_) {} }
+        __currentFetchController = new AbortController();
+        const { signal } = __currentFetchController;
+        // Intentar primero agenteId, si no hay datos probar agentId inmediatamente después
+        const tryOnce = async ([key, val]) => {
+          const url = `/api/customers?page=1&limit=200&${key}=${encodeURIComponent(val)}`;
+          const res = await fetch(url, { headers, signal });
+          if (!res.ok) { console.warn('[fetchLeadsByAgentId] HTTP', res.status, 'para', key); return []; }
+          const data = await res.json();
+          const leads = Array.isArray(data) ? data : (Array.isArray(data?.leads) ? data.leads : []);
+          console.log(`[fetchLeadsByAgentId] ${key} -> recibidos=${leads.length}`);
+          return leads;
+        };
+        let acc = await tryOnce(qParams[0]);
+        if (!acc.length) acc = await tryOnce(qParams[1]);
+        // Cachear
+        window.__agentLeadsCache.set(agentId, acc.slice());
+        console.log('[fetchLeadsByAgentId] total =', acc.length);
+        return acc;
+      } catch (e) {
+        console.warn('fetchLeadsByAgentId error:', e);
+        return [];
+      }
+    }
+    // Helper: obtener leads por nombre de agente desde backend (varias claves)
+    async function fetchLeadsByAgentName(agentName) {
+      try {
+        if (!agentName) return [];
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const strip = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu,'');
+        const collapsed = strip(agentName).replace(/\s+/g,'');
+        // Insertar un espacio entre nombre y apellido si viene colapsado tipo "EduardoRivas"
+        const spaced = (/^[A-Za-z]+[A-Z][a-z]+$/.test(agentName))
+          ? agentName.replace(/([a-z])([A-Z])/g, '$1 $2')
+          : agentName;
+        const nameVariants = Array.from(new Set([
+          agentName,
+          spaced,
+          collapsed
+        ].map(v => String(v).trim()).filter(Boolean)));
+        const keys = ['agenteNombre','nombreAgente','agente','salesAgent','vendedor','atendioPor','asignadoA','asignadoPor'];
+        const normalizeId = (v) => {
+          if (!v) return '';
+          if (typeof v === 'object') return String(v.$oid||v.id||v._id||v.value||'');
+          const s = String(v); const m = s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s;
+        };
+        const seen = new Set();
+        const acc = [];
+        for (const key of keys) {
+          for (const val of nameVariants) {
+            try {
+              const url = `/api/customers?page=1&limit=200&${key}=${encodeURIComponent(val)}`;
+              const res = await fetch(url, { headers });
+              if (!res.ok) { console.warn('[fetchLeadsByAgentName] HTTP', res.status, 'para', key, 'val', val); continue; }
+              const data = await res.json();
+              const leads = Array.isArray(data) ? data : (Array.isArray(data?.leads) ? data.leads : []);
+              for (const l of leads) {
+                const id = normalizeId(l._id) || normalizeId(l.id) || normalizeId(l.leadId) || JSON.stringify(l).length;
+                if (!seen.has(id)) { seen.add(id); acc.push(l); }
+              }
+              console.log(`[fetchLeadsByAgentName] ${key}=${val} -> recibidos=${leads.length} | acumulados=${acc.length}`);
+            } catch (e) {
+              console.warn('[fetchLeadsByAgentName] error con', key, 'val', val, e);
+            }
+          }
+        }
+        console.log('[fetchLeadsByAgentName] total combinados =', acc.length);
+        return acc;
+      } catch(e) {
+        console.warn('fetchLeadsByAgentName error:', e);
+        return [];
+      }
+    }
     // Manejador de errores global
     window.onerror = function(message, source, lineno, colno, error) {
       console.error('Error global detectado:', {
@@ -703,6 +805,48 @@
         if (teamMenuItem) {
           teamMenuItem.style.display = 'none';
         }
+
+    // Helper GLOBAL: matcher para agente seleccionado (canónico y heurísticas)
+    if (!window.matchSelectedAgent) {
+      window.matchSelectedAgent = function(l, selectedCanon) {
+        try {
+          if (!selectedCanon) return true;
+          const teamsApi = (window && window.Teams) ? window.Teams : null;
+          const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+          const collapse = s => norm(s).replace(/[^a-z0-9]/g, '');
+          const canonFrom = name => {
+            try { return teamsApi && typeof teamsApi.canonicalFromName==='function' ? teamsApi.canonicalFromName(name) : norm(name); } catch { return norm(name); }
+          };
+          const selectedDisplay = (teamsApi && typeof teamsApi.getDisplayName==='function') ? teamsApi.getDisplayName(selectedCanon) : selectedCanon;
+          const selCanonCollapsed = collapse(selectedCanon);
+          const selDisplayCollapsed = collapse(selectedDisplay);
+          // Intentar poblar __agentCanon usando el helper universal (usa mapa de IDs)
+          try { if (typeof getAgentCanonUniversal === 'function') { const c0 = getAgentCanonUniversal(l); if (c0) l.__agentCanon = c0; } } catch(_) {}
+          const c1 = (l && l.__agentCanon) ? l.__agentCanon : '';
+          if (c1 && (c1 === selectedCanon || collapse(c1) === selCanonCollapsed)) return true;
+          const candidates = [
+            l?.agenteNombre, l?.nombreAgente, l?.agente, l?.Agente, l?.agent, l?.Agent,
+            l?.vendedor, l?.seller, l?.usuario, l?.owner, l?.createdBy, l?.registeredBy,
+            l?.asignadoA, l?.asignado_a, l?.assignedTo, l?.assigned_to,
+            l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.Agente,
+            l?._raw?.agent, l?._raw?.Agent, l?._raw?.vendedor, l?._raw?.seller,
+            l?._raw?.usuario, l?._raw?.owner, l?._raw?.createdBy, l?._raw?.registeredBy,
+            l?._raw?.asignadoA, l?._raw?.asignado_a, l?._raw?.assignedTo, l?._raw?.assigned_to
+          ];
+          for (const v of candidates) {
+            if (!v) continue;
+            const c = canonFrom(v);
+            if (c && (c === selectedCanon || collapse(c) === selCanonCollapsed)) return true;
+            const col = collapse(v);
+            if (col && (col === selDisplayCollapsed || col === selCanonCollapsed)) return true;
+          }
+          const toks = selectedCanon.split(' ').filter(Boolean);
+          const txt = norm(JSON.stringify(l||{}));
+          if (toks.every(t => txt.includes(t))) return true;
+          return false;
+        } catch { return false; }
+      };
+    }
 
         // Obtener y normalizar rol
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
@@ -765,6 +909,9 @@
           return (userData.role || userData?.usuario?.role || '').toString().toLowerCase().trim();
         } catch { return ''; }
       }
+      
+
+      
       function getForceAll() {
         const usp = new URLSearchParams(window.location.search);
         const v = (usp.get('forceAll') || '').toString().toLowerCase();
@@ -796,7 +943,7 @@
       }
 
       // Resetear filtros residuales antes de cargar datos (evita listas reducidas por estados previos)
-      try { window.iraniaAgentFilter = null; } catch(_) {}
+      try { window.supervisorAgentFilter = null; } catch(_) {}
       try { window.adminTeamFilter = null; } catch(_) {}
 
       // Cargar datos iniciales
@@ -1560,8 +1707,10 @@
           const supName = (userData.name || userData.nombre || userData.username || userData?.usuario?.name || userData?.usuario?.nombre || '').toString();
           const agents = (window.Teams.getAgentsBySupervisor && window.Teams.getAgentsBySupervisor(supName)) || [];
           const norm = window.Teams.norm || ((s)=>String(s||'').toLowerCase().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim());
+          const canonicalFromName = window.Teams.canonicalFromName || ((name)=> norm(name));
           if (Array.isArray(agents) && agents.length) {
-            const teamAgents = new Set(agents.map(a => norm(a)));
+            // Conjunto de agentes canónicos del supervisor
+            const teamAgentsCanon = new Set((agents || []).map(a => canonicalFromName(a)));
             const getName = (l) => {
               if (typeof getAgentName === 'function') return getAgentName(l);
               const cand = [
@@ -1572,7 +1721,7 @@
               return v ? String(v).trim() : '';
             };
             const before = normalizedLeads.length;
-            normalizedLeads = normalizedLeads.filter(l => teamAgents.has(norm(getName(l))));
+            normalizedLeads = normalizedLeads.filter(l => teamAgentsCanon.has(canonicalFromName(getName(l))));
             console.log(`[Filtro rol=supervisor] ${before} -> ${normalizedLeads.length} leads del equipo de`, supName);
           } else {
             console.warn('[Filtro rol=supervisor] No se encontraron agentes para el supervisor:', supName);
@@ -1852,12 +2001,101 @@
           : [];
       // Guardar la última lista para re-renderizados por filtros/toolbar
       try { window.ultimaListaLeads = leadsArray.slice(); } catch(_) {}
+      // Migración de compatibilidad: renombrar filtro legado a nombre neutral
+      try {
+        if (window.iraniaAgentFilter != null && window.supervisorAgentFilter == null) {
+          window.supervisorAgentFilter = window.iraniaAgentFilter;
+        }
+      } catch(_) {}
+      // Construir/actualizar mapas GLOBAL: id -> canónico y canónico -> ids
+      try {
+        const teamsApi = (window && window.Teams) ? window.Teams : null;
+        const canonical = (name) => {
+          try { return teamsApi && typeof teamsApi.canonicalFromName==='function' ? teamsApi.canonicalFromName(name) : String(name||'').toLowerCase().trim(); } catch { return String(name||'').toLowerCase().trim(); }
+        };
+        const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+        const extractIds = (l) => {
+          const ids = [];
+          const candidates = [
+            l?.agenteId, l?._raw?.agenteId, l?.agente_id, l?._raw?.agente_id,
+            l?.idAgente, l?._raw?.idAgente, l?.agentId, l?._raw?.agentId,
+            l?.creadoPor, l?._raw?.creadoPor, l?.creado_por, l?._raw?.creado_por,
+            l?.createdBy, l?._raw?.createdBy, l?.ownerId, l?._raw?.ownerId,
+            l?.registeredById, l?._raw?.registeredById,
+            l?.assignedId, l?._raw?.assignedId
+          ];
+          for (const v of candidates) {
+            if (!v) continue;
+            if (typeof v === 'object') {
+              const oid = v.$oid || v.id || v._id || v.value;
+              if (oid) ids.push(String(oid));
+            } else {
+              let s = String(v);
+              // Normalizar formato "ObjectId('...')"
+              const m = s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/);
+              if (m) s = m[1];
+              ids.push(s);
+            }
+          }
+          return ids.map(x => x && x.trim()).filter(Boolean);
+        };
+        const idMap = window.__idToCanonGlobal instanceof Map ? window.__idToCanonGlobal : new Map();
+        (leadsArray||[]).forEach(l => {
+          const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+          const canon = canonical(norm(cand));
+          if (!canon) return;
+          const ids = extractIds(l);
+          ids.forEach(id => { try { idMap.set(id, canon); } catch(_) {} });
+          try { l.__agentCanon = l.__agentCanon || canon; } catch(_) {}
+        });
+        // Override explícito conocido: Eduardo Rivas (ID actualizado)
+    try { idMap.set('68bb1ddd0d4d7cdcb6eb3605', 'eduardo rivas'); } catch(_) {}
+    window.__idToCanonGlobal = idMap;
+        console.log('[ID->Canon] Tamaño del mapa:', idMap.size);
+      } catch(e) { console.warn('[ID->Canon] Error al construir mapa:', e); }
       // Flag de depuración: si la URL contiene debugNoFilters=1, no aplicar filtros especiales ni vistas por TEAM
       let __debugNoFilters = false;
       try {
         const usp = new URLSearchParams(window.location.search || '');
         __debugNoFilters = (usp.get('debugNoFilters') === '1' || usp.get('debugNoFilters') === 'true');
       } catch(_) { __debugNoFilters = false; }
+
+      // Construir mapa global id->agenteCanónico para mejorar detección por agenteId
+      try {
+        const teamsApiG = (window && window.Teams) ? window.Teams : null;
+        const normG = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+        const canonicalFromNameG = (name) => {
+          try { return teamsApiG && typeof teamsApiG.canonicalFromName==='function' ? teamsApiG.canonicalFromName(name) : normG(name); } catch { return normG(name); }
+        };
+        const getAgentIdGlobal = (l) => {
+          const raw = (
+            l?.agenteId || l?._raw?.agenteId ||
+            l?.agente_id || l?._raw?.agente_id ||
+            l?.idAgente || l?._raw?.idAgente ||
+            l?.agentId || l?._raw?.agentId ||
+            l?.creadoPor || l?._raw?.creadoPor ||
+            l?.creado_por || l?._raw?.creado_por ||
+            l?.createdBy || l?._raw?.createdBy ||
+            l?.ownerId || l?._raw?.ownerId ||
+            l?.assignedId || l?._raw?.assignedId || ''
+          );
+          try {
+            if (raw && typeof raw === 'object') {
+              const maybe = raw.$oid || raw.id || raw._id || raw.value || (raw.toString ? raw.toString() : '');
+              return String(maybe || '').trim();
+            }
+            return String(raw || '').trim();
+          } catch(_) { return String(raw || '').trim(); }
+        };
+        const idToCanonGlobal = new Map();
+        (leadsArray||[]).forEach(l => {
+          const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+          const canon = canonicalFromNameG(cand);
+          const aid = getAgentIdGlobal(l);
+          if (canon && aid) idToCanonGlobal.set(aid, canon);
+        });
+        try { window.__idToCanonGlobal = idToCanonGlobal; } catch(_) {}
+      } catch(_) {}
       
       // Filtro especial: si el usuario es Irania Serrano, mostrar solo leads de su TEAM
       try {
@@ -1957,7 +2195,10 @@
               if (eq.includes('team irania') || sup.includes('team irania')) {
                 const nombreAg = l?.nombreAgente || l?._raw?.nombreAgente || '';
                 const byFirst = canonicalFromFirstName(nombreAg);
-                if (byFirst) return byFirst;
+                if (byFirst) {
+                  console.log('[Filtro TEAM IRANIA] Agente detectado por primer nombre:', byFirst);
+                  return byFirst;
+                }
               }
             } catch(_) {}
             // 2) Escaneo amplio: buscar cualquier string que contenga nombres/apellidos
@@ -2026,6 +2267,7 @@
           // 2) Enriquecer con un mapa dinámico usando los leads con nombre detectable
           try {
             (leadsArray||[]).forEach(l => {
+              const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
               const canon = canonicalFromName(getAgentName(l));
               const aid = getAgentId(l);
               if (canon && aid) idToCanon.set(aid, canon);
@@ -2040,6 +2282,7 @@
             const canon = canonicalFromName(agente);
             if (canon) {
               try { l.__agentCanon = canon; } catch(_) {}
+              console.log('[Filtro TEAM IRANIA] Agente detectado:', canon);
               return true;
             }
             // intentar por agenteId con el mapa dinamico
@@ -2048,6 +2291,7 @@
               if (aid && idToCanon.has(aid)) {
                 const mcanon = idToCanon.get(aid);
                 try { l.__agentCanon = mcanon; } catch(_) {}
+                console.log('[Filtro TEAM IRANIA] Agente detectado por ID:', mcanon);
                 return true;
               }
             } catch(_) {}
@@ -2168,6 +2412,222 @@
         tbody.appendChild(tr);
       }
 
+      // Helper: render con separadores mensuales usando getDateFromLead
+      function renderWithMonthlySeparators(list) {
+        const tbodyLoc = document.getElementById('costumer-tbody');
+        if (!tbodyLoc) return;
+        const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        // Ordenar por fecha descendente usando getDateFromLead (YYYY-MM-DD)
+        const sorted = (Array.isArray(list) ? list.slice() : []).sort((a,b) => {
+          const da = getDateFromLead(a); // 'YYYY-MM-DD' o ''
+          const db = getDateFromLead(b);
+          const ta = da ? Date.parse(da) : 0;
+          const tb = db ? Date.parse(db) : 0;
+          return tb - ta; // descendente
+        });
+        let lastKey = '';
+        sorted.forEach(item => {
+          const iso = getDateFromLead(item);
+          let key = 'Sin fecha';
+          let title = 'Sin fecha — Clientes';
+          if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+            const [y, m] = iso.split('-').map(Number);
+            key = `${y}-${('0'+m).slice(-2)}`;
+            title = `${monthNames[(m||1)-1]} ${y} — Clientes`;
+          }
+          if (key !== lastKey) {
+            lastKey = key;
+            const sep = document.createElement('tr');
+            sep.className = 'costumer-month-separator';
+            sep.innerHTML = `<td colspan="21" style="background:#e2e8f0;font-weight:700;border-left:4px solid #1976d2;padding:12px 18px;color:#0f172a;">${title}</td>`;
+            tbodyLoc.appendChild(sep);
+          }
+          appendLeadRow(item);
+        });
+      }
+
+      // Helper: obtener agente canónico desde múltiples campos y escaneo amplio
+      function getAgentCanonUniversal(l) {
+        try {
+          const teamsApi = (window && window.Teams) ? window.Teams : null;
+          const canonical = (name) => {
+            try {
+              return teamsApi && typeof teamsApi.canonicalFromName === 'function'
+                ? teamsApi.canonicalFromName(name)
+                : (name||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+            } catch { return (name||'').toString().trim().toLowerCase(); }
+          };
+          if (l && l.__agentCanon) return l.__agentCanon;
+          const candidates = [
+            l?.agenteNombre, l?.nombreAgente, l?.agente, l?.Agente, l?.agent, l?.Agent,
+            l?.vendedor, l?.seller, l?.usuario, l?.owner, l?.createdBy, l?.registeredBy,
+            l?.asignadoA, l?.asignado_a, l?.assignedTo, l?.assigned_to,
+            l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.Agente,
+            l?._raw?.agent, l?._raw?.Agent, l?._raw?.vendedor, l?._raw?.seller,
+            l?._raw?.usuario, l?._raw?.owner, l?._raw?.createdBy, l?._raw?.registeredBy,
+            l?._raw?.asignadoA, l?._raw?.asignado_a, l?._raw?.assignedTo, l?._raw?.assigned_to
+          ];
+          const first = candidates.find(v => v && String(v).trim().length);
+          if (first) { const c = canonical(first); try { if (c) l.__agentCanon = c; } catch(_) {} return c; }
+          // Fallback por agenteId usando mapa global precalculado
+          try {
+            const idMap = window.__idToCanonGlobal;
+            if (idMap && typeof idMap.get === 'function') {
+              const raw = (
+                l?.agenteId || l?._raw?.agenteId || l?.agente_id || l?._raw?.agente_id ||
+                l?.idAgente || l?._raw?.idAgente || l?.agentId || l?._raw?.agentId ||
+                l?.creadoPor || l?._raw?.creadoPor || l?.creado_por || l?._raw?.creado_por ||
+                l?.createdBy || l?._raw?.createdBy || l?.ownerId || l?._raw?.ownerId ||
+                l?.registeredById || l?._raw?.registeredById ||
+                l?.assignedId || l?._raw?.assignedId || ''
+              );
+              const aid = (function(x){ try{ if (x && typeof x==='object') return String(x.$oid||x.id||x._id||x.value||'').trim(); let s=String(x||'').trim(); const m=s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); if(m) s=m[1]; return s; } catch{ return String(raw||'').trim(); } })(raw);
+              if (aid) { const viaId = idMap.get(aid); if (viaId) { try { l.__agentCanon = viaId; } catch(_) {} return viaId; } }
+            }
+          } catch(_) {}
+          // Escaneo amplio por strings en objetos anidados
+          const scan = (obj) => {
+            try {
+              for (const [k,v] of Object.entries(obj||{})) {
+                if (typeof v === 'string' && v) {
+                  const c = canonical(v);
+                  if (c) {
+                    if (teamsApi && typeof teamsApi.getTeamByAgent === 'function') {
+                      const t = teamsApi.getTeamByAgent(c);
+                      if (t) { try { l.__agentCanon = c; } catch(_) {} return c; }
+                    } else {
+                      try { l.__agentCanon = c; } catch(_) {}
+                      return c;
+                    }
+                  }
+                }
+              }
+            } catch(_) {}
+            return '';
+          };
+          const fromTop = scan(l);
+          if (fromTop) return fromTop;
+          const fromRaw = scan(l?._raw);
+          if (fromRaw) return fromRaw;
+          return '';
+        } catch { return ''; }
+      }
+
+      // Forzar toolbar por TEAM vía query param: ?forceTeam=team%20marisol%20beltran
+      try {
+        const uspFT = new URLSearchParams(window.location.search || '');
+        const forceTeamRaw = (uspFT.get('forceTeam') || uspFT.get('team') || '').toString();
+        if (forceTeamRaw) {
+          const teamsApiFT = (window && window.Teams) ? window.Teams : null;
+          const normFT = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+          const teamKeyFT = teamsApiFT && typeof teamsApiFT.getTeamDef==='function' ? normFT(forceTeamRaw) : normFT(forceTeamRaw);
+          let teamAgentsFT = [];
+          if (teamsApiFT && typeof teamsApiFT.getAgentsByTeam==='function') {
+            teamAgentsFT = teamsApiFT.getAgentsByTeam(teamKeyFT) || [];
+          }
+          // Fallback: derivar agentes desde leads si la lista viene vacía
+          if ((!teamAgentsFT || teamAgentsFT.length===0) && Array.isArray(leadsArray)) {
+            const setFT = new Set();
+            leadsArray.forEach(l => {
+              const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+              const c = teamsApiFT && typeof teamsApiFT.canonicalFromName==='function' ? teamsApiFT.canonicalFromName(cand) : normFT(cand);
+              if (c) setFT.add(c);
+            });
+            teamAgentsFT = Array.from(setFT);
+          }
+          try {
+            console.log('[Toolbar ForceTeam] teamKey =', teamKeyFT);
+            console.log('[Toolbar ForceTeam] agentes (canónicos) =', teamAgentsFT);
+            if (teamsApiFT && typeof teamsApiFT.getDisplayName==='function') {
+              console.log('[Toolbar ForceTeam] etiquetas =', teamAgentsFT.map(a=>teamsApiFT.getDisplayName(a)));
+            }
+          } catch(_) {}
+          // Construir barra
+          const tbodyElFT = document.getElementById('costumer-tbody');
+          if (tbodyElFT) {
+            const tableElFT = tbodyElFT.closest('table');
+            const hostFT = tableElFT ? tableElFT : tbodyElFT;
+            let barFT = document.getElementById('irania-agent-filter');
+            if (!barFT) {
+              barFT = document.createElement('div');
+              barFT.id = 'irania-agent-filter';
+              barFT.style.margin = '10px 0';
+              barFT.style.display = 'flex';
+              barFT.style.flexWrap = 'wrap';
+              barFT.style.gap = '8px';
+              (hostFT.parentElement || hostFT).insertBefore(barFT, hostFT);
+              barFT.style.position = 'sticky';
+              barFT.style.top = '0';
+              barFT.style.zIndex = '10';
+              barFT.style.background = '#ffffff';
+              barFT.style.padding = '8px 8px';
+            }
+            const mkBtnFT = (label, value) => {
+              const b = document.createElement('button');
+              b.textContent = label;
+              b.type = 'button';
+              b.style.padding = '6px 10px';
+              b.style.border = '1px solid #e2e8f0';
+              b.style.borderRadius = '999px';
+              b.style.background = '#ffffff';
+              b.style.cursor = 'pointer';
+              b.style.fontSize = '12px';
+              const active = (window.supervisorAgentFilter || null) === value;
+              if (active) { b.style.background = '#1d4ed8'; b.style.color = '#ffffff'; b.style.borderColor = '#1d4ed8'; }
+              b.addEventListener('click', () => {
+                window.supervisorAgentFilter = value; // null = Todos
+                try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+              });
+              return b;
+            };
+            barFT.innerHTML = '';
+            barFT.appendChild(mkBtnFT('Todos', null));
+            teamAgentsFT.forEach(a => {
+              const label = (teamsApiFT && typeof teamsApiFT.getDisplayName==='function') ? teamsApiFT.getDisplayName(a) : a.replace(/\b\w/g, c=>c.toUpperCase());
+              barFT.appendChild(mkBtnFT(label, a));
+            });
+          }
+          // Aplicar filtro activo y render
+          const teamsApi2FT = (window && window.Teams) ? window.Teams : null;
+          const norm2FT = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+          const canonicalFromNameFT = (name) => {
+            if (teamsApi2FT && typeof teamsApi2FT.canonicalFromName==='function') return teamsApi2FT.canonicalFromName(name);
+            const n = norm2FT(name); if (!n) return ''; if (teamAgentsFT.includes(n)) return n; for (const c of teamAgentsFT){ const toks=c.split(' '); if (toks.every(t=>n.includes(t))) return c; } return '';
+          };
+          const getAgentCanonFT = (l) => getAgentCanonUniversal(l);
+          try { console.debug('[ForceTeam] teamAgentsFT =', teamAgentsFT); } catch(_) {}
+          const tryCanonNameFT = (l) => {
+            const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+            return (teamsApi2FT && typeof teamsApi2FT.canonicalFromName==='function') ? teamsApi2FT.canonicalFromName(cand) : norm2FT(cand);
+          };
+          let listFT = [];
+          if (Array.isArray(leadsArray)) {
+            if (window.supervisorAgentFilter) {
+              // Si hay agente seleccionado, filtrar directo por agente sobre todos los leads
+              try { console.debug('[ForceTeam] Filtrado estricto por agente seleccionado'); } catch(_) {}
+              listFT = leadsArray.filter(l => matchSelectedAgent(l, window.supervisorAgentFilter));
+            } else {
+              // Sin agente seleccionado, limitar por miembros del team
+              listFT = leadsArray.filter(l => {
+                const c1 = getAgentCanonFT(l);
+                const c2 = tryCanonNameFT(l);
+                return teamAgentsFT.includes(c1) || teamAgentsFT.includes(c2);
+              });
+            }
+          }
+          const selectedFT = window.supervisorAgentFilter || null;
+          try { console.debug('[ForceTeam] selectedFT =', selectedFT); } catch(_) {}
+          if (selectedFT) { /* ya aplicado cuando se arma listFT arriba */ }
+          try {
+            const sample = (listFT||[]).slice(0,5).map(l=>({id:(typeof getLeadId==='function')?getLeadId(l):undefined, canon:getAgentCanonFT(l)}));
+            console.debug('[ForceTeam] sample after filter =', sample);
+          } catch(_) {}
+          renderWithMonthlySeparators(listFT);
+          try { console.log('[Toolbar ForceTeam] Render aplicado. leads =', listFT.length); } catch(_) {}
+          return;
+        }
+      } catch(e) { /* ignorar */ }
+
       // Vista especial para SUPERVISORES: mostrar lista PLANA del propio TEAM con toolbar por agente
       try {
         if (__debugNoFilters) throw new Error('DEBUG: filtros desactivados');
@@ -2177,16 +2637,72 @@
         const currentCanon = teamsApiRoot && typeof teamsApiRoot.canonicalFromName === 'function'
           ? teamsApiRoot.canonicalFromName(currentUserName)
           : (currentUserName || '').toString().trim().toLowerCase();
-        const isSupervisorUser = !!(teamsApiRoot && typeof teamsApiRoot.isSupervisor === 'function' && teamsApiRoot.isSupervisor(currentCanon));
+        // Leer usuario/rol desde storage para mejorar la detección de supervisor
+        let userObj = {};
+        try { userObj = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}'); } catch { userObj = {}; }
+        const rawRole = (userObj.role || userObj?.usuario?.role || '').toString().toLowerCase();
+        const roleIsSupervisor = rawRole === 'supervisor';
+        const teamForUser = (teamsApiRoot && typeof teamsApiRoot.getTeamForUser === 'function') ? teamsApiRoot.getTeamForUser(userObj) : '';
+        const isSupervisorUser = !!(
+          (teamsApiRoot && typeof teamsApiRoot.isSupervisor === 'function' && teamsApiRoot.isSupervisor(currentCanon))
+          || roleIsSupervisor
+          || teamForUser
+        );
+        try {
+          console.log('[Toolbar Supervisor] usuarioActual =', currentUserName);
+          console.log('[Toolbar Supervisor] usuarioCanon =', currentCanon);
+          console.log('[Toolbar Supervisor] roleIsSupervisor =', roleIsSupervisor, '| teamForUser =', teamForUser);
+          console.log('[Toolbar Supervisor] isSupervisorUser =', isSupervisorUser);
+          console.log('[Toolbar Supervisor] Teams API lista =', !!teamsApiRoot);
+        } catch(_) {}
         if (isSupervisorUser) {
-          // --- Toolbar de filtro por agente (TEAM IRANIA) ---
-          (function ensureIraniaAgentFilterToolbar(){
+          // --- Toolbar de filtro por agente (TEAM SUPERVISOR) ---
+          (function ensureSupervisorAgentFilterToolbar(){
             try {
               const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
               // Obtener agentes del supervisor actual usando Teams
               const teamsApi = (window && window.Teams) ? window.Teams : null;
               const supervisorCanon = currentCanon;
-              const teamAgents = teamsApi ? (teamsApi.getAgentsBySupervisor(supervisorCanon) || []) : [];
+              let teamAgents = [];
+              if (teamsApi) {
+                if (teamForUser) {
+                  // Si logramos deducir el team por el usuario, usarlo directamente
+                  teamAgents = (typeof teamsApi.getAgentsByTeam === 'function') ? (teamsApi.getAgentsByTeam(teamForUser) || []) : [];
+                }
+                if (!teamAgents || teamAgents.length === 0) {
+                  // Fallback por supervisor canónico
+                  teamAgents = teamsApi.getAgentsBySupervisor(supervisorCanon) || [];
+                }
+              }
+              // Fallback FINAL: si seguimos sin agentes, derivarlos de los leads actuales en memoria
+              try {
+                if ((!teamAgents || teamAgents.length === 0) && Array.isArray(window.ultimaListaLeads)) {
+                  const set = new Set();
+                  const titleCase = s => String(s||'').split(' ').map(w => w? (w[0].toUpperCase()+w.slice(1).toLowerCase()):'').join(' ');
+                  const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+                  const canonFrom = name => {
+                    try { return (teamsApi && typeof teamsApi.canonicalFromName==='function') ? teamsApi.canonicalFromName(name) : norm(name); } catch { return norm(name); }
+                  };
+                  window.ultimaListaLeads.forEach(l => {
+                    const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+                    const c = canonFrom(cand);
+                    if (c) set.add(c);
+                  });
+                  teamAgents = Array.from(set);
+                  console.log('[Toolbar Supervisor][fallback leads] Agentes derivados =', teamAgents);
+                }
+              } catch(_) {}
+              try {
+                console.log('[Toolbar Supervisor] Supervisor canónico =', supervisorCanon);
+                console.log('[Toolbar Supervisor] Team deducido para usuario =', teamForUser);
+                console.log('[Toolbar Supervisor] Agentes del equipo (canónicos) =', teamAgents);
+                if (teamsApi && typeof teamsApi.getDisplayName === 'function') {
+                  const labels = teamAgents.map(a => teamsApi.getDisplayName(a));
+                  console.log('[Toolbar Supervisor] Etiquetas UI (getDisplayName) =', labels);
+                }
+              } catch(_) {}
+              // Compartir lista con el bloque de render para evitar inconsistencias
+              try { window.__teamAgentsCanon = Array.isArray(teamAgents) ? teamAgents.slice() : []; } catch(_) {}
               const tbodyEl = document.getElementById('costumer-tbody');
               if (!tbodyEl) return;
               const tableEl = tbodyEl.closest('table');
@@ -2199,10 +2715,7 @@
                 bar.style.display = 'flex';
                 bar.style.flexWrap = 'wrap';
                 bar.style.gap = '8px';
-                const container = host.parentElement || host;
-                // Insertar barra ANTES de la tabla, sin contenedor con overflow
-                container.insertBefore(bar, host);
-                // Opcional: mantener sticky respecto al viewport principal
+                (host.parentElement || host).insertBefore(bar, host);
                 bar.style.position = 'sticky';
                 bar.style.top = '0';
                 bar.style.zIndex = '10';
@@ -2221,31 +2734,55 @@
                 b.style.background = '#ffffff';
                 b.style.cursor = 'pointer';
                 b.style.fontSize = '12px';
-                const active = (window.iraniaAgentFilter || null) === value;
+                const active = (window.supervisorAgentFilter || null) === value;
                 if (active) {
                   b.style.background = '#1d4ed8';
                   b.style.color = '#ffffff';
                   b.style.borderColor = '#1d4ed8';
                 }
                 b.addEventListener('click', () => {
-                  window.iraniaAgentFilter = value; // null = Todos
-                  // Re-render con la lista original para que no se encadene el filtro
+                  window.supervisorAgentFilter = value; // null = Todos
                   try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
                 });
                 return b;
               };
               bar.appendChild(mkBtn('Todos', null));
               teamAgents.forEach(a => {
-                const label = a.replace(/\b\w/g, c => c.toUpperCase());
+                const teamsApi = (window && window.Teams) ? window.Teams : null;
+                const label = (teamsApi && typeof teamsApi.getDisplayName === 'function')
+                  ? teamsApi.getDisplayName(a)
+                  : a.replace(/\b\w/g, c => c.toUpperCase());
                 bar.appendChild(mkBtn(label, a));
               });
+              try { console.log('[Toolbar Supervisor] Total chips renderizados =', 1 + teamAgents.length); } catch(_) {}
               // Encabezado de columnas: sin comportamiento sticky (restaurado al estado original)
             } catch(e) { console.warn('Toolbar TEAM IRANIA:', e); }
           })();
           // --- Aplicar filtro activo (si existe) y render plano  
           const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
           const teamsApi2 = (window && window.Teams) ? window.Teams : null;
-          const teamCanon = teamsApi2 ? (teamsApi2.getAgentsBySupervisor(currentCanon) || []) : [];
+          // Usar la misma lista de agentes que la toolbar calculó (con fallbacks)
+          let teamCanon = Array.isArray(window.__teamAgentsCanon) ? window.__teamAgentsCanon.slice() : [];
+          if (!teamCanon || teamCanon.length === 0) {
+            // Fallback de seguridad si no quedó poblado
+            teamCanon = teamsApi2 ? (teamsApi2.getAgentsBySupervisor(currentCanon) || []) : [];
+            if ((!teamCanon || teamCanon.length===0) && Array.isArray(window.ultimaListaLeads)) {
+              const set = new Set();
+              const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+              const canonFrom = name => {
+                try { return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(name) : norm(name); } catch { return norm(name); }
+              };
+              window.ultimaListaLeads.forEach(l => {
+                const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+                const c = canonFrom(cand);
+                if (c) set.add(c);
+              });
+              teamCanon = Array.from(set);
+              try { console.log('[Toolbar Supervisor][render fallback] teamCanon derivado de leads =', teamCanon); } catch(_) {}
+            }
+          }
+          // Valor seleccionado (chip actual del supervisor)
+          const selected = window.supervisorAgentFilter || null;
           const canonicalFromName = (name) => {
             if (teamsApi2 && typeof teamsApi2.canonicalFromName === 'function') return teamsApi2.canonicalFromName(name);
             const n = norm(name);
@@ -2254,22 +2791,228 @@
             for (const c of teamCanon) { const toks = c.split(' '); if (toks.every(t => n.includes(t))) return c; }
             return '';
           };
-          const getAgentCanon = (l) => {
-            if (l && l.__agentCanon) return l.__agentCanon;
-            const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
-            return canonicalFromName(cand);
-          };
+          const getAgentCanon = (l) => getAgentCanonUniversal(l);
           // Limitar a leads del TEAM del supervisor actual
-          let list = Array.isArray(leadsArray) ? leadsArray.filter(l => teamCanon.includes(getAgentCanon(l))) : [];
-          const selected = window.iraniaAgentFilter || null;
-          if (selected) {
-            list = list.filter(l => getAgentCanon(l) === selected);
+          try { console.debug('[Supervisor] teamCanon =', teamCanon); } catch(_) {}
+          const tryCanonName = (l) => {
+            const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+            return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(cand) : norm(cand);
+          };
+          // Asegurar que el mapa ID->Canon exista y esté poblado antes de filtrar
+          try {
+            if (!(window.__idToCanonGlobal instanceof Map)) window.__idToCanonGlobal = new Map();
+            const idMap = window.__idToCanonGlobal;
+            const canonical = (name) => {
+              try { return teamsApi2 && typeof teamsApi2.canonicalFromName==='function' ? teamsApi2.canonicalFromName(name) : norm(name); } catch { return norm(name); }
+            };
+            (leadsArray||[]).forEach(l => {
+              const nameCand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
+              const canon = canonical(nameCand);
+              const ids = (function extractIdsLocal(x){
+                const ids=[]; const cands=[x?.agenteId,x?._raw?.agenteId,x?.agente_id,x?._raw?.agente_id,x?.idAgente,x?._raw?.idAgente,x?.agentId,x?._raw?.agentId,x?.creadoPor,x?._raw?.creadoPor,x?.creado_por,x?._raw?.creado_por,x?.createdBy,x?._raw?.createdBy,x?.ownerId,x?._raw?.ownerId,x?.registeredById,x?._raw?.registeredById,x?.assignedId,x?._raw?.assignedId];
+                for (const v of cands){ if(!v) continue; if(typeof v==='object'){ const oid=v.$oid||v.id||v._id||v.value; if(oid) ids.push(String(oid)); } else { let s=String(v); const m=s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); if(m) s=m[1]; ids.push(s);} }
+                return ids.map(s=>s&&s.trim()).filter(Boolean);
+              })(l);
+              if (canon) ids.forEach(id=>{ try { idMap.set(id, canon); } catch(_) {} });
+            });
+            // Override explícito Eduardo Rivas (id conocido, actualizado)
+            try { idMap.set('68bb1ddd0d4d7cdcb6eb3605','eduardo rivas'); } catch(_) {}
+            console.log('[Supervisor][ID->Canon] Mapa listo. size=', idMap.size);
+          } catch(e) { console.warn('[Supervisor] No se pudo preparar ID->Canon:', e); }
+          // Construir la lista filtrada para la vista Supervisor
+          let list = [];
+          if (Array.isArray(leadsArray)) {
+            if (window.supervisorAgentFilter) {
+              // Si hay agente seleccionado, filtrar directo por agente sobre todos los leads
+              try { console.debug('[Supervisor] Filtrado estricto por agente seleccionado'); } catch(_) {}
+              // Diagnóstico: conteo por ID de Eduardo antes del filtro (incluye campos en español)
+              try {
+                const normId = (v) => { if(!v) return ''; if (typeof v==='object') return String(v.$oid||v.id||v._id||v.value||''); const s=String(v); const m=s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s; };
+                const getAnyAgentId = (l) => normId(l?.ownerId) || normId(l?.agentId) || normId(l?.registeredById) || normId(l?.createdBy) || normId(l?.agenteId) || normId(l?.creadoPor) || normId(l?._raw?.ownerId) || normId(l?._raw?.agentId) || normId(l?._raw?.registeredById) || normId(l?._raw?.createdBy) || normId(l?._raw?.agenteId) || normId(l?._raw?.creadoPor);
+                const targetId = '68bb1ddd0d4d7cdcb6eb3605';
+                const countById = (leadsArray||[]).filter(l => getAnyAgentId(l) === targetId).length;
+                console.log('[Supervisor][Diag eduardo rivas] leads con ID de Eduardo (antes de filtrar):', countById);
+              } catch(_) {}
+              list = leadsArray.filter(l => matchSelectedAgent(l, window.supervisorAgentFilter));
+              // Preferir consultar al servidor antes que buscar por tokens locales
+              const PREFER_SERVER_FALLBACK = true;
+              // Fallback: si quedó vacío y NO preferimos servidor, intentar heurística dentro del TEAM
+              if (!list.length && !PREFER_SERVER_FALLBACK) {
+                try {
+                  const display = (teamsApi2 && typeof teamsApi2.getDisplayName==='function') ? teamsApi2.getDisplayName(window.supervisorAgentFilter) : window.supervisorAgentFilter;
+                  const _norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+                  const toks = _norm(display).split(/\s+/).filter(Boolean); // ej: ['eduardo','rivas']
+                  const teamScoped = leadsArray.filter(l => {
+                    const c1 = getAgentCanon(l); const c2 = tryCanonName(l);
+                    return teamCanon.includes(c1) || teamCanon.includes(c2);
+                  });
+                  list = teamScoped.filter(l => {
+                    const hay = _norm(JSON.stringify(l||{}));
+                    return toks.every(t => hay.includes(t));
+                  });
+                  console.info('[Supervisor][Fallback] Estricto=0. Fallback por tokens dentro del TEAM. Resultado:', list.length);
+                } catch(e) { console.warn('[Supervisor][Fallback] Error en fallback:', e); }
+              }
+              // Fallback de servidor: si sigue vacío, pedir al backend por agentId
+              if (!list.length) {
+                try {
+                  const selCanon = (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(window.supervisorAgentFilter) : window.supervisorAgentFilter;
+                  // Buscar agentId por canónico
+                  let agentId = null;
+                  try {
+                    const map = window.__canonToIdsGlobal;
+                    if (map && typeof map.get === 'function') {
+                      const set = map.get(selCanon);
+                      if (set && set.size) agentId = [...set][0];
+                    }
+                  } catch(_) {}
+                  // Fallback duro para Eduardo Rivas
+                  if (!agentId && selCanon === 'eduardo rivas') agentId = '68bb1ddd0d4d7cdcb6eb3605';
+                  if (agentId) {
+                    fetchLeadsByAgentId(agentId).then(serverLeads => {
+                      if (Array.isArray(serverLeads) && serverLeads.length) {
+                        const normalizeId = (v) => {
+                          if (!v) return '';
+                          if (typeof v === 'object') return String(v.$oid||v.id||v._id||v.value||'');
+                          const s = String(v); const m = s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s;
+                        };
+                        const normFree = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+                        const getNameCanonFromLead = (l) => {
+                          try {
+                            const candidates = [
+                              l?.agenteNombre, l?.nombreAgente, l?.agente, l?.Agente, l?.agent, l?.Agent,
+                              l?.vendedor, l?.seller, l?.salesAgent, l?.atendioPor, l?.asignadoA, l?.asignadoPor,
+                              l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.Agente, l?._raw?.agent, l?._raw?.Agent,
+                              l?._raw?.vendedor, l?._raw?.seller, l?._raw?.salesAgent, l?._raw?.atendioPor, l?._raw?.asignadoA, l?._raw?.asignadoPor
+                            ];
+                            const nameCand = candidates.find(x => !!x) || '';
+                            return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(nameCand) : normFree(nameCand);
+                          } catch { return ''; }
+                        };
+                        // Diagnóstico: mostrar cómo vienen los campos de ID y el nombre canónico
+                        try {
+                          const diag = (serverLeads||[]).slice(0,10).map(l=>({
+                            ownerId: normalizeId(l?.ownerId), agentId: normalizeId(l?.agentId),
+                            registeredById: normalizeId(l?.registeredById), createdBy: normalizeId(l?.createdBy),
+                            agenteId: normalizeId(l?.agenteId), creadoPor: normalizeId(l?.creadoPor),
+                            _raw_ownerId: normalizeId(l?._raw?.ownerId), _raw_agentId: normalizeId(l?._raw?.agentId),
+                            _raw_registeredById: normalizeId(l?._raw?.registeredById), _raw_createdBy: normalizeId(l?._raw?.createdBy),
+                            _raw_agenteId: normalizeId(l?._raw?.agenteId), _raw_creadoPor: normalizeId(l?._raw?.creadoPor),
+                            nameCanon: getNameCanonFromLead(l)
+                          }));
+                          console.log('[Supervisor][Fallback servidor][Diag primeros 10]', diag);
+                        } catch(_) {}
+                        // Fase 1: por ID exacto
+                        const getAnyAgentId = (l) => normalizeId(l?.ownerId) || normalizeId(l?.agentId) || normalizeId(l?.registeredById) || normalizeId(l?.createdBy) || normalizeId(l?.agenteId) || normalizeId(l?.creadoPor) || normalizeId(l?._raw?.ownerId) || normalizeId(l?._raw?.agentId) || normalizeId(l?._raw?.registeredById) || normalizeId(l?._raw?.createdBy) || normalizeId(l?._raw?.agenteId) || normalizeId(l?._raw?.creadoPor);
+                        let out = serverLeads.filter(l => getAnyAgentId(l) === agentId);
+                        if (out.length === 0) {
+                          // Fase 2: por nombre canónico
+                          out = serverLeads.filter(l => getNameCanonFromLead(l) === selCanon);
+                          if (out.length) console.info('[Supervisor][Fallback servidor] match por nombre canónico:', out.length);
+                        } else {
+                          console.info('[Supervisor][Fallback servidor] match por ID:', out.length);
+                        }
+                        // Si aún no hay resultados, intentar por nombre desde backend
+                        if (out.length === 0) {
+                          const displayName = (teamsApi2 && typeof teamsApi2.getDisplayName==='function') ? teamsApi2.getDisplayName(selCanon) : selCanon;
+                          fetchLeadsByAgentName(displayName).then(byName => {
+                            let out2 = [];
+                            try {
+                              const normFree = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+                              const nSel = selCanon;
+                              const getNameCanonFromLead = (l) => {
+                                try {
+                                  const candidates = [
+                                    l?.agenteNombre, l?.nombreAgente, l?.agente, l?.Agente, l?.agent, l?.Agent,
+                                    l?.vendedor, l?.seller, l?.salesAgent, l?.atendioPor, l?.asignadoA, l?.asignadoPor,
+                                    l?._raw?.agenteNombre, l?._raw?.nombreAgente, l?._raw?.agente, l?._raw?.Agente, l?._raw?.agent, l?._raw?.Agent,
+                                    l?._raw?.vendedor, l?._raw?.seller, l?._raw?.salesAgent, l?._raw?.atendioPor, l?._raw?.asignadoA, l?._raw?.asignadoPor
+                                  ];
+                                  const nameCand = candidates.find(x => !!x) || '';
+                                  return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(nameCand) : normFree(nameCand);
+                                } catch { return ''; }
+                              };
+                              out2 = (byName||[]).filter(l => getNameCanonFromLead(l) === nSel);
+                            } catch(_) { out2 = []; }
+                            console.warn('[Supervisor][Fallback servidor][byName] resultados =', out2.length);
+                            if (out2.length) {
+                              try { out2.forEach(l => { try { l.__agentCanon = selCanon; } catch(_) {} }); } catch(_) {}
+                              try { window.ultimaListaLeads = byName.slice(); } catch(_) {}
+                              renderWithMonthlySeparators(out2);
+                            } else {
+                              renderWithMonthlySeparators([]);
+                            }
+                          }).catch(err => { console.warn('[Supervisor][Fallback servidor][byName] error:', err); renderWithMonthlySeparators([]); });
+                          return;
+                        }
+                        if (out.length === 0) {
+                          // Fase 3: por tokens dentro del objeto
+                          const toks = selCanon.split(' ').filter(Boolean); // ej: ['eduardo','rivas']
+                          out = serverLeads.filter(l => {
+                            const hay = normFree(JSON.stringify(l||{}));
+                            return toks.every(t => hay.includes(t));
+                          });
+                          if (out.length) console.info('[Supervisor][Fallback servidor] match por tokens JSON:', out.length);
+                        }
+                        // Etiquetar y actualizar mapas globales para futuras coincidencias
+                        try {
+                          if (!(window.__idToCanonGlobal instanceof Map)) window.__idToCanonGlobal = new Map();
+                          if (!(window.__canonToIdsGlobal instanceof Map)) window.__canonToIdsGlobal = new Map();
+                          const idMap = window.__idToCanonGlobal; const c2i = window.__canonToIdsGlobal;
+                          out.forEach(l => {
+                            const ids = [normalizeId(l.ownerId), normalizeId(l.agentId), normalizeId(l.registeredById), normalizeId(l.createdBy), normalizeId(l.agenteId), normalizeId(l.creadoPor), normalizeId(l?._raw?.ownerId), normalizeId(l?._raw?.agentId), normalizeId(l?._raw?.registeredById), normalizeId(l?._raw?.createdBy), normalizeId(l?._raw?.agenteId), normalizeId(l?._raw?.creadoPor)].filter(Boolean);
+                            try { l.__agentCanon = selCanon; } catch(_) {}
+                            ids.forEach(id => { try { idMap.set(id, selCanon); } catch(_) {} });
+                            if (ids.length) {
+                              const set = c2i.get(selCanon) || new Set();
+                              ids.forEach(id => set.add(id));
+                              c2i.set(selCanon, set);
+                            }
+                          });
+                        } catch(_) {}
+                        console.info('[Supervisor][Fallback servidor] leads finales =', out.length);
+                        try { window.ultimaListaLeads = serverLeads.slice(); } catch(_) {}
+                        renderWithMonthlySeparators(out);
+                      } else {
+                        console.warn('[Supervisor][Fallback servidor] sin resultados para agentId', agentId);
+                        renderWithMonthlySeparators([]);
+                      }
+                    }).catch(err => {
+                      console.warn('[Supervisor][Fallback servidor] error:', err);
+                      renderWithMonthlySeparators([]);
+                    });
+                    return; // no continuar, ya haremos render en el then
+                  }
+                } catch(e) { console.warn('[Supervisor][Fallback servidor] error preparando fetch:', e); }
+              }
+            } else {
+              // Sin agente seleccionado, limitar por miembros del team del supervisor
+              list = leadsArray.filter(l => {
+                const c1 = getAgentCanon(l);
+                const c2 = tryCanonName(l);
+                return teamCanon.includes(c1) || teamCanon.includes(c2);
+              });
+            }
           }
-          list.forEach(appendLeadRow);
+          try {
+            const selCanon = (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(selected||'') : (selected||'');
+            if (selCanon === 'eduardo rivas') {
+              const sampleDiag = (leadsArray||[]).slice(0,10).map(l=>({
+                id: (function(x){ try{ const cand=x?.ownerId||x?.agentId||x?.registeredById||x?.createdBy; if(!cand) return ''; if(typeof cand==='object'){ return cand.$oid||cand.id||cand._id||cand.value||'';} const s=String(cand); const m=s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s; } catch{ return ''; } })(l),
+                canon: getAgentCanon(l)
+              }));
+              console.log('[Supervisor][Diag eduardo rivas] sample ids/canon =', sampleDiag);
+            }
+          } catch(_) {}
+          try {
+            const sample = (list||[]).slice(0,5).map(l=>({id:(typeof getLeadId==='function')?getLeadId(l):undefined, canon:getAgentCanon(l)}));
+            console.debug('[Supervisor] sample after filter =', sample);
+          } catch(_) {}
+          renderWithMonthlySeparators(list);
           return; // retorno temprano para no pasar por otras agrupaciones
         }
       } catch (e) {
-        console.warn('No se pudo aplicar la vista plana para Irania:', e);
+        console.warn('No se pudo aplicar la vista plana para Supervisor:', e);
       }
 
       // Vista ADMIN/BACKOFFICE: toolbar por TEAM y render plano filtrado por team
@@ -2364,6 +3107,7 @@
           let list = Array.isArray(leadsArray) ? leadsArray.slice() : [];
           if (selectedTeam) {
             const agentsCanon = teamsApi.getAgentsByTeam(selectedTeam) || [];
+            try { console.debug('[Admin] selectedTeam =', selectedTeam, '| agentsCanon =', agentsCanon); } catch(_) {}
             // Mostrar TODOS los leads del team seleccionado (sin restringir a 'Completed')
             list = list.filter(l => agentsCanon.includes(getAgentCanon(l)));
           } else {
@@ -2372,13 +3116,13 @@
             list = list;
           }
 
-          // Render plano
-          list.forEach(appendLeadRow);
+          // Render con separadores mensuales
+          renderWithMonthlySeparators(list);
           return; // evitar ramas siguientes
         } catch (e) { console.warn('Error en vista admin por TEAM:', e); }
       } else {
-        // Render plano por defecto
-        leadsArray.forEach(appendLeadRow);
+        // Render por defecto con separadores mensuales
+        renderWithMonthlySeparators(leadsArray);
       }
     }
 

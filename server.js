@@ -126,6 +126,99 @@ if (helmet) {
 // Rate limiting (si disponible)
 const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
 const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
+
+// Crear registro para Team Lineas en colección dedicada "Lineas"
+app.post('/api/lineas', protect, async (req, res) => {
+  try {
+    // Asegurar conexión BD
+    if (!db) db = await connectToMongoDB();
+
+    const body = req.body || {};
+
+    // Helpers de normalización
+    const toUpper = (s) => (s == null ? '' : String(s).trim().toUpperCase());
+    const digitsOnly = (s) => (s == null ? '' : String(s).replace(/\D+/g, ''));
+    const asDate = (s) => {
+      if (!s) return null;
+      try {
+        // soportar yyyy-mm-dd y dd/mm/yyyy
+        const str = String(s).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str);
+        if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(str)) {
+          const [d, m, y] = str.split(/[\/\-]/).map(Number);
+          return new Date(y, m - 1, d);
+        }
+        const d = new Date(str);
+        return isNaN(d) ? null : d;
+      } catch { return null; }
+    };
+
+    // Validaciones mínimas obligatorias (según especificación):
+    const errors = [];
+    const requiredFields = ['nombre_cliente','telefono_principal','numero_cuenta','autopay','pin_seguridad','direccion','servicios','dia_venta','dia_instalacion','status','cantidad_lineas','id','mercado','supervisor'];
+    for (const f of requiredFields) {
+      if (body[f] == null || body[f] === '' || (Array.isArray(body[f]) && body[f].length === 0)) {
+        errors.push(`Campo requerido faltante: ${f}`);
+      }
+    }
+    if (errors.length) {
+      return res.status(400).json({ success: false, message: 'Validación fallida', errors });
+    }
+
+    // Coerciones/normalizaciones
+    const servicios = Array.isArray(body.servicios) ? body.servicios.map(v => String(v)) : [String(body.servicios)];
+    const cantidadLineasSel = Array.isArray(body.cantidad_lineas) ? body.cantidad_lineas : [body.cantidad_lineas];
+    const cantidadLineas = Number(cantidadLineasSel[0] || 0);
+    const telefonosRaw = Array.isArray(body.telefonos) ? body.telefonos : [body.telefono_1, body.telefono_2, body.telefono_3, body.telefono_4, body.telefono_5].filter(v => v != null);
+    const telefonos = telefonosRaw.map(digitsOnly).filter(Boolean).slice(0, Math.max(0, cantidadLineas || 0));
+
+    // Validaciones de dominio
+    const autopayVal = String(body.autopay || '').toLowerCase(); // 'si' | 'no'
+    if (!['si','no'].includes(autopayVal)) errors.push('autopay debe ser si | no');
+    const statusVal = String(body.status || '').toLowerCase(); // 'pending' | 'repro'
+    if (!['pending','repro'].includes(statusVal)) errors.push('status inválido (permitidos: pending, repro)');
+    const mercadoArr = Array.isArray(body.mercado) ? body.mercado : [body.mercado];
+    const mercado = mercadoArr.map(String);
+    if (mercado.length !== 1 || !['bamo','icon'].includes(mercado[0].toLowerCase())) errors.push('mercado debe ser uno: bamo | icon');
+    const supervisorVal = String(body.supervisor || '').toLowerCase();
+    if (!['jonathan','diego'].includes(supervisorVal)) errors.push('supervisor inválido (permitidos: JONATHAN, DIEGO)');
+    if (!cantidadLineas || isNaN(cantidadLineas) || cantidadLineas < 1 || cantidadLineas > 5) errors.push('cantidad_lineas debe ser entre 1 y 5');
+    if (telefonos.length !== cantidadLineas) errors.push('La cantidad de teléfonos debe coincidir con cantidad_lineas');
+    if (errors.length) {
+      return res.status(400).json({ success: false, message: 'Validación fallida', errors });
+    }
+
+    // Construir documento a insertar
+    const now = new Date();
+    const doc = {
+      team: 'team lineas',
+      nombre_cliente: toUpper(body.nombre_cliente),
+      telefono_principal: digitsOnly(body.telefono_principal),
+      numero_cuenta: String(body.numero_cuenta || '').trim(),
+      autopay: autopayVal === 'si',
+      pin_seguridad: String(body.pin_seguridad || '').trim(),
+      direccion: String(body.direccion || '').trim(),
+      servicios, // múltiples checks permitidos
+      dia_venta: asDate(body.dia_venta),
+      dia_instalacion: asDate(body.dia_instalacion),
+      status: statusVal.toUpperCase(), // PENDING | REPRO
+      cantidad_lineas: cantidadLineas,
+      telefonos,
+      ID: String(body.id || body.ID || '').trim(),
+      mercado: mercado[0].toUpperCase(), // BAMO | ICON
+      supervisor: supervisorVal.toUpperCase(), // JONATHAN | DIEGO
+      creadoEn: now,
+      actualizadoEn: now,
+      _raw: body
+    };
+
+    const result = await db.collection('Lineas').insertOne(doc);
+    return res.status(201).json({ success: true, message: 'Formulario Lineas creado', id: result.insertedId?.toString(), data: doc });
+  } catch (error) {
+    console.error('Error en POST /api/lineas:', error);
+    return res.status(500).json({ success: false, message: 'Error al crear el registro de Lineas', error: error.message });
+  }
+});
 const loginLimiter = makeLimiter({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Servir archivos estáticos
@@ -623,6 +716,7 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
     // - Agent: NUNCA puede ver "todos". Ignorar forceAll y filtrar por su propio agenteId.
     // - Supervisor: NUNCA puede ver "todos". Ignorar forceAll y filtrar por su equipo (agentes asignados a su supervisorId).
     // - Admin/Backoffice: pueden ver todos (sin filtro) y no necesitan forceAll.
+    const userRole = (req.user?.role || '').toLowerCase();
     if (req.user) {
       const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
       const role = (req.user.role || '').toLowerCase();
@@ -831,7 +925,8 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
     }
     
     // Filtro por agenteId directo si se especifica via query ?agenteId=
-    const agenteIdParamRaw = (req.query.agenteId || '').toString().trim();
+    // Alias: aceptar también ?agentId=
+    const agenteIdParamRaw = (req.query.agenteId || req.query.agentId || '').toString().trim();
     if (agenteIdParamRaw) {
       console.log('[DEBUG] Parámetro agenteId recibido:', agenteIdParamRaw);
       if (req.user && req.user.role === 'agent') {
@@ -849,28 +944,80 @@ app.get('/api/customers', protect, authorize('admin','supervisor','agent'), asyn
         let oid = null;
         try { if (/^[a-fA-F0-9]{24}$/.test(agenteIdParamRaw)) oid = new ObjectId(agenteIdParamRaw); } catch {}
         const bothTypes = oid ? { $in: [oid, agenteIdParamRaw] } : agenteIdParamRaw;
-        // Aplicar el filtro al conjunto de campos candidatos; si ya existe un $or previo, intentar intersección
         const agentFieldCandidates = ['agenteId', 'agente_id', 'idAgente', 'agentId', 'createdBy', 'creadoPor', 'creado_por', 'ownerId', 'assignedId'];
         const paramOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
-        if (query.$or && Array.isArray(query.$or)) {
-          // Intersecar ambos $or aproximando: mantener condiciones que tengan solape en $in (si lo hay)
-          const allowed = [];
-          query.$or.forEach(cond => {
-            const k = Object.keys(cond)[0];
-            const v = cond[k];
-            if (v && v.$in) allowed.push(...v.$in.map(x=>x.toString()));
-          });
-          const candidates = Array.isArray(bothTypes.$in) ? bothTypes.$in.map(x=>x.toString()) : [bothTypes.toString()];
-          const overlap = candidates.some(x => allowed.includes(x));
-          query.$or = overlap ? paramOr : [{ _id: new ObjectId('000000000000000000000000') }];
+        // Regla: si el usuario es supervisor, honrar SIEMPRE el agenteId explícito y además incluir filtro por NOMBRE del agente
+        if (userRole === 'supervisor') {
+          let nameOr = [];
+          try {
+            const usersColl = db.collection('users');
+            const idsToTry = [];
+            if (oid) idsToTry.push(oid);
+            // Si recibimos cadena válida tipo ObjectId, agregarla
+            try { if (!oid && ObjectId.isValid(agenteIdParamRaw)) idsToTry.push(new ObjectId(agenteIdParamRaw)); } catch {}
+            let candidateUsers = [];
+            if (idsToTry.length) {
+              candidateUsers = await usersColl.find({ _id: { $in: idsToTry } }).project({ username:1, name:1, nombre:1, fullName:1 }).toArray();
+            }
+            const names = new Set();
+            candidateUsers.forEach(u => {
+              [u?.username, u?.name, u?.nombre, u?.fullName].forEach(v => { if (v && String(v).trim()) names.add(String(v).trim()); });
+            });
+            // Considerar también el propio agenteId en texto (algunos documentos guardan el id como string en campos de texto)
+            if (String(agenteIdParamRaw).trim()) names.add(String(agenteIdParamRaw).trim());
+            const textFields = ['agente','agent','agenteNombre','agentName','nombreAgente','vendedor','seller','salesAgent','asignadoA','assignedTo','usuario','owner','registeredBy','ownerName'];
+            const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\]/g,'\\]');
+            const stripDiacritics = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu,'');
+            const collapse = (s) => stripDiacritics(String(s)).replace(/\s+/g,'').replace(/[^\p{L}\p{N}]/gu,'');
+            const makeVariants = (raw) => {
+              const base = String(raw).trim();
+              if (!base) return [];
+              const noDiac = stripDiacritics(base);
+              const collapsed = collapse(base);
+              // patrón con espacios opcionales entre palabras
+              const spaceOptional = noDiac.replace(/\s+/g, '\\s*');
+              return [base, noDiac, collapsed, spaceOptional];
+            };
+            const namesWithVariants = new Set();
+            for (const n of names) {
+              makeVariants(n).forEach(v => namesWithVariants.add(v));
+            }
+            const regexes = [...namesWithVariants].map(n => { try { return new RegExp(escapeRe(n), 'i'); } catch { return null; } }).filter(Boolean);
+            nameOr = regexes.length ? textFields.map(f => ({ [f]: { $in: regexes } })) : [];
+          } catch (e) {
+            console.warn('[DEBUG] No se pudieron resolver nombres para agenteId (fallback solo IDs):', e?.message);
+          }
+          query.$or = nameOr.length ? [...paramOr, ...nameOr] : paramOr;
+          console.log('[DEBUG] Rol supervisor + agenteId param: filtro por IDs y nombres aplicado.');
         } else {
-          query.$or = paramOr;
+          // Para otros roles, intentar intersección si ya existe filtro previo
+          if (query.$or && Array.isArray(query.$or) && query.$or.length) {
+            const allowed = [];
+            query.$or.forEach(cond => {
+              const k = Object.keys(cond)[0];
+              const v = cond[k];
+              if (v && v.$in) allowed.push(...v.$in.map(x=>x.toString()));
+            });
+            const candidates = Array.isArray(bothTypes.$in) ? bothTypes.$in.map(x=>x.toString()) : [bothTypes.toString()];
+            const overlap = candidates.some(x => allowed.includes(x));
+            query.$or = overlap ? paramOr : [{ _id: new ObjectId('000000000000000000000000') }];
+          } else {
+            query.$or = paramOr;
+          }
         }
       }
     }
 
     // Filtro adicional por agente si se especifica via query ?agente=
-    const agenteParam = (req.query.agente || '').toString().trim();
+    let agenteParam = (req.query.agente || '').toString().trim();
+    // Aceptar parámetros alternos de nombre y unificarlos en agenteParam
+    if (!agenteParam) {
+      const altNameKeys = ['agenteNombre','nombreAgente','agent','agentName','vendedor','salesAgent','asignadoA','assignedTo','usuario','owner','registeredBy','ownerName'];
+      for (const k of altNameKeys) {
+        const v = (req.query[k] || '').toString().trim();
+        if (v) { agenteParam = v; break; }
+      }
+    }
     if (!agenteIdParamRaw && agenteParam) {
       console.log('[DEBUG] Parámetro agente recibido:', agenteParam);
       // Si el usuario autenticado es 'agent', forzamos su propio ID y omitimos el parámetro

@@ -136,7 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return normUpper(checked);
       };
 
-      // Limpiar mensajes de error al cambiar/tipear
+       // Limpiar mensajes de error al cambiar/tipear
       try {
         Array.from(form.elements).forEach(el => {
           const name = el && el.name;
@@ -353,7 +353,8 @@ async function cargarDatosDesdeServidor() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
     const role = (getCurrentUserRole() || '').toLowerCase();
-    const isLocalUserBypass = isLocal && (role === 'user' || role === 'supervisor');
+    // Solo aplicar bypass local si NO hay token disponible. Si existe token, enviarlo siempre.
+    const isLocalUserBypass = isLocal && (role === 'user' || role === 'supervisor') && !token;
     
     // Configurar los headers. En local con rol user, no enviamos Authorization
     const headers = { 'Content-Type': 'application/json' };
@@ -502,167 +503,6 @@ async function cargarDatosDesdeServidor() {
   }
 }
 
-// Renderizado profesional y alineado de la tabla Costumer
-function renderCostumerTable(leads) {
-  console.log('RENDER COSTUMER TABLE', leads);
-  window.ultimaListaLeads = leads;
-  const tbody = document.getElementById('costumer-tbody');
-  tbody.innerHTML = '';
-  if (!leads || leads.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="21" style="text-align:center;padding:2em;">No hay registros para mostrar.</td></tr>`;
-    return;
-  }
-  // Helpers para agrupar por mes
-  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  // Helpers para obtener propiedades anidadas y probar varias rutas
-  function getByPath(obj, path) {
-    try { return path.split('.').reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj); } catch { return undefined; }
-  }
-  function firstOf(obj, paths) {
-    for (const p of paths) { const v = getByPath(obj, p); if (v !== undefined && v !== null && v !== '') return v; }
-    return undefined;
-  }
-  function parseDateFlexible(v) {
-    if (!v) return null;
-    try {
-      if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
-      const s = String(v).trim();
-      // Intento directo
-      const d1 = new Date(s);
-      if (!isNaN(d1.getTime())) return d1;
-      // dd/mm/yyyy o mm/dd/yyyy (desambiguar por rangos)
-      const m = s.match(/^([0-3]?\d)[\/.-]([0-1]?\d)[\/.-](\d{4})$/);
-      if (m) {
-        let a = parseInt(m[1], 10), b = parseInt(m[2], 10), yy = parseInt(m[3], 10);
-        let dd, mm;
-        if (a > 12 && b >= 1 && b <= 12) { // 31/08/2025 -> dd/mm/yyyy
-          dd = a; mm = b - 1;
-        } else if (b > 12 && a >= 1 && a <= 12) { // 08/31/2025 -> mm/dd/yyyy
-          dd = b; mm = a - 1;
-        } else if (a <= 12 && b <= 12) {
-          // Ambiguo: por defecto asumir dd/mm/yyyy si a > b, si no mm/dd/yyyy
-          if (a > b) { dd = a; mm = b - 1; } else { dd = b; mm = a - 1; }
-        } else {
-          dd = a; mm = b - 1;
-        }
-        const d2 = new Date(yy, mm, dd);
-        return isNaN(d2.getTime()) ? null : d2;
-      }
-      return null;
-    } catch { return null; }
-  }
-  function getLeadDate(lead) {
-    // Solo considerar fecha de venta/contratación en múltiples rutas posibles (planas o anidadas)
-    const candidate = firstOf(lead, [
-      'dia_venta','diaVenta',
-      'dia_contratacion','diaContratacion',
-      'fecha_contratacion','fechaContratacion',
-      '_raw.dia_venta','_raw.diaVenta',
-      '_raw.dia_contratacion','_raw.diaContratacion',
-      '_raw.fecha_contratacion','_raw.fechaContratacion'
-    ]);
-    return parseDateFlexible(candidate);
-  }
-  let lastMonthKey = '';
+// (Eliminada la definición duplicada de renderCostumerTable; se usa la de Costumer.html)
+// prueba-protegido: no commitear
 
-  // Ordenar por fecha descendente para agrupar correctamente por mes
-  const sortedLeads = (Array.isArray(leads) ? leads.slice() : []).sort((a, b) => {
-    const da = getLeadDate(a); const db = getLeadDate(b);
-    const ta = da ? da.getTime() : 0; const tb = db ? db.getTime() : 0;
-    return tb - ta; // descendente
-  });
-
-  // Mantener sincronizada la referencia global con el orden actual
-  window.ultimaListaLeads = sortedLeads;
-
-  let sepCount = 0;
-  sortedLeads.forEach((lead, idx) => {
-    // Insertar separador mensual cuando cambia el mes (YYYY-MM)
-    const d = getLeadDate(lead);
-    const key = d ? `${d.getFullYear()}-${('0'+(d.getMonth()+1)).slice(-2)}` : 'Sin fecha';
-    if (key !== lastMonthKey) {
-      lastMonthKey = key;
-      const title = d ? `${monthNames[d.getMonth()]} ${d.getFullYear()} — Clientes` : 'Sin fecha — Clientes';
-      tbody.innerHTML += `
-        <tr class="costumer-month-separator"><td colspan="21" style="background:#e2e8f0;font-weight:700;border-left:4px solid #1976d2;padding:12px 18px;color:#0f172a;">${title}</td></tr>
-      `;
-      sepCount++;
-    }
-    const rowClass = idx % 2 === 0 ? 'costumer-row-striped' : '';
-    const editable = canEditStatus();
-    const statusValue = (lead.status || '').toString();
-    const statusLower = statusValue.toLowerCase();
-    console.log('[Render] Fila', idx, 'LeadId:', (lead._id || ''), '| role:', (getCurrentUserRole()||'').toString(), '| editable:', editable, '| status:', statusValue);
-    const statusCellHtml = editable
-      ? `<select class="status-select" onchange="updateLeadStatus('${lead._id || ''}', this.value)">
-           <option value="pending" ${statusLower==='pending' ? 'selected' : ''}>Pending</option>
-           <option value="hold" ${statusLower==='hold' ? 'selected' : ''}>Hold</option>
-           <option value="cancelled" ${statusLower==='cancelled' ? 'selected' : ''}>Cancelled</option>
-           <option value="rescheduled" ${statusLower==='rescheduled' ? 'selected' : ''}>Rescheduled</option>
-           <option value="completed" ${statusLower==='completed' ? 'selected' : ''}>Completed</option>
-         </select>`
-      : `<span class="badge-status badge-status-${(statusLower)}">${statusValue}</span>`;
-    tbody.innerHTML += `
-      <tr class="${rowClass}">
-        <td class="td-ellipsis" title="${lead.nombre_cliente || ''}">${lead.nombre_cliente || ''}</td>
-        <td class="td-nowrap" title="${lead.telefono_principal || ''}">${lead.telefono_principal || ''}</td>
-        <td class="td-nowrap" title="${lead.telefono_alterno || 'N/A'}">${lead.telefono_alterno || 'N/A'}</td>
-        <td class="td-nowrap" title="${lead.numero_cuenta || 'N/A'}">${lead.numero_cuenta || 'N/A'}</td>
-        <td class="td-nowrap" title="${lead.autopago || ''}">${lead.autopago || ''}</td>
-        <td class="td-ellipsis" title="${lead.direccion || ''}">${lead.direccion || ''}</td>
-        <td class="td-ellipsis" title="${lead.tipo_servicios || ''}">${lead.tipo_servicios || ''}</td>
-        <td class="td-ellipsis" title="${(function(){ const v = firstOf(lead, ['sistema','system','plataforma','platform','_raw.sistema','_raw.system']); return v ?? 'N/A'; })()}">${(function(){ const v = firstOf(lead, ['sistema','system','plataforma','platform','_raw.sistema','_raw.system']); return v ?? 'N/A'; })()}</td>
-        <td class="td-nowrap" title="${(function(){ const v = firstOf(lead, ['riesgo','risk','nivel_riesgo','_raw.riesgo','_raw.risk']); return v ?? 'N/A'; })()}">${(function(){ const v = firstOf(lead, ['riesgo','risk','nivel_riesgo','_raw.riesgo','_raw.risk']); return v ?? 'N/A'; })()}</td>
-        <td class="td-nowrap" title="${lead.dia_venta || ''}">${lead.dia_venta || ''}</td>
-        <td class="td-nowrap" title="${lead.dia_instalacion || ''}">${lead.dia_instalacion || ''}</td>
-        <td class="td-nowrap">${statusCellHtml}</td>
-        <td class="td-ellipsis" title="${lead.servicios || ''}">${lead.servicios || ''}</td>
-        <td class="td-ellipsis" title="${lead.mercado || ''}">${lead.mercado || ''}</td>
-        <td class="td-ellipsis" title="${lead.supervisor || ''}">${lead.supervisor || ''}</td>
-        <td class="td-ellipsis" title="${lead.comentario || ''}">${lead.comentario || ''}</td>
-        <td class="td-ellipsis" title="${lead.motivo_llamada || ''}">${lead.motivo_llamada || ''}</td>
-        <td class="td-nowrap" title="${lead.zip_code || ''}">${lead.zip_code || ''}</td>
-        <td class="td-nowrap" title="${lead.puntaje !== undefined ? lead.puntaje : 0}">${lead.puntaje !== undefined ? lead.puntaje : 0}</td>
-        <td class="td-ellipsis">
-          <button class='comentarios-btn' onclick='toggleComentariosPanel(${idx})' title='Ver o añadir comentarios'>
-            <i class="fas fa-comment-dots"></i>
-          </button>
-        </td>
-        <td class="td-nowrap">
-          <button class="costumer-action-btn edit" title="Editar cliente" onclick="editarClienteModal('${lead._id || ''}')">
-            <i class="fas fa-pencil-alt"></i>
-          </button>
-          <button class="costumer-action-btn delete" title="Eliminar cliente" onclick="confirmarEliminarCliente('${lead._id || ''}')">
-            <i class="fas fa-trash-alt"></i>
-          </button>
-        </td>
-      </tr>
-      <tr id="comentarios-panel-${idx}" class="comentarios-panel-row" style="display:none;"><td colspan="21" style="background:#f9fafd;padding:0;">
-        <div class="comentarios-panel" id="comentarios-panel-${idx}">
-          <div style="font-weight:600;color:#1976d2;margin-bottom:0.5em;">Comentarios</div>
-          <div>
-            ${(Array.isArray(lead.comentarios_venta) && lead.comentarios_venta.length > 0)
-  ? lead.comentarios_venta.map((com, cidx) => `<div class='comentario-item'>
-    <div class='comentario-meta'>
-      <span class='comentario-autor'>${com.autor}</span>
-      <span class='comentario-fecha'>${com.fecha}</span>
-
-    </div>
-    <div class='comentario-texto' id='comentario-texto-${idx}-${cidx}'>${com.texto}</div>
-    <div class='comentario-edicion' id='comentario-edicion-${idx}-${cidx}' style='display:none;'>
-      <textarea id='editar-comentario-textarea-${idx}-${cidx}' maxlength='300'>${com.texto}</textarea>
-      <button class='comentario-btn guardar' title='Guardar edición' onclick='guardarEdicionComentario(${idx},${cidx})'><i class="fas fa-check"></i></button>
-      <button class='comentario-btn cancelar' title='Cancelar' onclick='cancelarEdicionComentario(${idx},${cidx})'><i class="fas fa-times"></i></button>
-    </div>
-  </div>`).join('')
-  : '<div class="comentario-item" style="color:#888;">Sin comentarios previos.</div>'}
-          </div>
-          <form class="nuevo-comentario-form" onsubmit="event.preventDefault(); enviarNuevoComentario(${idx}, '${lead._id || ''}')">
-            <textarea id="nuevo-comentario-textarea-${idx}" maxlength="300" placeholder="Escribe un nuevo comentario..."></textarea>
-            <button type="submit">Añadir</button>
-          </form>
-        </div>
-      </td></tr>
-    `;
-  });
-}

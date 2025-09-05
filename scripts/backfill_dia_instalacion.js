@@ -2,7 +2,7 @@
 /**
  * Backfill de dia_instalacion en la colección costumers
  * Estrategia de fuente (prioridad):
- *  1) fecha_instalacion
+ *  1) fecha_instalacion2
  *  2) dia_venta
  *  3) creadoEn (solo si es una fecha válida)
  *

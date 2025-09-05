@@ -112,6 +112,67 @@ async function fetchCustomersData() {
     
     console.log('Datos de prueba generados para la tabla:', leadsFormateados);
     
+    // Inyectar algunos leads específicos del flujo real (TEAM MARISOL / Eduardo R.)
+    try {
+      const hoyISO = new Date().toISOString().slice(0,10); // YYYY-MM-DD
+      const extras = [
+        {
+          _id: `mock_marisol_edur_1`,
+          nombre_cliente: 'Cliente Demo 1',
+          telefono_principal: '+1 786 555 0101',
+          telefono_alterno: '+1 786 555 0102',
+          numero_cuenta: 'C-EDU-1001',
+          autopago: 'Sí',
+          direccion: '123 Demo St, Miami FL 33176',
+          tipo_servicios: 'ATT 1G+',
+          sistema: 'SARA',
+          riesgo: 'Bajo',
+          dia_venta: hoyISO,
+          dia_instalacion: hoyISO,
+          status: 'Completed',
+          servicios: 'att-1g-plus',
+          mercado: 'ICON',
+          supervisor: 'TEAM MARISOL',
+          team: 'TEAM MARISOL',
+          comentario: 'Venta demo para validar filtro de agente',
+          motivo_llamada: 'VENTA',
+          zip_code: '33176',
+          puntaje: 2,
+          comentarios_venta: 'Cliente cerró con autopago.',
+          agenteNombre: 'Eduardo R.',
+          agente: 'Eduardo R.'
+        },
+        {
+          _id: `mock_marisol_edur_2`,
+          nombre_cliente: 'Cliente Demo 2',
+          telefono_principal: '+1 786 555 0201',
+          telefono_alterno: '+1 786 555 0202',
+          numero_cuenta: 'C-EDU-1002',
+          autopago: 'No',
+          direccion: '456 Example Ave, Miami FL 33176',
+          tipo_servicios: 'XFINITY',
+          sistema: 'SARA',
+          riesgo: 'Medio',
+          dia_venta: hoyISO,
+          dia_instalacion: hoyISO,
+          status: 'Pending',
+          servicios: 'xfinity-internet',
+          mercado: 'ICON',
+          supervisor: 'TEAM MARISOL',
+          team: 'TEAM MARISOL',
+          comentario: 'Pendiente de confirmación de instalación',
+          motivo_llamada: 'VENTA',
+          zip_code: '33176',
+          puntaje: 1.5,
+          comentarios_venta: 'Cliente interesado, falta confirmar.',
+          agenteNombre: 'Eduardo R.',
+          agente: 'Eduardo R.'
+        }
+      ];
+      leadsFormateados.unshift(...extras);
+      console.log('[MOCK] Inyectados leads de TEAM MARISOL / Eduardo R.:', extras.length);
+    } catch (_) {}
+
     // Devolver en el formato que espera la aplicación
     return { 
       success: true, 
