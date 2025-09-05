@@ -4,7 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CRM Agente - Equipo</title>
-  <link rel="stylesheet" href="css/theme.css" />
+  <script>
+    // Versionado para romper caché (actualiza este valor cuando hagas cambios visibles)
+    window.__APP_VERSION__ = '20250905-163930';
+    console.info('[lead.html] version', window.__APP_VERSION__);
+  </script>
+  <link rel="stylesheet" href="css/theme.css?v=20250905-163930" />
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Chart.js DataLabels Plugin -->
@@ -32,19 +37,39 @@
       }
     })();
   </script>
-  <script src="agentes/js/auth-check.js"></script>
-  <script src="/js/logout-handler.js"></script>
-  <script src="/js/user-info.js"></script>
-  <script src="/js/form-config.js"></script>
-  <script src="/utils/teams.js"></script>
-  <script src="js/sidebar-loader.js"></script>
+  <script src="agentes/js/auth-check.js?v=20250905-163930"></script>
+  <script src="/js/logout-handler.js?v=20250905-163930"></script>
+  <script src="/js/user-info.js?v=20250905-163930"></script>
+  <script src="/js/form-config.js?v=20250905-163930"></script>
+  <script src="/utils/teams.js?v=20250905-163930"></script>
+  <script src="js/sidebar-loader.js?v=20250905-163930"></script>
+  <script>
+    // Marcar body como team-lineas lo antes posible para aplicar CSS de ocultamiento
+    (function(){
+      try {
+        const norm = (s)=>String(s||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
+        const ALLOW = new Set(['jonathan figueroa','lineas-carlos','lineas-cristian r','lineas-edward','lineas-jocelyn','lineas-luis g','lineas-oscar r','lineas- karla','lineas-karla','lineas- daniel','lineas-daniel','lineas-sandy'].map(norm));
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+        const user = JSON.parse(userStr||'{}');
+        const candidates = [user?.username, user?.name, user?.nombre, user?.fullName].map(norm).filter(Boolean);
+        let isLineas = candidates.some(n=>ALLOW.has(n));
+        try {
+          if (!isLineas && window.Teams && typeof window.Teams.getTeamForUser==='function') {
+            const t = window.Teams.getTeamForUser(user) || '';
+            isLineas = norm(t) === 'team lineas';
+          }
+        } catch {}
+        if (isLineas) { document.addEventListener('DOMContentLoaded', ()=>document.body.classList.add('team-lineas')); }
+      } catch {}
+    })();
+  </script>
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <!-- Sidebar CSS -->
-  <link rel="stylesheet" href="css/sidebar.css">
-  <link rel="stylesheet" href="css/sidebar-inicio.css">
+  <link rel="stylesheet" href="css/sidebar.css?v=20250905-163930">
+  <link rel="stylesheet" href="css/sidebar-inicio.css?v=20250905-163930">
   <!-- Script para cargar la información del usuario en el sidebar -->
   <style>
     /* Estilos para el contenedor de la gráfica */
@@ -751,6 +776,23 @@
       font-weight: 500;
       text-transform: capitalize;
     }
+    /* Teléfono + Servicio (encabezado en línea y campo debajo) */
+    .inline-phone-service { display: block; }
+    .inline-phone-service .inline-header { display:flex; align-items:center; gap:32px; margin-bottom:6px; }
+    .inline-phone-service .inline-header label { margin:0; font-weight:700; color:#25a9dd; }
+    .inline-phone-service .radio-group { display:flex; gap:28px; align-items:center; }
+    .inline-phone-service .radio-label { display:flex; gap:6px; align-items:center; }
+    .inline-phone-service .radio-label input { margin:0; vertical-align: middle; }
+    .inline-phone-service .radio-label span { font-weight:700; color:#25a9dd; text-transform: uppercase; letter-spacing: 0.3px; }
+    .inline-phone-service .form-control { width:100%; min-width: 240px; }
+    /* Ocultamiento forzado para Team Líneas */
+    body.team-lineas [data-field="comentario"],
+    body.team-lineas [data-field="servicios"],
+    body.team-lineas label[for="servicios"],
+    body.team-lineas #servicios,
+    body.team-lineas select[name="servicios"] {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -777,9 +819,9 @@
             <input type="tel" id="telefono-principal" name="telefono_principal" class="form-control" required>
           </div>
           
-          <!-- Teléfono Alterno -->
+          <!-- Teléfono Alterno (estándar para roles fuera de Team Líneas) -->
           <div class="form-group" data-field="telefono_2">
-            <label for="telefono-alterno">Teléfono Alterno</label>
+            <label for="telefono_2">Teléfono Alterno</label>
             <input type="tel" id="telefono_2" name="telefono_2" class="form-control" required>
           </div>
           
@@ -797,21 +839,45 @@
           </div>
 
           <!-- Teléfonos adicionales controlados por cantidad_lineas (Team Líneas) -->
-          <div class="form-group" data-field="telefono_1" style="display:none;">
-            <label for="telefono_1">Teléfono 1</label>
+          <div class="form-group inline-phone-service" data-field="telefono_1" style="display:none;">
+            <div class="inline-header">
+              <label for="telefono_1">Teléfono 1</label>
+              <div class="radio-group" data-field="servicio_1">
+                <label class="radio-label"><input type="radio" name="servicio_1" value="sim-wireles"> <span>SIM WIRELES</span></label>
+                <label class="radio-label"><input type="radio" name="servicio_1" value="wireless"> <span>WIRELESS</span></label>
+              </div>
+            </div>
             <input type="tel" id="telefono_1" name="telefono_1" class="form-control">
           </div>
           
-          <div class="form-group" data-field="telefono_3" style="display:none;">
-            <label for="telefono_3">Teléfono 3</label>
+          <div class="form-group inline-phone-service" data-field="telefono_3" style="display:none;">
+            <div class="inline-header">
+              <label for="telefono_3">Teléfono 3</label>
+              <div class="radio-group" data-field="servicio_3">
+                <label class="radio-label"><input type="radio" name="servicio_3" value="sim-wireles"> <span>SIM WIRELES</span></label>
+                <label class="radio-label"><input type="radio" name="servicio_3" value="wireless"> <span>WIRELESS</span></label>
+              </div>
+            </div>
             <input type="tel" id="telefono_3" name="telefono_3" class="form-control">
           </div>
-          <div class="form-group" data-field="telefono_4" style="display:none;">
-            <label for="telefono_4">Teléfono 4</label>
+          <div class="form-group inline-phone-service" data-field="telefono_4" style="display:none;">
+            <div class="inline-header">
+              <label for="telefono_4">Teléfono 4</label>
+              <div class="radio-group" data-field="servicio_4">
+                <label class="radio-label"><input type="radio" name="servicio_4" value="sim-wireles"> <span>SIM WIRELES</span></label>
+                <label class="radio-label"><input type="radio" name="servicio_4" value="wireless"> <span>WIRELESS</span></label>
+              </div>
+            </div>
             <input type="tel" id="telefono_4" name="telefono_4" class="form-control">
           </div>
-          <div class="form-group" data-field="telefono_5" style="display:none;">
-            <label for="telefono_5">Teléfono 5</label>
+          <div class="form-group inline-phone-service" data-field="telefono_5" style="display:none;">
+            <div class="inline-header">
+              <label for="telefono_5">Teléfono 5</label>
+              <div class="radio-group" data-field="servicio_5">
+                <label class="radio-label"><input type="radio" name="servicio_5" value="sim-wireles"> <span>SIM WIRELES</span></label>
+                <label class="radio-label"><input type="radio" name="servicio_5" value="wireless"> <span>WIRELESS</span></label>
+              </div>
+            </div>
             <input type="tel" id="telefono_5" name="telefono_5" class="form-control">
           </div>
 
@@ -987,8 +1053,12 @@
             <label for="supervisor">Supervisor</label>
             <select id="supervisor" name="supervisor" class="form-control" required>
               <option value="">Seleccione</option>
-              <option value="JONATHAN">TEAM LINEAS (JONATHAN)</option>
-              <option value="DIEGO">TEAM LINEAS (DIEGO)</option>
+              <option value="IRANIA">IRANIA</option>
+              <option value="ROBERTO">ROBERTO</option>
+              <option value="MARISOL">MARISOL</option>
+              <option value="PLEITEZ">PLEITEZ</option>
+              <option value="RANDAL">RANDAL</option>
+              <option value="JONATHAN">JONATHAN</option>
             </select>
           </div>
           
@@ -1076,7 +1146,47 @@
           </div>
         </form>
       </section>
-
+      <script>
+        // Limpieza agresiva para Team Líneas: remover del DOM "comentario" y "servicios" si aún aparecen
+        (function(){
+          const cleanup = () => {
+            try {
+              if (!document.body.classList.contains('team-lineas')) return;
+              // 1) data-field="comentario"
+              const com = document.querySelector('[data-field="comentario"]');
+              if (com) com.remove();
+              // 2) data-field="servicios"
+              const dfServ = document.querySelector('[data-field="servicios"]');
+              if (dfServ) dfServ.remove();
+              // 3) select[name="servicios"] o #servicios y su contenedor
+              const selByName = document.querySelector('select[name="servicios"]');
+              if (selByName) { const c = selByName.closest('[data-field], .form-group'); if (c) c.remove(); else selByName.remove(); }
+              const selById = document.getElementById('servicios');
+              if (selById) { const c2 = selById.closest('[data-field], .form-group'); if (c2) c2.remove(); else selById.remove(); }
+              const lbl = document.querySelector('label[for="servicios"]');
+              if (lbl) { const c3 = lbl.closest('[data-field], .form-group'); if (c3) c3.remove(); else lbl.remove(); }
+              // 4) Bloque alterno: label con texto "¿Por qué llamó el cliente?"
+              const norm = (s)=>String(s||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
+              document.querySelectorAll('.form-group label').forEach(lab => {
+                try {
+                  const t = norm(lab.textContent);
+                  if (t.includes('por que llamo el cliente')) {
+                    const cg = lab.closest('.form-group');
+                    if (cg) cg.remove();
+                  }
+                } catch {}
+              });
+            } catch (e) { console.warn('[Team Lineas] cleanup error:', e); }
+          };
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', cleanup);
+          } else {
+            cleanup();
+          }
+          // Por si UI dinámica vuelve a inyectar algo, intentar de nuevo tras un tick
+          setTimeout(cleanup, 300);
+        })();
+      </script
       <!-- SECCIÓN DE GRÁFICAS -->
       <section class="graphs-section">
         <!-- Filtro de Fecha -->
