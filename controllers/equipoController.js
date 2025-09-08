@@ -22,7 +22,10 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
     // Filtro principal por fecha_contratacion (guardada como string YYYY-MM-DD)
     const matchStage = {
       $match: {
-        fecha_contratacion: { $gte: start, $lte: end },
+        $or: [
+          { fecha_contratacion: { $gte: start, $lte: end } },
+          { dia_venta: { $gte: start, $lte: end } }
+        ],
         status: { $ne: 'cancelado' }
       }
     };
@@ -41,13 +44,41 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
     // Agregación por team, contando ICON/BAMO, Total y sumando puntaje (normalizando mercado a mayúsculas)
     const pipeline = [
       matchStage,
+      // Normalizar campos para evitar fallos por espacios/caso
+      {
+        $addFields: {
+          mercado_norm: {
+            $toUpper: {
+              $trim: { input: { $ifNull: ['$mercado', ''] } }
+            }
+          },
+          team_norm: {
+            $trim: {
+              input: {
+                $ifNull: [
+                  '$team',
+                  { $ifNull: ['$supervisor', ''] }
+                ]
+              }
+            }
+          },
+          puntaje_num: {
+            $convert: { input: { $ifNull: ['$puntaje', 0] }, to: 'double', onError: 0, onNull: 0 }
+          }
+        }
+      },
       {
         $group: {
-          _id: { $ifNull: ['$team', 'Sin equipo'] },
-          ICON: { $sum: { $cond: [{ $eq: [{ $toUpper: { $ifNull: ['$mercado', ''] } }, 'ICON'] }, 1, 0] } },
-          BAMO: { $sum: { $cond: [{ $eq: [{ $toUpper: { $ifNull: ['$mercado', ''] } }, 'BAMO'] }, 1, 0] } },
+          _id: {
+            $let: {
+              vars: { t: { $trim: { input: { $ifNull: ['$team_norm', ''] } } } },
+              in: { $cond: [ { $eq: ['$$t',''] }, 'Sin equipo', '$$t' ] }
+            }
+          },
+          ICON: { $sum: { $cond: [{ $eq: ['$mercado_norm', 'ICON'] }, 1, 0] } },
+          BAMO: { $sum: { $cond: [{ $eq: ['$mercado_norm', 'BAMO'] }, 1, 0] } },
           Total: { $sum: 1 },
-          Puntaje: { $sum: { $ifNull: ['$puntaje', 0] } }
+          Puntaje: { $sum: '$puntaje_num' }
         }
       },
       { $sort: { Total: -1, _id: 1 } },
@@ -103,6 +134,9 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       ['ROBERTO', 'ROBERTO VELASQUEZ'],
       ['ROBERTO V', 'ROBERTO VELASQUEZ'],
       ['BRYAN', 'BRYAN PLEITEZ'],
+      ['PLEITEZ', 'BRYAN PLEITEZ'],
+      ['BRYAN P', 'BRYAN PLEITEZ'],
+      ['BRYAN PLEITES', 'BRYAN PLEITEZ'],
       ['RANDAL', 'RANDAL MARTINEZ'],
       ['LINEAS', 'LINEA'],
       ['LINEA', 'LINEA']
@@ -124,6 +158,20 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
     const padded = BASE_TEAMS.map(k => byKey.get(k) || ({ TEAM: `TEAM ${k}`, ICON: 0, BAMO: 0, Total: 0, Puntaje: 0 }));
     const lineasTotalICON = (lineasAgg || []).reduce((s, r) => s + Number(r.ICON || 0), 0);
 
+    // Diagnóstico opcional: devolver una muestra de documentos que pasan el $match
+    let docsSample = undefined;
+    if (String(req.query?.debugDocs || '').toLowerCase() === '1') {
+      try {
+        docsSample = await coll
+          .find(matchStage.$match)
+          .project({ team: 1, supervisor: 1, mercado: 1, puntaje: 1, fecha_contratacion: 1, dia_venta: 1 })
+          .limit(50)
+          .toArray();
+      } catch (e) {
+        docsSample = [{ error: 'error loading docsSample', message: e?.message }];
+      }
+    }
+
     // Encabezados de diagnóstico
     res.set('X-Equipos-Source', 'aggregate');
     res.set('X-Equipos-Coll', collName);
@@ -136,7 +184,8 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       data: padded,
       lineas: lineasAgg,
       lineasTotalICON,
-      debugCount: { rawCount: data.length, paddedCount: padded.length }
+      debugCount: { rawCount: data.length, paddedCount: padded.length },
+      docsSample
     };
     if (String(req.query?.debug || '').toLowerCase() === '1') {
       payload.dataRaw = data;

@@ -22,8 +22,27 @@ router.get('/', async (req, res) => {
     
     console.log('Conexión a BD establecida correctamente');
 
-    // Obtener todos los customers de la colección costumers
-    const customers = await db.collection('costumers').find({}).toArray();
+    // Filtro por fecha (por defecto, día actual) y orden ascendente por fecha_contratacion
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const hoyStr = `${yyyy}-${mm}-${dd}`;
+
+    const qStart = (req.query.fechaInicio && String(req.query.fechaInicio).trim()) || hoyStr;
+    const qEnd = (req.query.fechaFin && String(req.query.fechaFin).trim()) || hoyStr;
+    const forceAll = String(req.query.forceAll || '0').toLowerCase();
+    const noDateFilter = forceAll === '1' || forceAll === 'true';
+
+    const filter = noDateFilter ? {} : { fecha_contratacion: { $gte: qStart, $lte: qEnd } };
+
+    // Importante: si fecha_contratacion es string YYYY-MM-DD, sort lexicográfico funciona
+    // Orden ASC para que una venta con fecha 01 se coloque junto a las del 01
+    const customers = await db
+      .collection('costumers')
+      .find(filter)
+      .sort({ fecha_contratacion: 1, _id: 1 })
+      .toArray();
     
     // Agrupar por agente y calcular estadísticas
     const agentStats = {};
