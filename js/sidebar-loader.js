@@ -46,7 +46,8 @@
         { key: 'lead', href: 'lead.html' },
         { key: 'costumer', href: 'Costumer.html' },
         { key: 'register', href: 'register.html' },
-        { key: 'facturacion', href: 'facturacion.html' }
+        { key: 'facturacion', href: 'facturacion.html' },
+        { key: 'estadisticas', href: 'Estadisticas.html' }
       ];
       // 1) Prioridad: atributo data-active si viene de la página
       let target = null;
@@ -60,7 +61,8 @@
           { key: 'lead', match: 'lead.html' },
           { key: 'costumer', match: 'costumer.html' },
           { key: 'register', match: 'register.html' },
-          { key: 'facturacion', match: 'facturacion.html' }
+          { key: 'facturacion', match: 'facturacion.html' },
+          { key: 'estadisticas', match: 'estadisticas.html' }
         ].find(m => path.endsWith(m.match));
         if (urlTarget) target = map.find(m => m.key === urlTarget.key);
       }
@@ -88,6 +90,13 @@
       const factLi = factLink ? (factLink.closest('li') || factLink.parentElement) : null;
       if (factLi) {
         factLi.style.display = role === 'admin' ? '' : 'none';
+      }
+      // 3) Ocultar Estadísticas para quienes NO sean admin o BO (variantes)
+      const allowedStats = ['admin','backoffice','b:o','b.o','b-o','bo'];
+      const statsLink = nav.querySelector('a[href$="Estadisticas.html"], a[href$="estadisticas.html"]');
+      const statsLi = statsLink ? (statsLink.closest('li') || statsLink.parentElement) : null;
+      if (statsLi) {
+        statsLi.style.display = allowedStats.includes(role) ? '' : 'none';
       }
     } catch(e){ console.warn('sidebar admin visibility error', e); }
   }

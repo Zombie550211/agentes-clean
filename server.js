@@ -20,6 +20,7 @@ try { cookieParser = require('cookie-parser'); } catch { console.warn('[INIT] co
 const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
+const equipoRoutes = require('./routes/equipoRoutes');
 const { connectToMongoDB, getDb } = require('./config/db');
 // Middleware de autenticación unificado
 const { protect, authorize } = require('./middleware/auth');
@@ -241,8 +242,8 @@ app.options('*', cors(corsOptions));
 app.use('/api/auth', authLimiter, authRoutes);
 // Montar rutas de API públicas
 app.use('/api', apiRoutes);
-// Montar rutas de ranking
-app.use('/api', rankingRoutes);
+app.use('/api/ranking', rankingRoutes);
+app.use('/api/equipos', equipoRoutes);
 
 // Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)
 // Wrapper mínimo por compatibilidad con referencias existentes
