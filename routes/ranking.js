@@ -3,7 +3,9 @@ const router = express.Router();
 const { getDb } = require('../config/db');
 
 // Endpoint para obtener datos del ranking de agentes
-router.get('/ranking', async (req, res) => {
+// Nota: este router se monta en server.js bajo '/api/ranking',
+// por lo que el handler debe estar en '/'
+router.get('/', async (req, res) => {
   try {
     console.log('=== ENDPOINT /api/ranking LLAMADO ===');
     console.log('Headers:', req.headers);
