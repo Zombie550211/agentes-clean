@@ -28,8 +28,10 @@ router.get('/', async (req, res) => {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     const hoyStr = `${yyyy}-${mm}-${dd}`;
+    const mesInicioStr = `${yyyy}-${mm}-01`;
 
-    const qStart = (req.query.fechaInicio && String(req.query.fechaInicio).trim()) || hoyStr;
+    // Por defecto: acumulado del mes en curso (01..hoy)
+    const qStart = (req.query.fechaInicio && String(req.query.fechaInicio).trim()) || mesInicioStr;
     const qEnd = (req.query.fechaFin && String(req.query.fechaFin).trim()) || hoyStr;
     const forceAll = String(req.query.forceAll || '0').toLowerCase();
     const noDateFilter = forceAll === '1' || forceAll === 'true';
