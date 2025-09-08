@@ -104,7 +104,9 @@
   const FormConfig = {
     defaults: DEFAULTS,
     teams: {
-      'team lineas': deepMerge(DEFAULTS, TEAM_LINEAS)
+      'team lineas': deepMerge(DEFAULTS, TEAM_LINEAS),
+      'team lineas 1': deepMerge(DEFAULTS, TEAM_LINEAS),
+      'team lineas 2': deepMerge(DEFAULTS, TEAM_LINEAS)
     }
   };
 
@@ -240,7 +242,7 @@
         const teamByUser = (window.Teams && typeof window.Teams.getTeamForUser==='function')
           ? norm(window.Teams.getTeamForUser(user) || '')
           : '';
-        const isTeamLineas = teamByUser === 'team lineas';
+        const isTeamLineas = (teamByUser === 'team lineas' || teamByUser === 'team lineas 1' || teamByUser === 'team lineas 2');
         const isAllowed = candidates.some(n => ALLOWLIST.has(n));
         if (isAllowed || isTeamLineas) {
           try { document.body.classList.add('team-lineas'); } catch {}
@@ -316,6 +318,20 @@
 
           // 4) Reaplicar regla telefónica si se habilitó cantidad_lineas
           if (cantidadSelect) updateTelefonos();
+
+          // Prefijar supervisor por sub-team si aplica
+          try {
+            const supSelect = document.querySelector('[data-field="supervisor"] select') || document.getElementById('supervisor') || document.querySelector('[name="supervisor"]');
+            if (supSelect) {
+              let desired = '';
+              if (teamByUser === 'team lineas 1') desired = 'JONATHAN';
+              if (teamByUser === 'team lineas 2') desired = 'GUITIERREZ';
+              if (desired) {
+                const opt = Array.from(supSelect.options).find(o => String(o.textContent||o.value).toUpperCase().includes(desired));
+                if (opt) { supSelect.value = (opt.value || '').toLowerCase(); }
+              }
+            }
+          } catch {}
         }
       } catch (e) {
         console.warn('[FormConfig] allowlist error:', e);

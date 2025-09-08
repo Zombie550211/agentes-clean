@@ -96,7 +96,7 @@
         'riquelmi torres'
       ]
     },
-    // TEAM LINEAS (registrado desde requerimiento del usuario)
+    // Equipo histórico unificado (compatibilidad). Se mantiene, pero se añaden equipos 1 y 2 abajo.
     'team lineas': {
       displayName: 'TEAM LINEAS',
       supervisor: 'jonathan figueroa',
@@ -106,7 +106,34 @@
         'lineas-edward',
         'lineas-jocelyn',
         'lineas-luis g',
+        'lineas-oscar r',
+        'lineas-daniel',
+        'lineas-karla',
+        'lineas-sandy',
+        'lineas-angie'
+      ]
+    },
+    // TEAM LINEAS 1
+    'team lineas 1': {
+      displayName: 'TEAM LINEAS 1',
+      supervisor: 'jonathan figueroa',
+      agents: [
+        'lineas-carlos',
+        'lineas-cristian r',
+        'lineas-edward',
+        'lineas-jocelyn',
         'lineas-oscar r'
+      ]
+    },
+    // TEAM LINEAS 2
+    'team lineas 2': {
+      displayName: 'TEAM LINEAS 2',
+      supervisor: 'luis gutierrez',
+      agents: [
+        'lineas-daniel',
+        'lineas-karla',
+        'lineas-sandy',
+        'lineas-angie'
       ]
     }
   };

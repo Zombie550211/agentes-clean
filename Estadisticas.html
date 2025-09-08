@@ -552,12 +552,12 @@
         }
         // Separar TEAM LINEA a tabla aparte y mantener principal sin LINEA
         const mainTeams = teamData.filter(t => (t.name || '').toUpperCase() !== 'TEAM LINEA');
-        // Por ahora, mostrar tabla fija para TEAM LINEAS con 2 nombres y valores 0
+        // Tabla TEAM LINEAS (valores solicitados para el día actual)
         const lineasData = [
-          { name: 'JONATHAN', ICON: 0 },
-          { name: 'GUTIERREZ', ICON: 0 }
+          { name: 'JONATHAN', ICON: 6 },
+          { name: 'GUTIERREZ', ICON: 4 }
         ];
-        const lineasTotalICON = 0;
+        const lineasTotalICON = 10;
         
         // Calcular totales
         const totals = teamData.reduce((acc, r) => ({

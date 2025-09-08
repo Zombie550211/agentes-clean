@@ -56,7 +56,8 @@
         try {
           if (!isLineas && window.Teams && typeof window.Teams.getTeamForUser==='function') {
             const t = window.Teams.getTeamForUser(user) || '';
-            isLineas = norm(t) === 'team lineas';
+            const tk = norm(t);
+            isLineas = (tk === 'team lineas' || tk === 'team lineas 1' || tk === 'team lineas 2');
           }
         } catch {}
         if (isLineas) { document.addEventListener('DOMContentLoaded', ()=>document.body.classList.add('team-lineas')); }
@@ -820,7 +821,7 @@
           </div>
           
           <!-- Teléfono Alterno (estándar para roles fuera de Team Líneas) -->
-          <div class="form-group" data-field="telefono_2">
+          <div class="form-group" data-field="telefono_alterno">
             <label for="telefono_2">Teléfono Alterno</label>
             <input type="tel" id="telefono_2" name="telefono_2" class="form-control" required>
           </div>
@@ -850,6 +851,16 @@
             <input type="tel" id="telefono_1" name="telefono_1" class="form-control">
           </div>
           
+          <div class="form-group inline-phone-service" data-field="telefono_2" style="display:none;">
+            <div class="inline-header">
+              <label for="telefono_2_lineas">Teléfono 2</label>
+              <div class="radio-group" data-field="servicio_2">
+                <label class="radio-label"><input type="radio" name="servicio_2" value="sim-wireles"> <span>SIM WIRELES</span></label>
+                <label class="radio-label"><input type="radio" name="servicio_2" value="wireless"> <span>WIRELESS</span></label>
+              </div>
+            </div>
+            <input type="tel" id="telefono_2_lineas" name="telefono_2_lineas" class="form-control">
+          </div>
           <div class="form-group inline-phone-service" data-field="telefono_3" style="display:none;">
             <div class="inline-header">
               <label for="telefono_3">Teléfono 3</label>
@@ -1186,7 +1197,7 @@
           // Por si UI dinámica vuelve a inyectar algo, intentar de nuevo tras un tick
           setTimeout(cleanup, 300);
         })();
-      </script
+      </script>
       <!-- SECCIÓN DE GRÁFICAS -->
       <section class="graphs-section">
         <!-- Filtro de Fecha -->
@@ -1617,6 +1628,33 @@
         console.warn('[PAGINACIÓN] Error durante la descarga de páginas adicionales:', e?.message);
       }
       
+      // Filtro Team Líneas a nivel de documentos crudos (ANTES de agregar por día)
+      try {
+        const norm = (s) => (window.Teams && typeof window.Teams.norm === 'function')
+          ? window.Teams.norm(s)
+          : (function(x){ try { return String(x||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/[^a-z0-9 ]+/g,'').replace(/\s+/g,' ');} catch { return ''; } })(s);
+        const canonicalFromName = (name) => (window.Teams && typeof window.Teams.canonicalFromName === 'function')
+          ? window.Teams.canonicalFromName(name)
+          : norm(name);
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+        const user = JSON.parse(userStr||'{}');
+        const teamKey = (window.Teams && typeof window.Teams.getTeamForUser==='function') ? (window.Teams.getTeamForUser(user) || '') : '';
+        const tk = norm(teamKey);
+        const isLineas = (tk === 'team lineas 1' || tk === 'team lineas 2');
+        if (isLineas && window.Teams && typeof window.Teams.getAgentsByTeam==='function') {
+          const allowed = new Set((window.Teams.getAgentsByTeam(teamKey) || []).map(canonicalFromName).map(norm));
+          const before = Array.isArray(costumers) ? costumers.length : 0;
+          costumers = (costumers || []).filter(c => {
+            const raw = c.agenteNombre || c.nombreAgente || c.agente || '';
+            const canon = norm(canonicalFromName(raw));
+            return allowed.has(canon);
+          });
+          console.log(`[Lead] [actualizarGraficaVentasPuntaje] Filtro Team Líneas (${tk}) aplicado: ${before} -> ${costumers.length}`);
+        }
+      } catch (e) {
+        console.warn('[Lead] No se pudo aplicar filtro Team Líneas previo a la agregación:', e);
+      }
+
       // Inicializar un objeto para almacenar las ventas por día (claves en día de negocio UTC-6)
       const ventasPorDia = {};
       
@@ -1728,7 +1766,7 @@
               // DD/MM/YYYY o DD-MM-YYYY (asumimos day-first)
               if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(s)) {
                 const parts = s.split(/[\/\-]/).map(Number);
-                const [d, m, y] = parts;
+                const [d,m,y] = parts;
                 if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900) {
                   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
                 }
@@ -1922,7 +1960,39 @@
         return false;
       }
       
-      console.log('Datos recibidos para procesar:', datos);
+      // Determinar si el usuario pertenece a TEAM LINEAS 1 o 2 y filtrar solo ventas de sus agentes
+    // También activar bandera para mostrar solo ventas (sin puntaje) para Team Líneas
+    let onlyVentas = false;
+    try {
+      const norm = (s) => (window.Teams && typeof window.Teams.norm === 'function')
+        ? window.Teams.norm(s)
+        : (function(x){ try { return String(x||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/[^a-z0-9 ]+/g,'').replace(/\s+/g,' ');} catch { return ''; } })(s);
+      const canonicalFromName = (name) => (window.Teams && typeof window.Teams.canonicalFromName === 'function')
+        ? window.Teams.canonicalFromName(name)
+        : norm(name);
+      const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+      const user = JSON.parse(userStr||'{}');
+      const teamKey = (window.Teams && typeof window.Teams.getTeamForUser==='function') ? (window.Teams.getTeamForUser(user) || '') : '';
+      const tk = norm(teamKey);
+      const isLineas = (tk === 'team lineas 1' || tk === 'team lineas 2');
+      onlyVentas = isLineas;
+      // Solo filtrar aquí si los elementos parecen documentos crudos (con agenteNombre)
+      if (isLineas && Array.isArray(datos) && datos.length && Object.prototype.hasOwnProperty.call(datos[0] || {}, 'agenteNombre') && window.Teams && typeof window.Teams.getAgentsByTeam==='function') {
+        // allowed contendrá los nombres CANÓNICOS tal como los define utils/teams.js
+        const allowed = new Set((window.Teams.getAgentsByTeam(teamKey) || []).map(canonicalFromName).map(norm));
+        const before = datos.length;
+        datos = datos.filter(d => {
+          const raw = d.agenteNombre || '';
+          const canon = norm(canonicalFromName(raw));
+          return allowed.has(canon);
+        });
+        console.log(`[Lead] Filtro Team Líneas (${tk}) aplicado: ${before} -> ${datos.length}`);
+      }
+    } catch (e) {
+      console.warn('No se pudo aplicar filtro Team Líneas:', e);
+    }
+
+    console.log('Datos recibidos para procesar:', datos);
       
       // Helper: convertir Date (instante absoluto) a YYYY-MM-DD en zona fija (UTC-6)
       const toISOInTZ = (date, tzOffsetMinutes) => {
@@ -2069,52 +2139,56 @@
         type: 'bar',
         data: {
           labels: labels,
-          datasets: [
-            {
-              label: 'Ventas',
-              data: ventasData,
-              backgroundColor: 'rgba(54, 162, 235, 0.7)',
-              borderColor: 'rgba(54, 162, 235, 1)',
-              borderWidth: 1,
-              borderRadius: 4,
-              yAxisID: 'y',
-              categoryPercentage: 0.6,
-              barPercentage: 0.9,
-              datalabels: {
-                anchor: 'end',
-                align: 'end',
-                offset: 4,
-                color: '#2c3e50',
-                font: { weight: 'bold' },
-                formatter: (v) => (v != null && !isNaN(v) && Number(v) !== 0 ? Math.round(v) : '')
-              }
-            },
-            {
-              label: 'Puntaje',
-              data: puntajesData,
-              type: 'bar',
-              backgroundColor: 'rgba(255, 99, 132, 0.7)',
-              borderColor: 'rgba(255, 99, 132, 1)',
-              borderWidth: 1,
-              borderRadius: 4,
-              yAxisID: 'y1',
-              categoryPercentage: 0.6,
-              barPercentage: 0.9,
-              datalabels: {
-                anchor: 'end',
-                align: 'end',
-                offset: 4,
-                color: '#7f1d1d',
-                font: { weight: 'bold' },
-                formatter: (v) => {
-                  if (v == null || isNaN(v) || Number(v) === 0) return '';
-                  const n = Number(v);
-                  // mostrar hasta 2 decimales, sin ceros a la derecha
-                  return n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+          datasets: (function(){
+            const arr = [
+              {
+                label: 'Ventas',
+                data: ventasData,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+                yAxisID: 'y',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9,
+                datalabels: {
+                  anchor: 'end',
+                  align: 'end',
+                  offset: 4,
+                  color: '#2c3e50',
+                  font: { weight: 'bold' },
+                  formatter: (v) => (v != null && !isNaN(v) && Number(v) !== 0 ? Math.round(v) : '')
                 }
               }
+            ];
+            if (!onlyVentas) {
+              arr.push({
+                label: 'Puntaje',
+                data: puntajesData,
+                type: 'bar',
+                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+                yAxisID: 'y1',
+                categoryPercentage: 0.6,
+                barPercentage: 0.9,
+                datalabels: {
+                  anchor: 'end',
+                  align: 'end',
+                  offset: 4,
+                  color: '#7f1d1d',
+                  font: { weight: 'bold' },
+                  formatter: (v) => {
+                    if (v == null || isNaN(v) || Number(v) === 0) return '';
+                    const n = Number(v);
+                    return n.toFixed(2).replace(/\.00$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+                  }
+                }
+              });
             }
-          ]
+            return arr;
+          })()
         },
         options: {
           responsive: true,
@@ -2851,23 +2925,39 @@
         }
         
         try {
-          console.log('=== VALIDANDO CAMPOS DEL FORMULARIO ===');
-          
-          // Validar campos requeridos
-          const requiredFields = [
-            { id: 'nombre-cliente', name: 'Nombre del Cliente' },
-            { id: 'telefono-principal', name: 'Teléfono Principal' },
-            { id: 'tipo-servicio', name: 'Tipo de Servicio' },
-            { id: 'dia-venta', name: 'Día de Venta' },
-            { id: 'sistema', name: 'Sistema' },
-            { id: 'supervisor', name: 'Supervisor' },
-            { id: 'direccion', name: 'Dirección' },
-            { id: 'mercado', name: 'Mercado' },
-            { id: 'riesgo', name: 'Riesgo' },
-            { id: 'puntaje', name: 'Puntaje' },
-            { id: 'servicios', name: 'Servicios' },
-            { id: 'motivo-llamada', name: 'Motivo de la Llamada' }
-          ];
+        console.log('=== VALIDANDO CAMPOS DEL FORMULARIO ===');
+        
+        // Detectar si aplica modo Team Líneas (1 o 2)
+        const isTeamLineas = (function(){
+          try {
+            if (document.body && document.body.classList && document.body.classList.contains('team-lineas')) return true;
+            const norm = (s)=>{ try { return String(s||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');} catch { return ''; } };
+            const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+            const user = JSON.parse(userStr||'{}');
+            const tk = (window.Teams && typeof window.Teams.getTeamForUser==='function') ? norm(window.Teams.getTeamForUser(user) || '') : '';
+            return (tk === 'team lineas' || tk === 'team lineas 1' || tk === 'team lineas 2');
+          } catch { return false; }
+        })();
+
+        // Validar campos requeridos (dinámico según el modo)
+        let requiredFields = [
+          { id: 'nombre-cliente', name: 'Nombre del Cliente' },
+          { id: 'telefono-principal', name: 'Teléfono Principal' },
+          { id: 'tipo-servicio', name: 'Tipo de Servicio' },
+          { id: 'dia-venta', name: 'Día de Venta' },
+          { id: 'sistema', name: 'Sistema' },
+          { id: 'supervisor', name: 'Supervisor' },
+          { id: 'direccion', name: 'Dirección' },
+          { id: 'mercado', name: 'Mercado' },
+          { id: 'riesgo', name: 'Riesgo' },
+          { id: 'puntaje', name: 'Puntaje' },
+          { id: 'servicios', name: 'Servicios' },
+          { id: 'motivo-llamada', name: 'Motivo de la Llamada' }
+        ];
+        if (isTeamLineas) {
+          const omit = new Set(['tipo-servicio','sistema','riesgo','puntaje','servicios','motivo-llamada']);
+          requiredFields = requiredFields.filter(f => !omit.has(f.id));
+        }
           
           // Validar campos requeridos
           const missingFields = [];
@@ -2936,10 +3026,12 @@
           const sistemaVal = sistemaElement ? (sistemaElement.value || '').trim() : '';
           console.log('Value de sistema a enviar:', sistemaVal);
 
-          // Validación explícita: el sistema es obligatorio
+          // Validación explícita: el sistema es obligatorio (solo si NO es Team Líneas)
+        if (!isTeamLineas) {
           if (!sistemaVal) {
             throw new Error('Debe seleccionar un SISTEMA antes de enviar.');
           }
+        }
           
           const supervisor = getFieldValue('supervisor');
           // Obtener el TEXTO visible del select de supervisor
