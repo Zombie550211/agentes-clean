@@ -820,82 +820,10 @@
             <input type="tel" id="telefono-principal" name="telefono_principal" class="form-control" required>
           </div>
           
-          <!-- Teléfono Alterno (estándar para roles fuera de Team Líneas) -->
+          <!-- Teléfono Alterno -->
           <div class="form-group" data-field="telefono_alterno">
             <label for="telefono_2">Teléfono Alterno</label>
             <input type="tel" id="telefono_2" name="telefono_2" class="form-control" required>
-          </div>
-          
-          <!-- Cantidad de Líneas (Team Líneas) -->
-          <div class="form-group" data-field="cantidad_lineas">
-            <label for="cantidad_lineas">Cantidad de Líneas</label>
-            <select id="cantidad_lineas" name="cantidad_lineas" class="form-control">
-              <option value="">Seleccione</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
-
-          <!-- Teléfonos adicionales controlados por cantidad_lineas (Team Líneas) -->
-          <div class="form-group inline-phone-service" data-field="telefono_1" style="display:none;">
-            <div class="inline-header">
-              <label for="telefono_1">Teléfono 1</label>
-              <div class="radio-group" data-field="servicio_1">
-                <label class="radio-label"><input type="radio" name="servicio_1" value="sim-wireles"> <span>SIM WIRELES</span></label>
-                <label class="radio-label"><input type="radio" name="servicio_1" value="wireless"> <span>WIRELESS</span></label>
-              </div>
-            </div>
-            <input type="tel" id="telefono_1" name="telefono_1" class="form-control">
-          </div>
-          
-          <div class="form-group inline-phone-service" data-field="telefono_2" style="display:none;">
-            <div class="inline-header">
-              <label for="telefono_2_lineas">Teléfono 2</label>
-              <div class="radio-group" data-field="servicio_2">
-                <label class="radio-label"><input type="radio" name="servicio_2" value="sim-wireles"> <span>SIM WIRELES</span></label>
-                <label class="radio-label"><input type="radio" name="servicio_2" value="wireless"> <span>WIRELESS</span></label>
-              </div>
-            </div>
-            <input type="tel" id="telefono_2_lineas" name="telefono_2_lineas" class="form-control">
-          </div>
-          <div class="form-group inline-phone-service" data-field="telefono_3" style="display:none;">
-            <div class="inline-header">
-              <label for="telefono_3">Teléfono 3</label>
-              <div class="radio-group" data-field="servicio_3">
-                <label class="radio-label"><input type="radio" name="servicio_3" value="sim-wireles"> <span>SIM WIRELES</span></label>
-                <label class="radio-label"><input type="radio" name="servicio_3" value="wireless"> <span>WIRELESS</span></label>
-              </div>
-            </div>
-            <input type="tel" id="telefono_3" name="telefono_3" class="form-control">
-          </div>
-          <div class="form-group inline-phone-service" data-field="telefono_4" style="display:none;">
-            <div class="inline-header">
-              <label for="telefono_4">Teléfono 4</label>
-              <div class="radio-group" data-field="servicio_4">
-                <label class="radio-label"><input type="radio" name="servicio_4" value="sim-wireles"> <span>SIM WIRELES</span></label>
-                <label class="radio-label"><input type="radio" name="servicio_4" value="wireless"> <span>WIRELESS</span></label>
-              </div>
-            </div>
-            <input type="tel" id="telefono_4" name="telefono_4" class="form-control">
-          </div>
-          <div class="form-group inline-phone-service" data-field="telefono_5" style="display:none;">
-            <div class="inline-header">
-              <label for="telefono_5">Teléfono 5</label>
-              <div class="radio-group" data-field="servicio_5">
-                <label class="radio-label"><input type="radio" name="servicio_5" value="sim-wireles"> <span>SIM WIRELES</span></label>
-                <label class="radio-label"><input type="radio" name="servicio_5" value="wireless"> <span>WIRELESS</span></label>
-              </div>
-            </div>
-            <input type="tel" id="telefono_5" name="telefono_5" class="form-control">
-          </div>
-
-          <!-- PIN de Seguridad (Team Líneas) -->
-          <div class="form-group" data-field="pin_seguridad">
-            <label for="pin_seguridad">PIN de Seguridad</label>
-            <input type="text" id="pin_seguridad" name="pin_seguridad" class="form-control">
           </div>
 
           <!-- Número de cuenta -->
@@ -1541,50 +1469,27 @@
       
       // Extraer el array de clientes de la respuesta de forma robusta
       const safeData = responseData || {};
-      let costumers = Array.isArray(safeData)
-        ? safeData  
-        : (Array.isArray(safeData.leads) ? safeData.leads
-          : (Array.isArray(safeData.customers) ? safeData.customers
-            : (Array.isArray(safeData.data) ? safeData.data : [])));
+      console.log('Estructura de la respuesta:', safeData);
+      
+      // El backend devuelve {success: true, data: [...]}
+      let costumers = [];
+      if (Array.isArray(safeData)) {
+        costumers = safeData; // Si la respuesta es directamente un array
+      } else if (Array.isArray(safeData.data)) {
+        costumers = safeData.data; // Si la respuesta es {data: [...]}
+      } else if (Array.isArray(safeData.leads)) {
+        costumers = safeData.leads; // Si la respuesta es {leads: [...]}
+      } else if (Array.isArray(safeData.customers)) {
+        costumers = safeData.customers; // Si la respuesta es {customers: [...]}
+      }
 
-      // Fallback: si /api/leads regresó vacío, intentar /api/customers
+      console.log(`Datos extraídos: ${costumers.length} registros`);
+
+      // Si no hay datos, usar datos de prueba
       if (!Array.isArray(costumers) || costumers.length === 0) {
-        try {
-          const userStr2 = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
-          const user2 = JSON.parse(userStr2);
-          const roleLower2 = ((user2 && user2.role) || '').toString().toLowerCase();
-          const u2 = new URL('/api/customers', location.origin);
-          const params2 = new URLSearchParams(u2.search);
-          params2.set('limit', '500');
-          // Para roles privilegiados pedir todo explícitamente
-          if (['admin','backoffice'].includes(roleLower2)) {
-            params2.set('forceAll', 'true');
-          }
-          const url2 = `${u2.pathname}?${params2.toString()}`;
-          console.info('[Fallback] /api/leads vacío. Probando /api/customers:', url2);
-          const r2 = await fetch(url2, { method: 'GET', headers: baseHeaders, credentials: 'same-origin' });
-          if (r2.ok) {
-            const d2 = await r2.json();
-            const arr2 = Array.isArray(d2)
-              ? d2
-              : (
-                  Array.isArray(d2.leads) ? d2.leads
-                  : (Array.isArray(d2.data) ? d2.data
-                    : (Array.isArray(d2.customers) ? d2.customers : []))
-                );
-            if (Array.isArray(arr2) && arr2.length) {
-              console.info('[Fallback] /api/customers devolvió', arr2.length, 'registros');
-              costumers = arr2;
-            } else {
-              console.warn('[Fallback] /api/customers también devolvió vacío');
-            }
-          } else {
-            let txt2 = ''; try { txt2 = await r2.text(); } catch(_){ }
-            console.warn('[Fallback] /api/customers no OK:', r2.status, txt2);
-          }
-        } catch (e) {
-          console.warn('[Fallback] Error consultando /api/customers:', e?.message);
-        }
+        console.warn('No se encontraron datos en la respuesta. Usando datos de prueba.');
+        console.log('Respuesta completa:', JSON.stringify(safeData, null, 2));
+        return await procesarDatosGrafica(datosPrueba);
       }
 
       // Paginación: si la respuesta indica más páginas, traerlas y combinarlas
@@ -1644,11 +1549,25 @@
         if (isLineas && window.Teams && typeof window.Teams.getAgentsByTeam==='function') {
           const allowed = new Set((window.Teams.getAgentsByTeam(teamKey) || []).map(canonicalFromName).map(norm));
           const before = Array.isArray(costumers) ? costumers.length : 0;
+          const expectedSupervisor = (tk === 'team lineas 1') ? 'jonathan' : (tk === 'team lineas 2') ? 'gutierrez' : '';
           costumers = (costumers || []).filter(c => {
             const raw = c.agenteNombre || c.nombreAgente || c.agente || '';
             const canon = norm(canonicalFromName(raw));
-            return allowed.has(canon);
+            if (allowed.has(canon)) return true;
+            // Fallback por supervisor para robustez
+            const sup = norm(c.supervisor || c.SUPERVISOR || '');
+            if (expectedSupervisor && sup.includes(expectedSupervisor)) return true;
+            return false;
           });
+          // Logs de depuración
+          try {
+            console.log('[Lead][Team Líneas] allowed agents:', Array.from(allowed));
+            console.log('[Lead][Team Líneas] primeros docs mapeados:', (costumers||[]).slice(0,5).map(c=>({
+              agenteRaw: c.agenteNombre || c.nombreAgente || c.agente || '',
+              agenteCanon: norm(canonicalFromName(c.agenteNombre || c.nombreAgente || c.agente || '')),
+              supervisor: c.supervisor || c.SUPERVISOR || ''
+            })));
+          } catch {}
           console.log(`[Lead] [actualizarGraficaVentasPuntaje] Filtro Team Líneas (${tk}) aplicado: ${before} -> ${costumers.length}`);
         }
       } catch (e) {
@@ -3395,11 +3314,61 @@
         }
       }
       
+      // Función para manejar la lógica de cantidad de líneas
+      function setupCantidadLineasLogic() {
+        const cantidadLineasSelect = document.getElementById('cantidad_lineas');
+        if (!cantidadLineasSelect) return;
+
+        // Función para mostrar/ocultar campos de teléfonos según cantidad
+        function toggleTelefonosFields(cantidad) {
+          const telefonosFields = [
+            'telefono_1', 'telefono_2', 'telefono_3', 'telefono_4', 'telefono_5'
+          ];
+          
+          telefonosFields.forEach((fieldName, index) => {
+            const fieldGroup = document.querySelector(`[data-field="${fieldName}"]`);
+            if (fieldGroup) {
+              if (index < cantidad) {
+                fieldGroup.style.display = 'block';
+                // Hacer requerido el campo si está visible
+                const input = fieldGroup.querySelector('input');
+                if (input) input.required = true;
+              } else {
+                fieldGroup.style.display = 'none';
+                // Limpiar y quitar requerimiento si está oculto
+                const input = fieldGroup.querySelector('input');
+                if (input) {
+                  input.value = '';
+                  input.required = false;
+                }
+                // Limpiar también los radio buttons de servicio
+                const radioButtons = fieldGroup.querySelectorAll('input[type="radio"]');
+                radioButtons.forEach(radio => radio.checked = false);
+              }
+            }
+          });
+        }
+
+        // Event listener para el cambio de cantidad de líneas
+        cantidadLineasSelect.addEventListener('change', function() {
+          const cantidad = parseInt(this.value) || 0;
+          toggleTelefonosFields(cantidad);
+        });
+
+        // Inicializar estado al cargar la página
+        const initialCantidad = parseInt(cantidadLineasSelect.value) || 0;
+        toggleTelefonosFields(initialCantidad);
+      }
+
       // Inicializar el formulario cuando el DOM esté listo
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeForm);
+        document.addEventListener('DOMContentLoaded', () => {
+          initializeForm();
+          setupCantidadLineasLogic();
+        });
       } else {
         initializeForm();
+        setupCantidadLineasLogic();
       }
     } // Cierre de la función principal
     
