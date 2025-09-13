@@ -174,23 +174,23 @@ app.post("/guardar-lead", (req, res) => {
   }
 });
 
-// ✅ OBTENER LEADS DEL EXCEL
-app.get("/api/leads", (req, res) => {
-  const archivo = "leads.xlsx";
-  if (!fs.existsSync(archivo)) {
-    return res.json([]);
-  }
+// ✅ OBTENER LEADS DEL EXCEL - DESHABILITADO (usar routes/api.js del servidor principal)
+// app.get("/api/leads", (req, res) => {
+//   const archivo = "leads.xlsx";
+//   if (!fs.existsSync(archivo)) {
+//     return res.json([]);
+//   }
 
-  try {
-    const workbook = XLSX.readFile(archivo);
-    const hoja = workbook.Sheets[workbook.SheetNames[0]];
-    const datos = XLSX.utils.sheet_to_json(hoja);
-    res.json(datos);
-  } catch (error) {
-    console.error("❌ Error al leer leads.xlsx:", error);
-    res.status(500).json({ ok: false, mensaje: "Error al leer leads.xlsx" });
-  }
-});
+//   try {
+//     const workbook = XLSX.readFile(archivo);
+//     const hoja = workbook.Sheets[workbook.SheetNames[0]];
+//     const datos = XLSX.utils.sheet_to_json(hoja);
+//     res.json(datos);
+//   } catch (error) {
+//     console.error("❌ Error al leer leads.xlsx:", error);
+//     res.status(500).json({ ok: false, mensaje: "Error al leer leads.xlsx" });
+//   }
+// });
 
 // Iniciar servidor
 app.listen(PORT, () => {

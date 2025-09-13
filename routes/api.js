@@ -1,436 +1,436 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { ObjectId } = require('mongodb');
+const { protect } = require('../middleware/auth');
 const User = require('../models/User');
-const { MongoClient } = require('mongodb');
+const { connectToMongoDB, getDb } = require('../config/db');
 
-// Ruta para obtener datos para las gráficas
-router.get('/leads', async (req, res) => {
+// Middleware para manejar la conexión a la base de datos
+const withDatabase = async (req, res, next) => {
   try {
-    // Extraer información del usuario desde el token
-    let usuarioAutenticado = null;
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (token && token !== 'temp-token-dev') {
-      try {
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key-default');
-        usuarioAutenticado = {
-          id: decoded.userId || decoded.id,
-          username: decoded.username,
-          role: decoded.role
-        };
-        console.log('Usuario autenticado desde token:', usuarioAutenticado);
-      } catch (jwtError) {
-        console.log('Error decodificando token:', jwtError.message);
-      }
+    const db = await connectToMongoDB();
+    if (!db) {
+      console.error('[ERROR] No se pudo conectar a la base de datos');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error de conexión con la base de datos' 
+      });
     }
-    
-    // Capturar filtros por query
-    const agenteQuery = (req.query.agente || '').toString().trim();
-    const statusQuery = (req.query.status || '').toString().trim();
-
-    // Verificar si estamos en modo demo (sin base de datos)
-    if (!process.env.MONGODB_URI) {
-      // Modo demo: devolver datos de ejemplo filtrados por usuario
-      const agenteName = agenteQuery || usuarioAutenticado?.username || 'Usuario Demo';
-      const datosEjemplo = [
-        { fecha: new Date(), producto: 'Internet', puntaje: 8, status: 'COMPLETED', agente: agenteName },
-        { fecha: new Date(), producto: 'Televisión', puntaje: 7, status: 'PENDING', agente: agenteName },
-        { fecha: new Date(Date.now() - 86400000), producto: 'Internet', puntaje: 9, status: 'COMPLETED', agente: agenteName },
-        { fecha: new Date(Date.now() - 86400000), producto: 'Telefonía', puntaje: 6, status: 'CANCELLED', agente: agenteName }
-      ];
-      const filtrados = statusQuery ? datosEjemplo.filter(d => d.status === statusQuery) : datosEjemplo;
-      return res.json(filtrados);
-    }
-    
-    // Si hay conexión a MongoDB, obtener datos reales de costumers
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db('crmagente');
-    
-    let filtro = {};
-    // Priorizar filtro por query 'agente' si viene especificado
-    if (agenteQuery) {
-      filtro = { $or: [ { agenteNombre: agenteQuery }, { agente: agenteQuery } ] };
-      console.log('Filtrando leads por query agente:', agenteQuery);
-    } else if (usuarioAutenticado) {
-      // Si no se pasó agente por query, decidir por rol
-      const role = (usuarioAutenticado.role || '').toString().toLowerCase();
-      const isPrivileged = ['admin', 'supervisor', 'backoffice'].includes(role);
-      if (isPrivileged) {
-        // Roles con vista global: no filtrar por usuario
-        filtro = {};
-        console.log(`Rol ${role} con permisos globales: devolviendo todos los leads`);
-      } else {
-        // Agentes: filtrar por su propio username
-        filtro = { $or: [ { agenteNombre: usuarioAutenticado.username }, { agente: usuarioAutenticado.username } ] };
-        console.log('Filtrando leads por usuario autenticado:', usuarioAutenticado.username);
-      }
-    } else {
-      console.log('Sin filtro de agente ni usuario; devolviendo todos los leads');
-    }
-    
-    // Aplicar filtro por estado si viene en query
-    if (statusQuery) {
-      filtro = { $and: [ filtro, { status: statusQuery } ] };
-    }
-
-    const customers = await db.collection('costumers').find(filtro).toArray();
-    await client.close();
-    
-    console.log(`Encontrados ${customers.length} leads para el usuario ${usuarioAutenticado?.username || 'sin autenticar'}`);
-    
-    // Formatear los datos para las gráficas (mismo orden de prioridad que la gráfica)
-    const tryDateFrom = (val) => {
-      if (!val) return null;
-      if (typeof val === 'string') {
-        const s = val.trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-          const [y, m, d] = s.split('-').map(Number);
-          return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-        }
-        if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(s)) {
-          const parts = s.split(/[\/\-]/).map(Number);
-          const [d, m, y] = parts;
-          if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900) {
-            return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-          }
-        }
-      }
-      if (typeof val === 'number') return new Date(val < 1e12 ? val * 1000 : val);
-      const dt = new Date(val); return isNaN(dt) ? null : dt;
-    };
-    const getBy = (o, k) => (o && o[k] !== undefined ? o[k] : undefined);
-    const firstOf = (o, keys) => { for (const k of keys) { const v = getBy(o, k); if (v !== undefined && v !== null && v !== '') return v; } };
-
-    const datosGraficas = customers.map(customer => {
-      // Prioridad: dia_venta/fecha_contratacion -> fechas de creación -> fallback hoy
-      const diaVentaVal = firstOf(customer, ['dia_venta','diaVenta','fecha_contratacion']);
-      let fecha = tryDateFrom(typeof diaVentaVal === 'string' ? diaVentaVal.trim() : diaVentaVal);
-      if (!fecha) {
-        const createdVal = firstOf(customer, ['creadoEn','fecha_creacion','createdAt','created_at','fecha']);
-        fecha = tryDateFrom(createdVal);
-      }
-      if (!fecha) fecha = new Date();
-
-      const v = customer.puntaje;
-      const puntajeNum = typeof v === 'string' ? parseFloat(v) : Number(v);
-      return {
-        fecha,
-        producto: customer.tipo_servicio || 'Sin especificar',
-        puntaje: isNaN(puntajeNum) ? 0 : puntajeNum,
-        status: customer.status || 'PENDING',
-        agente: customer.agenteNombre || customer.agente
-      };
-    });
-    
-    res.json(datosGraficas);
+    req.db = db;
+    next();
   } catch (error) {
-    console.error('Error al obtener leads:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener los leads' });
-  }
-});
-
-// Ruta de ejemplo
-router.get('/', (req, res) => {
-  res.json({ 
-    success: true,
-    message: 'API funcionando correctamente' 
-  });
-});
-
-// Métricas para panel Costumer: ventasHoy, ventasMes, pendientes, total clientes
-router.get('/agente/costumer-metricas', async (req, res) => {
-  try {
-    // Decodificar usuario desde Authorization (opcional)
-    let usuarioAutenticado = null;
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token && token !== 'temp-token-dev') {
-      try {
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-key-default');
-        usuarioAutenticado = {
-          id: decoded.userId || decoded.id,
-          username: decoded.username || decoded.name || decoded.email,
-          role: (decoded.role || '').toString().toLowerCase()
-        };
-      } catch (_) {}
-    }
-
-    // Si no hay DB -> demo
-    if (!process.env.MONGODB_URI) {
-      const now = new Date();
-      return res.json({ ventasHoy: 0, ventasMes: 0, leadsPendientes: 0, clientes: 0, now });
-    }
-
-    // Conectar a Mongo
-    const { MongoClient } = require('mongodb');
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db('crmagente');
-
-    // Filtros por rol (alineados a /api/customers)
-    const agenteQuery = (req.query.agente || '').toString().trim();
-    const agenteIdParamRaw = (req.query.agenteId || '').toString().trim();
-    let filtroBase = {};
-    const { ObjectId } = require('mongodb');
-
-    // Roles privilegiados: vista global
-    const role = (usuarioAutenticado?.role || '').toString().toLowerCase();
-    const isPrivileged = ['admin', 'supervisor', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'].includes(role);
-
-    if (!isPrivileged && role === 'agent') {
-      // Construir filtro robusto por múltiples campos de ID con fallback por nombre SOLO si faltan IDs
-      const currentUserId = String(usuarioAutenticado?.id || '').trim();
-      let oid = null; try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
-      const bothTypes = oid ? { $in: [currentUserId, oid] } : currentUserId;
-
-      const agentFieldCandidates = [
-        'agenteId','agentId','createdBy','ownerId','assignedId','usuarioId','userId','registeredBy','asignadoId','asignadoAId'
-      ];
-      const idOr = agentFieldCandidates.map(f => ({ [f]: bothTypes }));
-
-      // Fallback por nombre si TODOS los campos de ID están vacíos/ausentes
-      const nameCandidatesRaw = [usuarioAutenticado?.username, usuarioAutenticado?.name, usuarioAutenticado?.email]
-        .filter(v => typeof v === 'string' && v.trim().length > 0)
-        .map(v => v.trim());
-      const nameRegexes = nameCandidatesRaw.map(n => new RegExp(`^${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'));
-      const nameFields = ['agenteNombre','agente','agentName','nombreAgente','nombre_agente','agente_nombre','salesAgent','asignadoA','assignedTo','usuario','owner','registeredBy','seller','vendedor'];
-      const nameOrSimple = [];
-      nameFields.forEach(f => nameRegexes.forEach(rx => nameOrSimple.push({ [f]: rx })));
-      const idEmptyOrMissing = { $and: agentFieldCandidates.map(f => ({ $or: [ { [f]: { $exists: false } }, { [f]: null }, { [f]: '' } ] })) };
-      const nameAndIfNoIds = (nameOrSimple.length ? { $and: [ { $or: nameOrSimple }, idEmptyOrMissing ] } : null);
-
-      filtroBase = nameAndIfNoIds ? { $or: [...idOr, nameAndIfNoIds] } : { $or: [...idOr] };
-    }
-
-    // Si viene agenteId por query (para admin/supervisor/backoffice)
-    if (isPrivileged && agenteIdParamRaw) {
-      let oid = null;
-      try { if (/^[a-fA-F0-9]{24}$/.test(agenteIdParamRaw)) oid = new ObjectId(agenteIdParamRaw); } catch {}
-      const bothTypes = oid ? { $in: [agenteIdParamRaw, oid] } : agenteIdParamRaw;
-      filtroBase = { agenteId: bothTypes };
-    } else if (isPrivileged && !agenteIdParamRaw && agenteQuery) {
-      // Admin/supervisor/backoffice: permitir filtro por nombre (parcial) si se especifica
-      const safe = agenteQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const containsCI = new RegExp(safe, 'i');
-      filtroBase = {
-        $or: [
-          { agente: containsCI },
-          { agent: containsCI },
-          { agenteNombre: containsCI },
-          { agentName: containsCI }
-        ]
-      };
-    }
-
-    // Obtener todos los costumers visibles para el usuario
-    const costumers = await db.collection('costumers').find(filtroBase).toArray();
-
-    // Helpers de fecha: misma lógica que la gráfica (UTC-6)
-    const BUSINESS_TZ_OFFSET_MIN = -6 * 60; // UTC-6 fijo
-    const toISOInTZ = (date, tzOffsetMinutes) => {
-      const target = new Date(date.getTime() + tzOffsetMinutes * 60000);
-      const y = target.getUTCFullYear();
-      const m = String(target.getUTCMonth() + 1).padStart(2, '0');
-      const d = String(target.getUTCDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    };
-    const getByPath = (obj, path) => {
-      try { return path.split('.').reduce((acc, k) => (acc && acc[k] !== undefined ? acc[k] : undefined), obj); }
-      catch { return undefined; }
-    };
-    const findFirst = (obj, paths) => {
-      for (const p of paths) {
-        const v = getByPath(obj, p);
-        if (v !== undefined && v !== null && v !== '') return v;
-      }
-      return undefined;
-    };
-    const tryDateFrom = (val) => {
-      if (!val) return null;
-      if (typeof val === 'string') {
-        const s = val.trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-          const [y, m, d] = s.split('-').map(Number);
-          return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-        }
-        if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(s)) {
-          const parts = s.split(/[\/\-]/).map(Number);
-          const [d, m, y] = parts;
-          if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 1900) {
-            return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-          }
-        }
-      }
-      if (typeof val === 'number') return new Date(val < 1e12 ? val * 1000 : val);
-      const dt = new Date(val); return isNaN(dt) ? null : dt;
-    };
-
-    const hoyISO = toISOInTZ(new Date(), BUSINESS_TZ_OFFSET_MIN);
-    const createdPaths = [
-      // raíz
-      'creadoEn','fecha_creacion','fechaCreacion','createdAt','created_at','createdon','createdOn','created','fecha','fecha_lead',
-      'insertedAt','inserted_at','createdDate','created_date','created_datetime',
-      // _raw
-      '_raw.creadoEn','_raw.fecha_creacion','_raw.fechaCreacion','_raw.createdAt','_raw.created_at','_raw.createdon','_raw.createdOn','_raw.created','_raw.fecha','_raw.fecha_lead',
-      '_raw.insertedAt','_raw.inserted_at','_raw.createdDate','_raw.created_date','_raw.created_datetime',
-      // metadata
-      'metadata.createdAt','metadata.created_at','metadata.createdon','metadata.createdOn',
-      // audit/timestamps
-      'audit.createdAt','audit.created_at','audit.createdon','audit.createdOn',
-      'timestamps.createdAt','timestamps.created_at','timestamps.createdon','timestamps.createdOn'
-    ];
-    const diaVentaPaths = ['dia_venta','diaVenta','dia','_raw.dia_venta','_raw.diaVenta','_raw.dia','fecha_contratacion','_raw.fecha_contratacion'];
-
-    let ventasHoy = 0;
-    let ventasMes = 0;
-    let leadsPendientes = 0;
-    const clientes = costumers.length;
-
-    // Calcular el primer día del mes actual en UTC-6
-    const hoy = new Date();
-    const hoyISO_ = toISOInTZ(hoy, BUSINESS_TZ_OFFSET_MIN);
-    const [hy, hm] = hoyISO_.split('-').map(Number);
-    const primerDiaMesUTC = new Date(Date.UTC(hy, hm - 1, 1, 12, 0, 0));
-    const inicioMesISO = toISOInTZ(primerDiaMesUTC, BUSINESS_TZ_OFFSET_MIN);
-
-    const debugMode = (req.query.debug === '1' || req.query.debug === 'true');
-    const debugInfo = debugMode ? { hoyISO, inicioMesISO, matchedToday: [], matchedMonth: 0, pending: 0, examined: 0, fallbacksToToday: 0 } : null;
-
-    for (const c of costumers) {
-      // Fecha de negocio priorizando dia_venta; luego fechas de creación
-      const diaVentaVal = findFirst(c, diaVentaPaths);
-      let fecha = tryDateFrom(typeof diaVentaVal === 'string' ? diaVentaVal.trim() : diaVentaVal);
-      if (!fecha) {
-        const fechaCreacionVal = findFirst(c, createdPaths);
-        fecha = tryDateFrom(fechaCreacionVal);
-      }
-      // Fallback: si no hay fecha válida, usar hoy (igual que la gráfica)
-      let fechaStr = fecha ? toISOInTZ(fecha, BUSINESS_TZ_OFFSET_MIN) : null;
-      if (!fechaStr) {
-        fechaStr = hoyISO;
-        if (debugMode) debugInfo.fallbacksToToday++;
-      }
-      if (fechaStr === hoyISO) ventasHoy += 1;
-      if (fechaStr && fechaStr >= inicioMesISO) ventasMes += 1;
-
-      const st = (c.status || c.estado || '').toString().toUpperCase();
-      if (st === 'PENDING' || st === 'PENDIENTE') leadsPendientes += 1;
-
-      if (debugMode) {
-        debugInfo.examined++;
-        if (fechaStr === hoyISO) {
-          debugInfo.matchedToday.push({ _id: c._id, dia_venta: diaVentaVal, fechaStr, status: st });
-        }
-        if (fechaStr && fechaStr >= inicioMesISO) debugInfo.matchedMonth++;
-        if (st === 'PENDING' || st === 'PENDIENTE') debugInfo.pending++;
-      }
-    }
-
-    await client.close();
-
-    const payload = { ventasHoy, ventasMes, leadsPendientes, clientes, hoyISO };
-    if (debugMode) payload.debug = debugInfo;
-    return res.json(payload);
-  } catch (error) {
-    console.error('Error en /agente/costumer-metricas:', error);
-    return res.status(500).json({ success: false, message: 'Error al obtener métricas', error: error.message });
-  }
-});
-
-// Ruta para obtener estadísticas de agentes (ventas y puntajes)
-router.get('/agent-stats', async (req, res) => {
-  try {
-    // Verificar si estamos en modo demo (sin base de datos)
-    if (!process.env.MONGODB_URI) {
-      // Modo demo: devolver datos de ejemplo
-      const datosEjemplo = {
-        success: true,
-        data: [
-          { agente: 'Juan Pérez', ventas: 15, puntajeTotal: 120, puntajePromedio: 8 },
-          { agente: 'María García', ventas: 12, puntajeTotal: 108, puntajePromedio: 9 },
-          { agente: 'Carlos López', ventas: 8, puntajeTotal: 64, puntajePromedio: 8 }
-        ]
-      };
-      return res.json(datosEjemplo);
-    }
-    
-    // Conectar a MongoDB
-    const client = new MongoClient(process.env.MONGODB_URI);
-    await client.connect();
-    const db = client.db('crmagente');
-    
-    // Agregación para obtener estadísticas por agente
-    const pipeline = [
-      {
-        $match: {
-          status: 'COMPLETED', // Solo leads completados
-          agente: { $exists: true, $ne: null } // Que tengan agente asignado
-        }
-      },
-      {
-        $group: {
-          _id: '$agente',
-          ventas: { $sum: 1 },
-          puntajeTotal: { $sum: { $toInt: '$puntaje' } },
-          puntajePromedio: { $avg: { $toInt: '$puntaje' } }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          agente: '$_id',
-          ventas: 1,
-          puntajeTotal: 1,
-          puntajePromedio: { $round: ['$puntajePromedio', 2] }
-        }
-      },
-      { $sort: { ventas: -1 } } // Ordenar por número de ventas (descendente)
-    ];
-    
-    const estadisticas = await db.collection('costumers').aggregate(pipeline).toArray();
-    await client.close();
-    
-    res.json({
-      success: true,
-      data: estadisticas
-    });
-    
-  } catch (error) {
-    console.error('Error al obtener estadísticas de agentes:', error);
-    res.status(500).json({ 
+    console.error('[ERROR] Error en la conexión a la base de datos:', error);
+    return res.status(500).json({ 
       success: false, 
-      message: 'Error al obtener las estadísticas de agentes',
-      error: error.message
+      message: 'Error al conectar con la base de datos',
+      error: error.message 
     });
   }
-});
+};
 
-// Ruta simulada para registro de usuario
-router.post('/register', (req, res) => {
-  const { name, email } = req.body;
+// Ruta para obtener leads completos (o datos para gráficas si paraGrafica=true)
+router.get('/leads', protect, withDatabase, async (req, res) => {
+  const db = req.db;
+  let filtro = {}; 
+  let usuarioAutenticado = req.user || null;
   
-  if (!name || !email) {
-    return res.status(400).json({ 
+  try {
+    const { 
+      paraGrafica = 'false', 
+      fecha,
+      status: statusQuery,
+      fechaInicio,
+      fechaFin,
+      agente: agenteQuery
+    } = req.query;
+
+    console.log('🔥 [ENDPOINT] /api/leads ejecutándose');
+    console.log('[DEBUG] Query params:', req.query);
+    console.log('[DEBUG] Usuario autenticado:', usuarioAutenticado || 'No autenticado');
+
+    // Obtener la colección
+    let collection;
+    try {
+      collection = db.collection('costumers');
+      console.log('[DEBUG] Colección costumers obtenida correctamente');
+    } catch (error) {
+      console.error('[ERROR] Error al obtener la colección costumers:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Error al acceder a la colección de clientes',
+        error: error.message 
+      });
+    }
+
+    // Construir el filtro de consulta
+    const allFilters = [];
+    
+    // Aplicar filtro por agente si se especificó
+    if (agenteQuery) {
+      allFilters.push({ agente: agenteQuery });
+      allFilters.push({ agenteNombre: agenteQuery });
+      allFilters.push({ createdBy: agenteQuery });
+    }
+    
+    // Aplicar filtro por estado si se especificó
+    if (statusQuery) {
+      filtro.status = statusQuery;
+    }
+    
+    // Aplicar filtro por rango de fechas si se especificó
+    if (fechaInicio || fechaFin) {
+      const fechaFiltro = {};
+      
+      // Función para convertir fecha Honduras a UTC
+      const hondurasToUTC = (dateStr) => {
+        console.log('[DEBUG] Convirtiendo fecha Honduras a UTC:', dateStr);
+        const [year, month, day] = dateStr.split('-').map(Number);
+        // Crear fecha en UTC que represente la medianoche en Honduras (00:00 Honduras = 06:00 UTC)
+        const fechaUTC = new Date(Date.UTC(year, month - 1, day, 6, 0, 0, 0));
+        console.log(`[DEBUG] Fecha convertida a UTC: ${fechaUTC.toISOString()}`);
+        return fechaUTC;
+      };
+
+      if (fechaInicio) {
+        const inicio = hondurasToUTC(fechaInicio);
+        fechaFiltro.$gte = inicio;
+        console.log(`[DEBUG] Filtro fecha inicio (Honduras): ${fechaInicio} -> UTC: ${inicio.toISOString()}`);
+      }
+      
+      if (fechaFin) {
+        // Usar la misma función para convertir la fecha de fin
+        const fin = hondurasToUTC(fechaFin);
+        // Ajustar al final del día (23:59:59.999)
+        fin.setUTCHours(29, 59, 59, 999); // 23:59:59.999 Honduras = 05:59:59.999 UTC del día siguiente
+        fechaFiltro.$lte = fin;
+        console.log(`[DEBUG] Filtro fecha fin (Honduras): ${fechaFin} -> UTC: ${fin.toISOString()}`);
+      }
+      
+      // Crear filtros para diferentes campos de fecha
+      const filtrosFecha = [];
+      
+      // 1. Primero, buscar por dia_venta exacto (formato YYYY-MM-DD)
+      if (fechaInicio) {
+        // Filtro simple para dia_venta exacto
+        const filtroDiaVenta = {
+          'dia_venta': fechaInicio
+        };
+        console.log('[DEBUG] Aplicando filtro exacto para dia_venta:', filtroDiaVenta);
+        filtrosFecha.push(filtroDiaVenta);
+        
+        // Filtro para documentos sin dia_venta pero con fechas en otros campos
+        const filtroCamposFecha = {
+          $and: [
+            { 
+              $or: [
+                { 'fecha_venta': { ...fechaFiltro } },
+                { 'fecha_contratacion': { ...fechaFiltro } },
+                { 'creadoEn': { ...fechaFiltro } },
+                { 'createdAt': { ...fechaFiltro } },
+                { 'fecha_creacion': { ...fechaFiltro } },
+                { 'fecha': { ...fechaFiltro } }
+              ]
+            },
+            {
+              $or: [
+                { 'dia_venta': { $exists: false } },
+                { 'dia_venta': null },
+                { 'dia_venta': '' },
+                { 'dia_venta': { $not: { $type: 'string' } } }
+              ]
+            }
+          ]
+        };
+        
+        console.log('[DEBUG] Aplicando filtro para campos de fecha estándar');
+        filtrosFecha.push(filtroCamposFecha);
+      }
+      
+      // 2. Filtro para campos de fecha que son objetos Date
+      // Solo aplicar si hay filtros de fecha definidos
+      if (Object.keys(fechaFiltro).length > 0) {
+        const camposFecha = [
+          'fecha', 'createdAt', 'fecha_creacion', 'fechaCreacion', 
+          'fecha_lead', 'fecha_venta', 'fechaVenta', 'fecha_contratacion',
+          'fechaContratacion', 'creadoEn', 'fecha_registro', 'fechaRegistro'
+        ];
+        
+        camposFecha.forEach(campo => {
+          filtrosFecha.push({ [campo]: { ...fechaFiltro } });
+        });
+      }
+      
+      console.log('[DEBUG] Filtros de fecha aplicados:', JSON.stringify(filtrosFecha, null, 2));
+      
+      // Combinar con filtros existentes
+      if (Object.keys(filtro).length > 0) {
+        filtro = {
+          $and: [
+            filtro,
+            { $or: filtrosFecha }
+          ]
+        };
+      } else {
+        filtro = { $or: filtrosFecha };
+      }
+    }
+    
+    // Aplicar filtros de agente si existen
+    if (allFilters.length > 0) {
+      filtro = {
+        ...filtro,
+        $or: [...(filtro.$or || []), ...allFilters]
+      };
+    }
+    
+    console.log('[DEBUG] Filtro aplicado:', JSON.stringify(filtro, null, 2));
+    
+    // Ejecutar la consulta
+    let customers = [];
+    try {
+      console.log('[DEBUG] Ejecutando consulta con filtro:', JSON.stringify(filtro, null, 2));
+      customers = await collection.find(filtro).toArray();
+      console.log(`[DEBUG] Se encontraron ${customers.length} registros`);
+      
+      // Procesar los resultados
+      customers = customers.map(customer => {
+        // Asegurar que todos los campos necesarios existan
+        const defaultValues = {
+          nombre_cliente: 'Sin nombre',
+          telefono_principal: 'Sin teléfono',
+          direccion: 'Sin dirección',
+          tipo_servicios: 'Sin especificar',
+          sistema: 'Sin especificar',
+          mercado: 'Sin especificar',
+          riesgo: 'Sin especificar',
+          dia_venta: 'Sin especificar',
+          dia_instalacion: 'Sin especificar',
+          servicios: 'Sin servicios',
+          supervisor: 'Sin supervisor',
+          comentario: '',
+          motivo_llamada: '',
+          zip_code: '',
+          telefono_alterno: '',
+          autopago: 'No',
+          cantidad_lineas: 0,
+          pin_seguridad: '',
+          numero_cuenta: ''
+        };
+        
+        // Aplicar valores por defecto solo si el campo no existe
+        Object.entries(defaultValues).forEach(([key, defaultValue]) => {
+          if (customer[key] === undefined || customer[key] === null) {
+            customer[key] = defaultValue;
+          }
+        });
+        
+        return customer;
+      });
+      
+    } catch (error) {
+      console.error('[ERROR] Error al ejecutar la consulta:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error al consultar la base de datos',
+        error: error.message
+      });
+    }
+    
+    // Si se solicitan datos para gráficas, formatear la salida
+    if (paraGrafica === 'true') {
+      console.log('[DEBUG] Procesando datos para gráfica...');
+      console.log(`[DEBUG] Total de registros a procesar: ${customers.length}`);
+      
+      const datosPorFecha = new Map(); // Usamos Map para mejor rendimiento
+      let totalVentas = 0; // Contador de ventas totales
+      
+      // Función para extraer fecha de un objeto de cliente
+      const extraerFecha = (cliente) => {
+        // Función para crear fecha en zona horaria de Honduras (UTC-6)
+        const crearFechaHonduras = (year, month, day) => {
+          // Crear fecha en UTC-6 (Honduras)
+          const fecha = new Date(Date.UTC(year, month - 1, day, 6, 0, 0, 0));
+          console.log(`[DEBUG] Fecha creada para Honduras: ${year}-${month}-${day} -> ${fecha.toISOString()}`);
+          return fecha;
+        };
+
+        // Primero verificar si existe el campo dia_venta
+        if (cliente.dia_venta) {
+          try {
+            // Si es un string con formato YYYY-MM-DD
+            if (typeof cliente.dia_venta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cliente.dia_venta)) {
+              const [year, month, day] = cliente.dia_venta.split('-').map(Number);
+              const fecha = crearFechaHonduras(year, month, day);
+              console.log('[DEBUG] Fecha extraída de dia_venta (YYYY-MM-DD):', {
+                original: cliente.dia_venta,
+                parsed: fecha.toISOString(),
+                local: fecha.toString()
+              });
+              return fecha;
+            }
+            // Si es un string con formato DD/MM/YYYY
+            else if (typeof cliente.dia_venta === 'string' && cliente.dia_venta.includes('/')) {
+              const [day, month, year] = cliente.dia_venta.split('/').map(Number);
+              // Asegurar año de 4 dígitos
+              const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+              const fecha = crearFechaHonduras(fullYear, month, day);
+              console.log('[DEBUG] Fecha extraída de dia_venta (DD/MM/YYYY):', {
+                original: cliente.dia_venta,
+                parsed: fecha.toISOString(),
+                local: fecha.toString()
+              });
+              return fecha;
+            }
+            // Si es una fecha ISO o timestamp
+            else {
+              const fecha = new Date(cliente.dia_venta);
+              if (!isNaN(fecha.getTime())) {
+                // Ajustar a zona horaria de Honduras (UTC-6)
+                const fechaHonduras = new Date(fecha.getTime() + (fecha.getTimezoneOffset() * 60000) + (-6 * 60 * 60000));
+                console.log('[DEBUG] Fecha extraída de dia_venta (ISO):', {
+                  original: cliente.dia_venta,
+                  parsed: fechaHonduras.toISOString(),
+                  local: fechaHonduras.toString()
+                });
+                return fechaHonduras;
+              }
+            }
+          } catch (e) {
+            console.warn('[ADVERTENCIA] Error al procesar campo dia_venta:', e);
+          }
+        }
+        
+        // Si no se pudo obtener de dia_venta, intentar con otros campos
+        const otrosCamposFecha = [
+          'fecha_venta', 'fechaVenta',
+          'fecha_contratacion', 'fechaContratacion',
+          'fecha_creacion', 'fechaCreacion', 'createdAt',
+          'fecha_registro', 'fechaRegistro', 'creadoEn',
+          'fecha', 'updatedAt', 'fecha_actualizacion'
+        ];
+        
+        for (const campo of otrosCamposFecha) {
+          if (cliente[campo]) {
+            try {
+              const fecha = new Date(cliente[campo]);
+              if (!isNaN(fecha.getTime())) {
+                // Ajustar a la zona horaria local (Honduras UTC-6)
+                const localTime = new Date(fecha.getTime() - (6 * 60 * 60 * 1000));
+                console.log(`[ADVERTENCIA] Usando campo alternativo ${campo} en lugar de dia_venta`);
+                return localTime;
+              }
+            } catch (e) {
+              console.warn(`[ADVERTENCIA] Error al procesar campo ${campo}:`, e);
+            }
+          }
+        }
+        
+        // Si no se encuentra ninguna fecha válida, devolver la fecha actual
+        const now = new Date();
+        const localNow = new Date(now.getTime() - (6 * 60 * 60 * 1000));
+        console.warn('[ADVERTENCIA] No se encontró una fecha válida, usando fecha actual:', localNow);
+        return localNow;
+      };
+
+      // Procesar cada cliente
+      customers.forEach((customer, index) => {
+        try {
+          // Obtener la fecha del registro usando la función mejorada
+          const fecha = extraerFecha(customer);
+          
+          // Si no se pudo determinar la fecha, omitir este registro
+          if (!fecha) {
+            console.warn(`[ADVERTENCIA] Registro ${index}: No se pudo determinar la fecha para el cliente:`, 
+              customer._id || 'ID no disponible');
+            return; // Saltar a la siguiente iteración
+          }
+          
+          // Formatear la fecha a YYYY-MM-DD
+          const fechaFormateada = fecha.toISOString().split('T')[0];
+          
+          // Obtener o inicializar los datos para esta fecha
+          if (!datosPorFecha.has(fechaFormateada)) {
+            datosPorFecha.set(fechaFormateada, {
+              fecha: fechaFormateada,
+              ventas: 0,
+              puntaje: 0,
+              registros: []
+            });
+          }
+          
+          const datosDia = datosPorFecha.get(fechaFormateada);
+          
+          // Calcular cantidad de ventas (líneas) para este cliente
+          const cantidadVentas = Math.max(1, parseInt(customer.cantidad_lineas) || 1);
+          const puntajeVenta = parseFloat(customer.puntaje) || 0;
+          
+          // Actualizar contadores
+          datosDia.ventas += cantidadVentas;
+          datosDia.puntaje += puntajeVenta;
+          totalVentas += cantidadVentas;
+          
+          // Mantener registro de los datos originales (opcional, para depuración)
+          if (datosDia.registros.length < 5) { // Limitar para no sobrecargar memoria
+            datosDia.registros.push({
+              id: customer._id,
+              nombre: customer.nombre_cliente || 'Sin nombre',
+              lineas: cantidadVentas,
+              puntaje: puntajeVenta
+            });
+          }
+          
+          // Debug detallado para los primeros 5 registros
+          if (index < 5) {
+            console.log(`[DEBUG] Registro ${index + 1}:`, {
+              fecha: fechaFormateada,
+              cliente: customer.nombre_cliente || 'Sin nombre',
+              lineas: cantidadVentas,
+              puntaje: puntajeVenta,
+              totalVentasHastaAhora: datosDia.ventas
+            });
+          }
+        } catch (error) {
+          console.error(`[ERROR] Error al procesar registro ${index}:`, error);
+        }
+      });
+
+      // Convertir el Map a array y ordenar por fecha
+      const resultado = Array.from(datosPorFecha.values())
+        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+      
+      console.log(`[DEBUG] Resumen de ventas por fecha:`, resultado.map(r => ({
+        fecha: r.fecha, 
+        ventas: r.ventas,
+        registros: r.registros.length
+      })));
+      
+      console.log(`[DEBUG] Total de ventas procesadas: ${totalVentas}`);
+      
+      return res.json({
+        success: true,
+        data: resultado,
+        totalVentas: totalVentas,
+        totalDias: resultado.length
+      });
+      
+    } // Fin del if (paraGrafica === 'true')
+
+    // Si no es para gráfica, devolver los clientes sin procesar
+    return res.json({
+      success: true,
+      data: customers,
+      total: customers.length
+    });
+    
+  } catch (error) {
+    console.error('[ERROR] Error en el endpoint /leads:', error);
+    return res.status(500).json({ 
       success: false, 
-      message: 'Por favor ingrese nombre y correo' 
+      message: 'Error al procesar la solicitud',
+      error: error.message 
     });
   }
-
-  // Simular respuesta exitosa sin guardar en base de datos
-  res.status(201).json({
-    success: true,
-    message: 'Usuario registrado exitosamente (modo demo)',
-    user: {
-      id: 'demo-user-123',
-      name,
-      email,
-      role: 'agent'
-    }
-  });
 });
 
-
+// Exportar el router
 module.exports = router;

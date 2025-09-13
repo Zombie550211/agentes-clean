@@ -1013,6 +1013,21 @@
       } catch { return false; }
     }
   
+        // Función para verificar si el usuario puede editar el estado de un lead
+    function canEditStatus() {
+      try {
+        // Obtener datos del usuario desde localStorage o sessionStorage
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const userRole = (userData.role || '').toLowerCase();
+        
+        // Permitir edición a administradores y supervisores
+        return ['admin', 'supervisor', 'backoffice'].includes(userRole);
+      } catch (error) {
+        console.error('Error al verificar permisos de edición:', error);
+        return false; // Por defecto, no permitir edición si hay un error
+      }
+    }
+
     // Funciones para el manejo de comentarios
     function abrirComentarios(leadId) {
       leadActual = leadId;
@@ -1836,41 +1851,59 @@
     // Función para formatear fechas con el formato 'día_de_la_semana número_del_día' (ej: 'mié 13')
     function formatearFechaSinDesfase(fechaStr) {
       try {
-        let fecha;
-        
-        // Si la fecha ya es un objeto Date
-        if (fechaStr instanceof Date) {
-          fecha = fechaStr;
-        } 
-        // Si es un string, convertirlo a objeto Date
-        else if (typeof fechaStr === 'string') {
-          // Si ya está en formato YYYY-MM-DD, crear la fecha en UTC para evitar problemas de zona horaria
-          if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
-            const [year, month, day] = fechaStr.split('-').map(Number);
-            fecha = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
-          } else {
-            // Para otros formatos, intentar convertir directamente
-            fecha = new Date(fechaStr);
-          }
-        } else {
+        // Si no es string, devolver valor por defecto
+        if (typeof fechaStr !== 'string') {
           console.warn('Tipo de fecha no soportado:', typeof fechaStr, fechaStr);
-          return 'Fecha inválida';
+          return 'N/A';
         }
+
+        // Limpiar la cadena de espacios en blanco
+        const fechaLimpia = fechaStr.trim();
+        
+        // Extraer día, mes y año directamente del string
+        let day, month, year;
+        
+        // Intentar con formato YYYY-MM-DD
+        let match = fechaLimpia.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+          [_, year, month, day] = match;
+        } 
+        // Si no coincide, intentar con formato DD/MM/YYYY
+        else if ((match = fechaLimpia.match(/^(\d{2})\/(\d{2})\/(\d{4})/))) {
+          [_, day, month, year] = match;
+        }
+        // Si no coincide con ningún formato conocido
+        else {
+          console.warn('Formato de fecha no reconocido (se espera YYYY-MM-DD o DD/MM/YYYY):', fechaLimpia);
+          return 'N/A';
+        }
+        
+        // Convertir a números
+        year = parseInt(year);
+        month = parseInt(month) - 1; // Los meses en JavaScript van de 0 a 11
+        day = parseInt(day);
+        
+        // Crear fecha sin conversión de zona horaria
+        const fecha = new Date(Date.UTC(year, month, day, 12, 0, 0));
         
         // Verificar si la fecha es válida
         if (isNaN(fecha.getTime())) {
-          console.warn('Fecha inválida:', fechaStr);
-          return 'Fecha inválida';
+          console.warn('Fecha inválida (no válida):', fechaLimpia);
+          return 'N/A';
         }
         
-        // Obtener el día de la semana (0=domingo, 1=lunes, ..., 6=sábado)
+        // Días de la semana en español
         const diasSemana = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
-        const diaSemana = diasSemana[fecha.getDay()];
         
-        // Obtener el día del mes
-        const diaMes = fecha.getDate();
+        // Obtener día de la semana (0 = domingo, 1 = lunes, etc.)
+        const diaSemana = diasSemana[fecha.getUTCDay()];
         
-        // Formatear como 'día_semana día_mes' (ej: 'mié 13')
+        // Obtener día del mes
+        const diaMes = fecha.getUTCDate();
+        
+        // Mostrar la fecha en la consola para depuración
+        console.log(`Formateando fecha: ${fechaLimpia} -> ${diaSemana} ${diaMes}`);
+        
         return `${diaSemana} ${diaMes}`;
         
       } catch (error) {
@@ -2354,7 +2387,14 @@
           <td>${lead.tipo_servicios || 'N/A'}</td>
           <td>${lead.sistema || 'N/A'}</td>
           <td>${lead.riesgo || 'N/A'}</td>
-          <td>${lead.dia_venta ? formatearFechaSinDesfase(lead.dia_venta) : 'N/A'}</td>
+          <td>${(() => {
+              console.log('Datos de lead:', {
+                dia_venta: lead.dia_venta,
+                dia_instalacion: lead.dia_instalacion,
+                fecha_contratacion: lead.fecha_contratacion
+              });
+              return lead.dia_venta ? formatearFechaSinDesfase(lead.dia_venta) : 'N/A';
+            })()}</td>
           <td>${lead.dia_instalacion ? formatearFechaSinDesfase(lead.dia_instalacion) : 'N/A'}</td>
           <td>
             ${editable ? `
@@ -3508,4 +3548,3 @@
   <script src="js/auth-logout.js"></script>
 </body>
 </html>
-

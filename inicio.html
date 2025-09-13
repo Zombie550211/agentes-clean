@@ -45,19 +45,18 @@
     .main-content {
       flex: 1;
       height: 100vh;
-      overflow: hidden;
+      overflow-y: auto;
       margin-left: 240px;
       padding: 20px;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
     }
     
     .ranking-panel {
-      transform: translateY(-120px) !important;
       max-width: 1000px;
       width: 100%;
+      margin-top: 20px;
     }
     
     /* Limpieza: se eliminan overrides agresivos de .main-content */
@@ -140,10 +139,11 @@
       margin-left: 260px; /* Ancho del sidebar-inicio */
       width: calc(100vw - 260px);
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
       min-height: 100vh;
       position: relative;
+      overflow-y: auto;
     }
     
     /* Estilos para el panel de ranking */
@@ -151,7 +151,7 @@
       background: transparent;
       border-radius: 0;
       box-shadow: none;
-      margin: 0;
+      margin: 20px 0;
       width: 90%;
       max-width: 1400px;
       overflow: visible;
@@ -999,18 +999,178 @@
     /* Overrides: ocultar etiquetas de rol bajo los nombres */
     .podium-item .agent-info p,
     .rank-list .agent-details p { display: none !important; }
+
+    /* Estilos para el panel de bienvenida del usuario */
+    .user-welcome-panel {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 20px;
+      padding: 30px;
+      margin-bottom: 40px;
+      color: white;
+      box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      width: 100%;
+      max-width: 1200px;
+    }
+
+    .welcome-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .welcome-avatar {
+      font-size: 4rem;
+      color: rgba(255, 255, 255, 0.9);
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+    }
+
+    .welcome-info h2 {
+      margin: 0 0 8px 0;
+      font-size: 2.2rem;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .welcome-info p {
+      margin: 0;
+      font-size: 1.1rem;
+      opacity: 0.9;
+      font-weight: 300;
+    }
+
+    .welcome-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-icon {
+      font-size: 2rem;
+      color: rgba(255, 255, 255, 0.9);
+      min-width: 50px;
+      text-align: center;
+    }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-number {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.8;
+      font-weight: 400;
+    }
+
+    /* Responsive para el panel de usuario */
+    @media (max-width: 768px) {
+      .user-welcome-panel {
+        padding: 20px;
+        margin-bottom: 30px;
+      }
+
+      .welcome-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+      }
+
+      .welcome-avatar {
+        font-size: 3rem;
+      }
+
+      .welcome-info h2 {
+        font-size: 1.8rem;
+      }
+
+      .welcome-stats {
+        grid-template-columns: 1fr;
+        gap: 15px;
+      }
+
+      .stat-card {
+        padding: 15px;
+      }
+
+      .stat-number {
+        font-size: 1.5rem;
+      }
+    }
   </style>
   <script>
-    // Verificar autenticación usando cookie HttpOnly y poblar datos de usuario
+    // Verificar autenticación al cargar la página
     document.addEventListener('DOMContentLoaded', async function() {
       try {
-        const res = await fetch('/api/protected', { method: 'GET', credentials: 'include' });
+        console.log('🔍 Iniciando verificación de autenticación...');
+        const res = await fetch('/api/auth/verify', { method: 'GET', credentials: 'include' });
+        
+        console.log('📡 Response status:', res.status);
+        console.log('📡 Response ok:', res.ok);
+        
         if (!res.ok) {
+          console.error('❌ Respuesta no válida, redirigiendo a login');
           window.location.href = 'login.html';
           return;
         }
-        const data = await res.json().catch(() => ({}));
+        
+        const data = await res.json().catch((err) => {
+          console.error('❌ Error parseando JSON:', err);
+          return {};
+        });
+        
+        console.log('📦 Datos completos recibidos del servidor:', JSON.stringify(data, null, 2));
+        
         const user = data?.user || {};
+        console.log('👤 Usuario extraído:', JSON.stringify(user, null, 2));
+        
+        // Verificar si realmente hay datos de usuario
+        if (!user || !user.username) {
+          console.error('❌ No se recibieron datos válidos del usuario');
+          console.log('🔄 Data recibida:', data);
+          console.log('🔄 User extraído:', user);
+          
+          // Verificar si hay token en cookies
+          console.log('🍪 Cookies disponibles:', document.cookie);
+          
+          // Intentar obtener de localStorage como fallback
+          const storedUser = localStorage.getItem('user');
+          console.log('💾 Usuario en localStorage:', storedUser);
+          
+          if (!user.username && !storedUser) {
+            console.error('❌ No hay datos de usuario disponibles, redirigiendo a login');
+            window.location.href = 'login.html';
+            return;
+          }
+        } else {
+          console.log('✅ Datos de usuario válidos recibidos');
+        }
 
         // Mostrar nombre de usuario en el sidebar
         const welcomeMessage = document.getElementById('welcome-message');
@@ -1020,15 +1180,23 @@
 
         // Mostrar nombre de usuario en el perfil de usuario
         const userNameElement = document.getElementById('user-name');
+        console.log('Elemento user-name encontrado:', userNameElement);
         if (userNameElement) {
           userNameElement.textContent = user.username || 'Usuario';
+          console.log('Nombre actualizado a:', user.username);
+        } else {
+          console.log('ERROR: No se encontró el elemento user-name');
         }
 
         // Mostrar rol del usuario
         const userRoleElement = document.getElementById('user-role');
+        console.log('Elemento user-role encontrado:', userRoleElement);
         if (userRoleElement) {
           const role = user.role || 'usuario';
           userRoleElement.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+          console.log('Rol actualizado a:', role);
+        } else {
+          console.log('ERROR: No se encontró el elemento user-role');
         }
 
         // Mostrar opción de "Crear cuenta" solo si es ADMIN
@@ -1037,11 +1205,122 @@
           const roleLower = (user.role || '').toLowerCase();
           createAccountItem.style.display = roleLower === 'admin' ? 'block' : 'none';
         }
+
+
+        // Actualizar estadísticas en el sidebar
+        const sidebarUserSales = document.getElementById('sidebar-user-sales');
+        const sidebarUserPoints = document.getElementById('sidebar-user-points');
+        const sidebarUserTeam = document.getElementById('sidebar-user-team');
+
+        if (sidebarUserTeam) {
+          sidebarUserTeam.textContent = user.team || 'Sin equipo';
+        }
+
+        // Obtener estadísticas personales del usuario para el sidebar
+        await loadUserStatsForSidebar(user.username);
+
+        // Función para actualizar información del usuario en el sidebar
+        function updateUserInfoInSidebar() {
+          console.log('Actualizando información del usuario en sidebar...');
+          console.log('Datos del usuario disponibles:', user);
+          
+          // Actualizar nombre de usuario
+          const userNameElement = document.getElementById('user-name');
+          console.log('Elemento user-name encontrado:', userNameElement);
+          if (userNameElement) {
+            userNameElement.textContent = user.username || 'Usuario';
+            console.log('Nombre actualizado:', user.username);
+          } else {
+            console.error('Elemento #user-name no encontrado en el DOM');
+          }
+
+          // Actualizar rol del usuario
+          const userRoleElement = document.getElementById('user-role');
+          console.log('Elemento user-role encontrado:', userRoleElement);
+          if (userRoleElement) {
+            const role = user.role || 'usuario';
+            userRoleElement.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+            console.log('Rol actualizado:', role);
+          } else {
+            console.error('Elemento #user-role no encontrado en el DOM');
+          }
+
+          // Actualizar estadísticas en el sidebar
+          const sidebarUserTeam = document.getElementById('sidebar-user-team');
+          if (sidebarUserTeam) {
+            sidebarUserTeam.textContent = user.team || 'Sin equipo';
+          }
+
+          // Recargar estadísticas para el sidebar
+          loadUserStatsForSidebar(user.username);
+        }
+
+        // Esperar a que el sidebar se cargue y luego actualizar la información
+        document.addEventListener('sidebar:loaded', updateUserInfoInSidebar);
+        
+        // También intentar actualizar inmediatamente en caso de que el sidebar ya esté cargado
+        setTimeout(updateUserInfoInSidebar, 1000);
+
       } catch (e) {
         console.error('Error verificando autenticación:', e);
         window.location.href = 'login.html';
       }
     });
+
+    // Función para cargar estadísticas personales del usuario para el sidebar
+    async function loadUserStatsForSidebar(username) {
+      try {
+        // Obtener datos de leads/customers del usuario
+        const response = await fetch('/api/leads', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const leads = data.data || [];
+
+          // Calcular estadísticas del usuario actual
+          const userLeads = leads.filter(lead => 
+            lead.agenteNombre === username || 
+            lead.agente === username ||
+            lead.createdBy === username ||
+            lead.ownerId === username
+          );
+
+          // Calcular ventas del mes actual
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const monthlyLeads = userLeads.filter(lead => {
+            const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+            return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+          });
+
+          // Actualizar estadísticas en el sidebar
+          const sidebarUserSales = document.getElementById('sidebar-user-sales');
+          if (sidebarUserSales) {
+            sidebarUserSales.textContent = monthlyLeads.length;
+          }
+
+          // Calcular puntos totales
+          const totalPoints = userLeads.reduce((sum, lead) => {
+            const points = parseFloat(lead.puntaje || lead.points || 0);
+            return sum + points;
+          }, 0);
+
+          const sidebarUserPoints = document.getElementById('sidebar-user-points');
+          if (sidebarUserPoints) {
+            sidebarUserPoints.textContent = totalPoints.toFixed(1);
+          }
+        }
+      } catch (error) {
+        console.log('Error cargando estadísticas del usuario para sidebar:', error);
+        // Mantener valores por defecto en caso de error
+      }
+    }
+
+    // Debug: Verificar elementos del sidebar
+    console.log('Verificando elementos del sidebar...');
   </script>
   <script src="js/core/dashboard.js"></script>
   <script src="js/ranking.js"></script>
@@ -1051,6 +1330,7 @@
     <!-- SIDEBAR (cargado dinámicamente) -->
     <nav class="sidebar sidebar-inicio" data-active="inicio"></nav>
     <main class="main-content">
+
           <!-- Ranking de Agentes -->
           <div class="ranking-panel">
             <div class="ranking-header">

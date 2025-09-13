@@ -5,10 +5,121 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Login</title>
     <style>
+    /* Estilos base */
+    :root {
+        --primary-color: #4e73df;
+        --primary-hover: #2e59d9;
+        --danger-color: #e74a3b;
+        --warning-color: #f6c23e;
+        --success-color: #1cc88a;
+        --info-color: #36b9cc;
+        --gray-100: #f8f9fc;
+        --gray-200: #eaecf4;
+        --gray-300: #dddfeb;
+        --gray-600: #858796;
+        --gray-800: #5a5c69;
+        --box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    }
+    
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+    
     html, body {
         height: 100%;
         margin: 0;
         padding: 0;
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-size: 0.9rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #4a4b65;
+        background-color: var(--gray-100);
+    }
+    
+    /* Estilos para los mensajes de alerta */
+    .alert {
+        position: relative;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid transparent;
+        border-radius: 0.35rem;
+        font-size: 0.85rem;
+        display: none;
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .alert.alert-success {
+        color: #0f5132;
+        background-color: #d1e7dd;
+        border-color: #badbcc;
+    }
+    
+    .alert.alert-danger {
+        color: #842029;
+        background-color: #f8d7da;
+        border-color: #f5c2c7;
+    }
+    
+    .alert.alert-warning {
+        color: #664d03;
+        background-color: #fff3cd;
+        border-color: #ffecb5;
+    }
+    
+    .alert.alert-info {
+        color: #055160;
+        background-color: #cff4fc;
+        border-color: #b6effb;
+    }
+    
+    .alert-info {
+        background-color: #e6f3ff;
+        color: #0066cc;
+        border: 1px solid #b3d7ff;
+    }
+    
+    .alert-success {
+        background-color: #e6f7e6;
+        color: #1a8c1a;
+        border: 1px solid #99cc99;
+    }
+    
+    .alert-warning {
+        background-color: #fff3e6;
+        color: #cc7a00;
+        border: 1px solid #ffcc80;
+    }
+    
+    .alert-danger {
+        background-color: #ffebee;
+        color: #cc0000;
+        border: 1px solid #ff9999;
+    }
+    
+    /* Estilos para el spinner de carga */
+    .spinner-border {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        vertical-align: text-bottom;
+        border: 0.2em solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        -webkit-animation: spinner-border .75s linear infinite;
+        animation: spinner-border .75s linear infinite;
+        margin-right: 8px;
+    }
+    
+    @keyframes spinner-border {
+        to { transform: rotate(360deg); }
     }
     body {
         min-height: 100vh;
@@ -196,11 +307,19 @@
                     <input type="password" id="password" name="password" placeholder="Password" required>
                 </div>
                 <div class="underline"></div>
-                <div class="options-row">
-                    <label class="remember-me"><input type="checkbox" id="remember"> Remember me</label>
-                    <a href="#" class="forgot-password" onclick="forgotPassword()">Forgot Password?</a>
+                <div class="form-group d-flex justify-content-between align-items-center">
+                    <label for="remember" class="mb-0">
+                        <input type="checkbox" id="remember" name="remember">
+                        Recordar sesión
+                    </label>
+                    <a href="#" onclick="forgotPassword(); return false;" class="small">¿Olvidaste tu contraseña?</a>
                 </div>
-                <button type="submit" class="login-btn-glass">LOGIN</button>
+
+                <button type="submit" class="btn btn-primary btn-block mt-3">
+                    <span class="d-flex align-items-center justify-content-center">
+                        <span class="login-text">Iniciar sesión</span>
+                    </span>
+                </button>
                 <div id="message"></div>
                 <!-- Enlace a registro removido por políticas de acceso -->
                 <!-- <div style="text-align: center; margin-top: 1rem;">
@@ -217,31 +336,61 @@
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
         });
 
+        // Función para obtener parámetros de la URL
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            const results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+
+        // Mostrar mensaje si existe en la URL
+        const urlMessage = getUrlParameter('message');
+        if (urlMessage) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = decodeURIComponent(urlMessage);
+            messageDiv.className = 'alert alert-info';
+            messageDiv.style.display = 'block';
+        }
+
         async function handleLogin(event) {
             event.preventDefault();
             
-            const username = document.getElementById('username').value;
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const rememberMe = document.getElementById('remember').checked;
+            const redirectUrl = getUrlParameter('redirect') || '/inicio.html';
+            
+            // Validar campos vacíos
+            if (!username || !password) {
+                const messageDiv = document.getElementById('message');
+                messageDiv.textContent = 'Por favor ingrese nombre de usuario y contraseña';
+                messageDiv.className = 'alert alert-warning';
+                messageDiv.style.display = 'block';
+                return;
+            }
             
             // Mostrar indicador de carga
             const submitBtn = document.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = 'Iniciando sesión...';
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Iniciando sesión...';
             
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = 'Verificando credenciales...';
-            messageDiv.className = 'success';
+            messageDiv.className = 'alert alert-info';
             messageDiv.style.display = 'block';
             
             try {
+                console.log('[LOGIN] Iniciando proceso de autenticación para:', username);
+                
                 // Enviar credenciales al servidor
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({
                         username: username,
@@ -250,50 +399,154 @@
                 });
                 
                 const data = await response.json();
+                console.log('[LOGIN] Respuesta del servidor:', { status: response.status, data });
                 
-                if (response.ok) {
-                    // Usar cookies HttpOnly: no guardar token. Solo persistir información básica del usuario si "Remember me".
+                if (response.ok && data.success) {
+                    // Guardar token y datos del usuario
                     try {
-                        const userInfo = { name: data.user?.username, role: data.user?.role || 'user' };
-                        if (rememberMe) {
-                            localStorage.setItem('user', JSON.stringify(userInfo));
-                            // Limpieza opcional de tokens heredados
-                            localStorage.removeItem('token');
-                        } else {
-                            sessionStorage.setItem('user', JSON.stringify(userInfo));
-                            sessionStorage.removeItem('token');
-                        }
-                    } catch {}
-                    
-                    // Mostrar mensaje de éxito
-                    messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
-                    messageDiv.className = 'success';
-                    
-                    // Redirigir a la página de inicio después de un breve retraso
-                    setTimeout(() => {
-                        // Usar ruta explícita y reemplazo de historial para evitar bucles
-                        window.location.replace('/inicio.html');
-                    }, 800);
+                        const userInfo = { 
+                            id: data.user?.id,
+                            username: data.user?.username, 
+                            name: data.user?.username,
+                            role: data.user?.role || 'user',
+                            permissions: data.user?.permissions || []
+                        };
+                        
+                        // Guardar token y datos del usuario según la preferencia de "Recordarme"
+                        const storage = rememberMe ? localStorage : sessionStorage;
+                        storage.setItem('token', data.token);
+                        storage.setItem('user', JSON.stringify(userInfo));
+                        
+                        console.log('[LOGIN] Datos guardados en', rememberMe ? 'localStorage' : 'sessionStorage');
+                        
+                        // Mostrar mensaje de éxito
+                        messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
+                        messageDiv.className = 'alert alert-success';
+                        
+                        // Redirigir a la página solicitada o a la página por defecto
+                        const redirectUrl = getUrlParameter('redirect') || '/inicio.html';
+                        console.log(`[LOGIN] Redirigiendo a: ${redirectUrl}`);
+                        
+                        // Pequeño retraso para mostrar el mensaje de éxito
+                        setTimeout(() => {
+                            // Usar replace para evitar problemas con el botón de retroceso
+                            window.location.replace(redirectUrl);
+                        }, 800);
+                        
+                    } catch (storageError) {
+                        console.error('[LOGIN] Error al guardar datos de sesión:', storageError);
+                        messageDiv.textContent = 'Error al guardar la sesión. Intenta de nuevo.';
+                        messageDiv.className = 'alert alert-warning';
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Iniciar sesión';
+                    }
                     
                 } else {
-                    // Mostrar mensaje de error
-                    messageDiv.textContent = data.message || 'Error al iniciar sesión. Verifica tus credenciales.';
-                    messageDiv.className = 'error';
+                    // Determinar el mensaje de error apropiado
+                    let errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
+                    
+                    if (response.status === 401) {
+                        errorMessage = 'Credenciales inválidas. Verifica tu usuario y contraseña.';
+                    } else if (response.status === 429) {
+                        errorMessage = 'Demasiados intentos. Por favor, espera unos minutos antes de intentar de nuevo.';
+                    } else if (response.status >= 500) {
+                        errorMessage = 'Error del servidor. Por favor, intente más tarde.';
+                    } else if (data.message) {
+                        errorMessage = data.message;
+                    }
+                    
+                    console.warn('[LOGIN] Error en la autenticación:', { 
+                        status: response.status,
+                        statusText: response.statusText,
+                        message: data.message,
+                        data: data
+                    });
+                    
+                    // Mostrar mensaje de error al usuario
+                    messageDiv.textContent = errorMessage;
+                    messageDiv.className = 'alert alert-danger';
+                    
+                    // Enfocar el campo de usuario o contraseña según el error
+                    if (response.status === 401) {
+                        const usernameField = document.getElementById('username');
+                        const passwordField = document.getElementById('password');
+                        
+                        // Limpiar solo la contraseña para seguridad
+                        passwordField.value = '';
+                        
+                        // Enfocar el campo apropiado
+                        if (!usernameField.value.trim()) {
+                            usernameField.focus();
+                        } else {
+                            passwordField.focus();
+                        }
+                    }
+                    
+                    // Restaurar el botón
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Iniciar sesión';
                 }
                 
             } catch (error) {
-                console.error('Error al iniciar sesión:', error);
-                messageDiv.textContent = 'Error de conexión. Intenta de nuevo más tarde.';
-                messageDiv.className = 'error';
+                console.error('[LOGIN] Error en el proceso de autenticación:', error);
+                
+                // Determinar el tipo de error
+                let errorMessage = 'Error de conexión. Verifica tu conexión e intenta de nuevo.';
+                
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    errorMessage = 'No se pudo conectar al servidor. Verifica tu conexión a internet.';
+                } else if (error.name === 'SyntaxError') {
+                    errorMessage = 'Error al procesar la respuesta del servidor. Intenta de nuevo.';
+                }
+                
+                // Mostrar mensaje de error
+                messageDiv.textContent = errorMessage;
+                messageDiv.className = 'alert alert-danger';
+                
+                // Restaurar el botón
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = 'Iniciar sesión';
+                
+                // Enfocar el campo de contraseña
+                document.getElementById('password').focus();
             }
         }
         
-        function forgotPassword() {
-            alert("Funcionalidad de recuperación de contraseña próximamente...");
+        async function forgotPassword() {
+            const email = prompt('Por favor ingrese su dirección de correo electrónico para restablecer su contraseña:');
+            
+            if (!email) {
+                return; // Usuario canceló
+            }
+            
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = 'Enviando solicitud de restablecimiento...';
+            messageDiv.className = 'alert alert-info';
+            messageDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/auth/forgot-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    messageDiv.textContent = 'Se ha enviado un correo con instrucciones para restablecer tu contraseña.';
+                    messageDiv.className = 'alert alert-success';
+                } else {
+                    throw new Error(data.message || 'Error al procesar la solicitud');
+                }
+            } catch (error) {
+                console.error('Error al solicitar restablecimiento de contraseña:', error);
+                messageDiv.textContent = error.message || 'Error al procesar la solicitud. Intente nuevamente más tarde.';
+                messageDiv.className = 'alert alert-danger';
+            }
         }
     </script>
 </body>

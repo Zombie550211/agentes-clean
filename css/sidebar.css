@@ -13,6 +13,50 @@
   z-index: 1000;
 }
 
+/* Estadísticas del usuario en sidebar */
+.user-stats {
+  padding: 16px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.stat-item:last-child {
+  border-bottom: none;
+}
+
+.stat-item i {
+  font-size: 1.1rem;
+  color: #6b7280;
+  width: 20px;
+  text-align: center;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 0.9rem;
+  color: #1f2937;
+  font-weight: 600;
+}
+
 /* Encabezado y títulos dentro del sidebar */
 .sidebar h3 {
   font-size: 0.9rem;

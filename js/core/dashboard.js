@@ -10,7 +10,16 @@ async function cargarClientes() {
     // Crear token temporal para desarrollo
     const token = localStorage.getItem('token') || 'temp-token-dev';
     
-    const resp = await fetch(`${API_URL}/api/leads`, {
+    // Obtener la fecha de hoy en formato YYYY-MM-DD
+    const hoy = new Date().toISOString().split('T')[0];
+    
+    // Modificar la URL para incluir el filtro por fecha
+    const url = new URL(`${API_URL}/api/leads`);
+    url.searchParams.append('fecha', hoy);
+    
+    console.log('Solicitando datos a:', url.toString());
+    
+    const resp = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -18,11 +27,20 @@ async function cargarClientes() {
     });
     
     if (!resp.ok) {
-      throw new Error(`Error HTTP: ${resp.status}`);
+      const errorData = await resp.json().catch(() => ({}));
+      console.error('Error en la respuesta:', errorData);
+      throw new Error(`Error HTTP: ${resp.status} - ${errorData.message || 'Error desconocido'}`);
     }
     
-    const clientes = await resp.json();
-    mostrarClientes(clientes);
+    const responseData = await resp.json();
+    console.log('Datos recibidos de la API:', responseData);
+    
+    if (responseData.success && Array.isArray(responseData.data)) {
+      mostrarClientes(responseData.data);
+    } else {
+      console.error('Formato de respuesta inesperado:', responseData);
+      mostrarClientes([]);
+    }
   } catch (error) {
     console.error('Error al cargar clientes:', error);
     // Mostrar mensaje de error en la interfaz
@@ -39,25 +57,56 @@ function mostrarClientes(clientes) {
     console.error('No se encontró el elemento #tablaClientes tbody');
     return;
   }
+  
   tbody.innerHTML = '';
+  
+  if (!Array.isArray(clientes) || clientes.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="100%" class="text-center">No se encontraron clientes para la fecha seleccionada.</td>
+      </tr>
+    `;
+    return;
+  }
+  
   clientes.forEach(cliente => {
+    // Extraer valores con valores por defecto para evitar undefined
+    const id = cliente._id;
+    const nombre = cliente.nombre_cliente || 'Sin nombre';
+    const telefono = cliente.telefono_principal || 'Sin teléfono';
+    const email = cliente.email || 'Sin email';
+    const agente = cliente.agenteNombre || cliente.agente || 'Sin asignar';
+    const estado = cliente.status || 'Pendiente';
+    const direccion = cliente.direccion || 'Sin dirección';
+    const producto = cliente.tipo_servicio || cliente.producto || 'Sin producto';
+    
+    // Crear botones de acción
     let acciones = `
-      <button onclick="mostrarComentarioForm('${cliente._id}')">Comentar</button>
-      <button onclick="enviarVentaExistente('${cliente._id}')">Enviar Venta</button>
+      <button class="btn btn-sm btn-info mr-1" onclick="mostrarComentarioForm('${id}')">
+        <i class="fas fa-comment"></i> Comentar
+      </button>
+      <button class="btn btn-sm btn-success mr-1" onclick="enviarVentaExistente('${id}')">
+        <i class="fas fa-paper-plane"></i> Enviar Venta
+      </button>
+      <button class="btn btn-sm btn-warning solo-admin" onclick="editarCliente('${id}')">
+        <i class="fas fa-edit"></i> Editar
+      </button>
+      <button class="btn btn-sm btn-danger solo-admin" onclick="eliminarCliente('${id}')">
+        <i class="fas fa-trash"></i> Eliminar
+      </button>
     `;
-    acciones += `
-      <button class="solo-admin" onclick="editarCliente('${cliente._id}')">Editar</button>
-      <button class="solo-admin" onclick="eliminarCliente('${cliente._id}')">Eliminar</button>
-      <button class="solo-admin" onclick="cambiarEstadoCliente('${cliente._id}')">Cambiar Estado</button>
-    `;
+    
+    // Agregar fila a la tabla
     tbody.innerHTML += `
       <tr>
-        <td>${cliente.nombre}</td>
-        <td>${cliente.email}</td>
-        <td>${cliente.telefono}</td>
-        <td>${cliente.agente || ''}</td>
-        <td>${cliente.estado || ''}</td>
-        <td>${acciones}</td>
+        <td>${nombre}</td>
+        <td>${telefono}</td>
+        <td>${email}</td>
+        <td>${producto}</td>
+        <td>${direccion}</td>
+        <td>${agente}</td>
+        <td>${estado}</td>
+        <td class="text-nowrap">${acciones}</td>
       </tr>
     `;
   });

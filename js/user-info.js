@@ -37,20 +37,23 @@ document.addEventListener('DOMContentLoaded', function() {
           // se mostrará el estado por defecto.
           try {
             // fetch con credenciales para que el servidor lea la cookie de sesión
-            fetch('/api/protected', { method: 'GET', credentials: 'include' })
-              .then(r => r.ok ? r.json() : null)
+            fetch('/api/auth/verify', { method: 'GET', credentials: 'include' })
+              .then(r => r && r.ok ? r.json() : null)
               .then(data => {
                 const apiUser = (data && data.user) || null;
                 if (!apiUser) return; // sin sesión por cookie
                 const normalized = {
+                  username: apiUser.username || apiUser.name || 'Usuario',
                   name: apiUser.username || apiUser.name || 'Usuario',
-                  role: (apiUser.role || 'usuario')
+                  role: (apiUser.role || 'usuario'),
+                  team: apiUser.team || 'Sin equipo',
+                  id: apiUser.id || apiUser._id || null
                 };
                 try { sessionStorage.setItem('user', JSON.stringify(normalized)); } catch {}
                 // Pintar inmediatamente con los datos recibidos
                 try {
                   const userNameElement = document.getElementById('user-name');
-                  if (userNameElement) userNameElement.textContent = normalized.name;
+                  if (userNameElement) userNameElement.textContent = normalized.username || normalized.name;
                   const userRoleElement = document.getElementById('user-role');
                   if (userRoleElement) {
                     const raw = (normalized.role || '').toString().toLowerCase().trim();
@@ -89,18 +92,41 @@ document.addEventListener('DOMContentLoaded', function() {
       const rawRole = (
         user.role ||
         (user.usuario && user.usuario.role) ||
-        ''
+        'usuario'
       ).toString().toLowerCase().trim();
 
+      // Mapeo completo de roles con variantes
       const roleMap = {
-        admin: 'Administrador',
-        supervisor: 'Supervisor',
-        agent: 'Agente',
-        backoffice: 'Backoffice',
-        'b:o': 'Backoffice',
+        // Administradores
+        'admin': 'Administrador',
+        'administrador': 'Administrador',
+        'administrator': 'Administrador',
+        'adm': 'Administrador',
+        
+        // Supervisores
+        'supervisor': 'Supervisor',
+        'super': 'Supervisor',
+        'sup': 'Supervisor',
+        'manager': 'Supervisor',
+        
+        // Agentes
+        'agent': 'Agente',
+        'agente': 'Agente',
+        'user': 'Agente',
+        'usuario': 'Agente',
+        'operador': 'Agente',
+        'operator': 'Agente',
+        
+        // Backoffice
+        'backoffice': 'Backoffice',
+        'back office': 'Backoffice',
+        'back-office': 'Backoffice',
         'b.o': 'Backoffice',
+        'b:o': 'Backoffice',
         'b-o': 'Backoffice',
-        bo: 'Backoffice'
+        'bo': 'Backoffice',
+        'soporte': 'Backoffice',
+        'support': 'Backoffice'
       };
       const displayRole = roleMap[rawRole] || (rawRole ? rawRole.charAt(0).toUpperCase() + rawRole.slice(1) : 'Usuario');
 

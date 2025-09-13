@@ -11,22 +11,63 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
     // Rango de fechas: hoy por defecto, o por querystring (YYYY-MM-DD)
     const { fechaInicio, fechaFin } = req.query || {};
     const hoy = new Date();
-    const yyyy = hoy.getUTCFullYear();
-    const mm = String(hoy.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(hoy.getUTCDate()).padStart(2, '0');
-    const hoyStr = `${yyyy}-${mm}-${dd}`; // Formato YYYY-MM-DD, comparable lexicográficamente
+    // Cortes en horario LOCAL (no UTC)
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const hoyStr = `${yyyy}-${mm}-${dd}`; // Formato YYYY-MM-DD (local)
 
-    const start = (fechaInicio && String(fechaInicio).trim()) || hoyStr;
-    const end = (fechaFin && String(fechaFin).trim()) || hoyStr;
+    const startStr = (fechaInicio && String(fechaInicio).trim()) || hoyStr;
+    const endStr = (fechaFin && String(fechaFin).trim()) || hoyStr;
+    // Construir límites Date en HORA LOCAL para abarcar todo el día local
+    const [sy, sm, sd] = startStr.split('-').map(Number);
+    const [ey, em, ed] = endStr.split('-').map(Number);
+    const startDate = new Date(sy, (sm || 1) - 1, sd || 1, 0, 0, 0, 0);
+    const endDate = new Date(ey, (em || 1) - 1, ed || 1, 23, 59, 59, 999);
 
-    // Filtro principal por fecha_contratacion (guardada como string YYYY-MM-DD)
+    // Filtro principal: Usar fechas de tipo Date para la comparación
     const matchStage = {
       $match: {
-        $or: [
-          { fecha_contratacion: { $gte: start, $lte: end } },
-          { dia_venta: { $gte: start, $lte: end } }
-        ],
-        status: { $ne: 'cancelado' }
+        $and: [
+          {
+            $or: [
+              { 
+                $and: [
+                  { fecha_contratacion: { $ne: null } },
+                  { 
+                    $expr: {
+                      $and: [
+                        { $gte: [ { $toDate: '$fecha_contratacion' }, startDate ] },
+                        { $lte: [ { $toDate: '$fecha_contratacion' }, endDate ] }
+                      ]
+                    }
+                  }
+                ]
+              },
+              { 
+                $and: [
+                  { dia_venta: { $ne: null } },
+                  { 
+                    $expr: {
+                      $and: [
+                        { $gte: [ { $toDate: '$dia_venta' }, startDate ] },
+                        { $lte: [ { $toDate: '$dia_venta' }, endDate ] }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          { 
+            $expr: { 
+              $ne: [ 
+                { $toLower: { $ifNull: ['$status',''] } }, 
+                'cancelado' 
+              ] 
+            } 
+          }
+        ]
       }
     };
 
@@ -125,7 +166,8 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       'ROBERTO VELASQUEZ',
       'BRYAN PLEITEZ',
       'MARISOL BELTRAN',
-      'RANDAL MARTINEZ'
+      'RANDAL MARTINEZ',
+      'LINEA'
     ];
     // Alias conocidos desde la BD hacia los nombres base
     const ALIASES = new Map([
@@ -146,7 +188,6 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       const rawK = normalizeTeam(r.TEAM);
       const k = ALIASES.get(rawK) || rawK;
       if (!k) continue;
-      if (k === 'LINEA') continue; // excluir de la tabla principal
       byKey.set(k, {
         TEAM: `TEAM ${k}`,
         ICON: Number(r.ICON || 0),
@@ -179,8 +220,8 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       success: true,
       message: `OK-MONGO-AGG PADDED-${padded.length} LINEAS-${lineasAgg.length}`,
       total: padded.length,
-      fechaInicio: start,
-      fechaFin: end,
+      fechaInicio: startStr,
+      fechaFin: endStr,
       data: padded,
       lineas: lineasAgg,
       lineasTotalICON,

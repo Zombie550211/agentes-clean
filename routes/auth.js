@@ -12,6 +12,9 @@ router.post('/login', authController.login);
 // Ruta para cerrar sesión (limpia cookie)
 router.post('/logout', authController.logout);
 
+// Ruta para verificar la sesión actual
+router.get('/verify', protect, authController.verify);
+
 // Ruta para restablecer contraseña (solo ADMIN)
 router.post('/reset-password', protect, authorize('admin'), authController.resetPassword);
 
