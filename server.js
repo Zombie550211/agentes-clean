@@ -667,6 +667,13 @@ app.put('/api/leads/:id/status', protect, authorize('admin','backoffice','b:o','
   }
 });
 
+// Alias para compatibilidad: /api/leads redirige a /api/customers
+app.get('/api/leads', protect, authorize('admin','supervisor','agent'), async (req, res) => {
+  // Redirigir a /api/customers con los mismos parámetros
+  const queryParams = new URLSearchParams(req.query).toString();
+  res.redirect(307, `/api/customers?${queryParams}`);
+});
+
 // Endpoint para obtener clientes desde la base de datos (PROTEGIDO + RBAC)
 app.get('/api/customers', protect, authorize('admin','supervisor','agent'), async (req, res) => {
   try {
