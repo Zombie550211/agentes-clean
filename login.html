@@ -5,20 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Login</title>
     <style>
-    /* Estilos base */
+    /* Variables de diseño */
     :root {
-        --primary-color: #4e73df;
-        --primary-hover: #2e59d9;
-        --danger-color: #e74a3b;
-        --warning-color: #f6c23e;
-        --success-color: #1cc88a;
-        --info-color: #36b9cc;
-        --gray-100: #f8f9fc;
-        --gray-200: #eaecf4;
-        --gray-300: #dddfeb;
-        --gray-600: #858796;
-        --gray-800: #5a5c69;
-        --box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        --primary-color: #4361ee;
+        --primary-hover: #3a56d4;
+        --secondary-color: #3f37c9;
+        --danger-color: #ef476f;
+        --warning-color: #ffd166;
+        --success-color: #06d6a0;
+        --info-color: #4cc9f0;
+        --gray-100: #f8f9fa;
+        --gray-200: #e9ecef;
+        --gray-300: #dee2e6;
+        --gray-600: #6c757d;
+        --gray-800: #343a40;
+        --box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+        --border-radius: 12px;
     }
     
     * {
@@ -123,14 +126,16 @@
     }
     body {
         min-height: 100vh;
-        background: #fff;
-        font-family: 'Segoe UI', 'Arial', sans-serif;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', sans-serif;
         display: flex;
         align-items: center;
         justify-content: center;
         position: relative;
         overflow: hidden;
         height: 100vh;
+        color: #2d3748;
+        line-height: 1.5;
     }
     .login-center {
         width: 100vw;
@@ -144,15 +149,26 @@
     .login-glass {
         position: relative;
         z-index: 1;
-        width: 370px;
-        padding: 44px 36px 36px 36px;
-        border-radius: 38px;
-        background: #fff;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.09);
-        border: 1.5px solid #f0f0f0;
+        width: 100%;
+        max-width: 420px;
+        padding: 2.5rem 2rem 2.5rem;
+        border-radius: var(--border-radius);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: var(--box-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         display: flex;
         flex-direction: column;
         align-items: center;
+        transform: translateY(0);
+        transition: var(--transition);
+        margin: 0 1.5rem;
+    }
+    
+    .login-glass:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.15);
     }
     .avatar {
         display: flex;
@@ -164,7 +180,8 @@
         width: 100%;
         display: flex;
         flex-direction: column;
-        gap: 0px;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
     }
     .input-row {
         display: flex;
@@ -182,15 +199,31 @@
         color: #888;
         opacity: 0.95;
     }
+    .input-row {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+    
     .input-row input {
-        background: transparent;
-        border: none;
+        width: 100%;
+        padding: 0.75rem 1rem 0.75rem 2.5rem;
+        font-size: 1rem;
+        border: 2px solid var(--gray-200);
+        border-radius: var(--border-radius);
+        background-color: var(--gray-100);
+        color: var(--gray-800);
+        transition: var(--transition);
         outline: none;
-        color: #222;
-        font-size: 1.07rem;
-        flex: 1;
-        padding: 13px 0 10px 0;
-        letter-spacing: 0.02em;
+    }
+    
+    .input-row input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.15);
+    }
+    
+    .input-row input::placeholder {
+        color: var(--gray-600);
+        opacity: 0.7;
     }
     .input-row input::placeholder {
         color: #888;
@@ -227,16 +260,38 @@
         margin-right: 2px;
     }
     .forgot-password {
-        color: #b3b3b3;
-        font-style: italic;
-        font-size: 0.97rem;
-        text-decoration: none;
-        opacity: 0.85;
-        transition: color 0.2s;
+        text-align: center;
+        margin: 1.5rem 0 0.5rem;
     }
-    .forgot-password:hover {
-        color: #222;
-        opacity: 1;
+    
+    .forgot-password a {
+        color: var(--gray-600);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        position: relative;
+        padding: 0.25rem 0;
+        display: inline-block;
+    }
+    
+    .forgot-password a::after {
+        content: '';
+        position: absolute;
+        width: 0;
+        height: 2px;
+        bottom: 0;
+        left: 0;
+        background-color: var(--primary-color);
+        transition: width 0.3s ease;
+    }
+    
+    .forgot-password a:hover {
+        color: var(--primary-color);
+    }
+    
+    .forgot-password a:hover::after {
+        width: 100%;
     }
     .login-btn-glass {
         width: 100%;
@@ -257,6 +312,109 @@
     .login-btn-glass:hover {
         background: linear-gradient(90deg, #333 0%, #7a8be8 100%);
         box-shadow: 0 4px 18px rgba(80,80,140,0.13);
+    }
+    .btn-login {
+        background-color: #2563eb; /* Azul más intenso */
+        color: white;
+        border: 2px solid transparent;
+        padding: 0.9rem 2rem;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-top: 1.5rem;
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+    }
+    
+    .btn-login::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    
+    .btn-login:hover {
+        background-color: #1d4ed8; /* Azul un poco más oscuro al pasar el ratón */
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    
+    .btn-login:hover::before {
+        opacity: 1;
+    }
+    
+    .btn-login:active {
+        transform: translateY(0);
+        background-color: #1e40af; /* Azul más oscuro al hacer clic */
+        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+    }
+    
+    .btn-login:focus {
+        outline: 2px solid #93c5fd;
+        outline-offset: 2px;
+        box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.5);
+    }
+    
+    .btn-login:disabled {
+        background-color: #e5e7eb;
+        color: #9ca3af;
+        border-color: #e5e7eb;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn-login:disabled .spinner-border {
+        animation: spinner-border .75s linear infinite, pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 0.6; }
+        50% { opacity: 1; }
+        100% { opacity: 0.6; }
+    }
+    
+    /* Estilos para el indicador de carga en el botón */
+    .btn-login .spinner-border {
+        display: none; /* Oculto por defecto */
+        width: 1.25rem;
+        height: 1.25rem;
+        vertical-align: middle;
+        border: 0.25em solid rgba(255, 255, 255, 0.3);
+        border-right-color: white;
+        border-radius: 50%;
+        animation: spinner-border .75s linear infinite;
+        margin-right: 0.5rem;
+    }
+    
+    /* Mostrar spinner solo cuando está activo */
+    .btn-login.loading .spinner-border {
+        display: inline-block;
+    }
+    
+    @keyframes spinner-border {
+        to { transform: rotate(360deg); }
+    }
+    
+    .btn-login .btn-text {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
     }
     #message {
         margin-top: 10px;
@@ -315,8 +473,9 @@
                     <a href="#" onclick="forgotPassword(); return false;" class="small">¿Olvidaste tu contraseña?</a>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-block mt-3">
-                    <span class="d-flex align-items-center justify-content-center">
+                <button type="submit" class="btn-login" id="loginButton">
+                    <span class="btn-text">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
                         <span class="login-text">Iniciar sesión</span>
                     </span>
                 </button>
@@ -371,10 +530,17 @@
             }
             
             // Mostrar indicador de carga
-            const submitBtn = document.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
+            const submitBtn = document.getElementById('loginButton');
+            const spinner = submitBtn.querySelector('.spinner-border');
+            const loginText = submitBtn.querySelector('.login-text');
+            
+            // Guardar el texto original
+            const originalText = loginText.textContent;
+            
+            // Actualizar estados
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Iniciando sesión...';
+            submitBtn.classList.add('loading');
+            loginText.textContent = 'Iniciando sesión...';
             
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = 'Verificando credenciales...';
@@ -438,7 +604,9 @@
                         messageDiv.textContent = 'Error al guardar la sesión. Intenta de nuevo.';
                         messageDiv.className = 'alert alert-warning';
                         submitBtn.disabled = false;
-                        submitBtn.innerHTML = 'Iniciar sesión';
+                        submitBtn.classList.remove('loading');
+                        const loginText = submitBtn.querySelector('.login-text');
+                        if (loginText) loginText.textContent = 'Iniciar sesión';
                     }
                     
                 } else {
@@ -484,11 +652,20 @@
                     
                     // Restaurar el botón
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = 'Iniciar sesión';
+                    submitBtn.classList.remove('loading');
+                    loginText.textContent = 'Iniciar sesión';
                 }
                 
             } catch (error) {
                 console.error('[LOGIN] Error en el proceso de autenticación:', error);
+                
+                // Restaurar el botón en caso de error
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                    const loginText = submitBtn.querySelector('.login-text');
+                    if (loginText) loginText.textContent = 'Iniciar sesión';
+                }
                 
                 // Determinar el tipo de error
                 let errorMessage = 'Error de conexión. Verifica tu conexión e intenta de nuevo.';
@@ -502,10 +679,6 @@
                 // Mostrar mensaje de error
                 messageDiv.textContent = errorMessage;
                 messageDiv.className = 'alert alert-danger';
-                
-                // Restaurar el botón
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = 'Iniciar sesión';
                 
                 // Enfocar el campo de contraseña
                 document.getElementById('password').focus();
