@@ -129,51 +129,93 @@ function setupEventListeners() {
  * Maneja la autenticación y los errores de red.
  */
 async function cargarDatosDesdeServidor() {
-  console.log('[API] Solicitando datos de clientes...');
+  console.log('[API] Iniciando carga de datos...');
   const tbody = document.getElementById('costumer-tbody');
   if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="22" style="text-align:center;padding:2em;">Cargando datos...</td></tr>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="22" style="text-align:center;padding:2em;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p style="margin-top: 10px;">Cargando datos de clientes...</p>
+            <p id="debug-info" style="font-size: 12px; color: #666; margin-top: 10px;"></p>
+          </td>
+        </tr>`;
   }
+  
+  const debugInfo = (msg) => {
+    console.log('[DEBUG]', msg);
+    const debugEl = document.getElementById('debug-info');
+    if (debugEl) debugEl.textContent = msg;
+  };
 
   try {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
     // Configurar headers con el token de autenticación
     const headers = { 
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}` // Siempre enviar el token en el header
+      'Content-Type': 'application/json'
     };
+    
+    // Solo agregar el token si existe
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      debugInfo('Token de autenticación encontrado');
+    } else {
+      debugInfo('No se encontró token de autenticación');
+    }
 
     // Evitar caché y diagnosticar respuestas
     // Backend principal (Mongo) corre en 10000; evitar usar location.origin si apunta a otro server (p.ej. 3000)
     const API_BASE = (window.API_BASE || 'http://localhost:10000').replace(/\/$/, '');
+    debugInfo(`Conectando a: ${API_BASE}`);
     // Obtener la fecha actual en la zona horaria de Honduras (UTC-6)
     // 1. Crear fecha actual en la zona local
     const hoy = new Date();
     
-    // 2. Obtener la fecha en formato YYYY-MM-DD en la zona horaria local
-    const year = hoy.getFullYear();
-    const month = String(hoy.getMonth() + 1).padStart(2, '0');
-    const day = String(hoy.getDate()).padStart(2, '0');
-    const fechaFormateada = `${year}-${month}-${day}`;
+    // 2. Obtener la fecha de ayer en formato YYYY-MM-DD
+    const ayer = new Date(hoy);
+    ayer.setDate(ayer.getDate() - 1);
+    
+    const year = ayer.getFullYear();
+    const month = String(ayer.getMonth() + 1).padStart(2, '0');
+    const day = String(ayer.getDate()).padStart(2, '0');
+    const fechaAyer = `${year}-${month}-${day}`;
     
     // 3. Crear objeto Date para Honduras (UTC-6)
-    const hoyHonduras = new Date(fechaFormateada + 'T00:00:00-06:00');
+    const ayerHonduras = new Date(fechaAyer + 'T00:00:00-06:00');
     
     // 4. Para depuración
     console.log('[DEBUG] Fechas generadas:', {
       fechaLocal: hoy.toString(),
-      fechaHonduras: hoyHonduras.toString(),
+      fechaAyer: ayer.toString(),
       fechaUTC: hoy.toISOString(),
-      fechaFormateada: fechaFormateada,
+      fechaAyerFormateada: fechaAyer,
       zonaHoraria: Intl.DateTimeFormat().resolvedOptions().timeZone
     });
     
-    console.log(`[DEBUG] Fecha formateada para la consulta: ${fechaFormateada}`);
+    console.log(`[DEBUG] Fecha de ayer para la consulta: ${fechaAyer}`);
     
-    // Filtrar por la fecha de hoy en Honduras
-    let url = `${API_BASE}/api/leads?fecha=${fechaFormateada}&limit=1000`;
+    // Cargar todos los datos sin filtrar por fecha
+    let url = `${API_BASE}/api/leads?limit=1000`;
+    console.log('[DEBUG] Cargando TODOS los clientes sin filtrar por fecha');
+    debugInfo(`Solicitando datos desde: ${url}`);
     console.log('[INFO] Fetching leads from:', url);
+    
+    // Mostrar indicador de carga
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="22" style="text-align:center;padding:2em;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p style="margin-top: 10px;">Conectando al servidor...</p>
+            <p id="debug-info" style="font-size: 12px; color: #666; margin-top: 10px;">${url}</p>
+          </td>
+        </tr>`;
+    }
     let response = await fetch(url, {
       method: 'GET',
       credentials: 'include',
@@ -195,9 +237,23 @@ async function cargarDatosDesdeServidor() {
     
     // Verificar si la respuesta es exitosa
     if (!response.ok) {
+      const errorMsg = `Error en la respuesta: ${response.status} ${response.statusText}`;
+      debugInfo(errorMsg);
+      console.error(errorMsg);
+      
       if (response.status === 401) {
         console.error('Error 401: No autorizado. Redirigiendo al login.');
-        window.location.href = '/login.html';
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="22" style="text-align:center;padding:2em;color:red;">
+                <i class="fas fa-exclamation-triangle"></i> No autorizado
+                <p>Redirigiendo a la página de inicio de sesión...</p>
+              </td>
+            </tr>`;
+        }
+        setTimeout(() => window.location.href = '/login.html', 2000);
+        return;
       } else {
         const errorText = await response.text();
         console.error('Error en la respuesta del servidor:', response.status, errorText);
@@ -206,8 +262,18 @@ async function cargarDatosDesdeServidor() {
     }
     
     // Parsear la respuesta JSON
-    const responseData = await response.json();
-    console.log('Datos recibidos de la API:', responseData);
+    let responseData;
+    try {
+      responseData = await response.json();
+      console.log('Datos recibidos de la API:', responseData);
+      debugInfo('Datos recibidos correctamente');
+    } catch (parseError) {
+      const errorText = await response.text();
+      console.error('Error al parsear la respuesta JSON:', parseError);
+      console.error('Respuesta del servidor (texto):', errorText);
+      debugInfo('Error al procesar la respuesta del servidor');
+      throw new Error(`Error al procesar la respuesta: ${parseError.message}`);
+    }
     
     let leads = [];
     
@@ -231,7 +297,27 @@ async function cargarDatosDesdeServidor() {
     
     console.log(`[DEBUG] Se encontraron ${leads.length} leads`);
     
+    // Verificar si hay datos
+    if (!leads || leads.length === 0) {
+      console.warn('No se encontraron leads en la respuesta');
+      debugInfo('No se encontraron datos para mostrar');
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="22" style="text-align:center;padding:2em;">
+              <i class="fas fa-info-circle"></i> No se encontraron datos para la fecha seleccionada.
+              <p>Por favor, intente con otra fecha o verifique la conexión.</p>
+              <button onclick="cargarDatosDesdeServidor()" class="btn btn-primary mt-2">
+                <i class="fas fa-sync-alt"></i> Reintentar
+              </button>
+            </td>
+          </tr>`;
+      }
+      return;
+    }
+
     // Normalizar los datos antes de mostrarlos
+    debugInfo(`Procesando ${leads.length} registros...`);
     const normalizedLeads = leads.map(lead => {
       try {
         return normalizeLeadData(lead);
@@ -244,11 +330,34 @@ async function cargarDatosDesdeServidor() {
     // Guardar en variables globales para uso posterior
     window.leadsData = normalizedLeads;
     window.allLeads = normalizedLeads;
+    window.ultimaListaLeads = normalizedLeads; // Asegurar compatibilidad con código existente
     
-    // Actualizar la interfaz de usuario
-    renderCostumerTable(normalizedLeads);
-    updateSummaryCards(normalizedLeads);
-    generateTeamFilters(normalizedLeads);
+    try {
+      // Actualizar la interfaz de usuario
+      if (typeof window.renderCostumerTable === 'function') {
+        window.renderCostumerTable(normalizedLeads);
+      } else {
+        console.warn('renderCostumerTable no está disponible en el objeto window');
+        renderCostumerTable(normalizedLeads); // Intentar con la función local
+      }
+      
+      // Actualizar tarjetas de resumen
+      if (typeof window.updateSummaryCards === 'function') {
+        window.updateSummaryCards(normalizedLeads);
+      } else {
+        updateSummaryCards(normalizedLeads);
+      }
+      
+      // Generar filtros de equipo
+      if (typeof window.generateTeamFilters === 'function') {
+        window.generateTeamFilters(normalizedLeads);
+      } else {
+        generateTeamFilters(normalizedLeads);
+      }
+    } catch (error) {
+      console.error('Error al actualizar la interfaz de usuario:', error);
+      throw error; // Relanzar para que sea manejado por el catch externo
+    }
     
     console.log(`[DEBUG] Leads extraídos: ${leads.length} registros`);
     if (leads.length > 0) {
@@ -260,8 +369,23 @@ async function cargarDatosDesdeServidor() {
 
   } catch (error) {
     console.error('Error fatal al cargar datos:', error);
+    const errorMessage = error.message || 'Error desconocido';
+    debugInfo(`Error: ${errorMessage}`);
+    
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="22" style="text-align:center;padding:2em;color:red;">Error al cargar los datos. Verifique la consola.</td></tr>`;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="22" style="text-align:center;padding:2em;color:red;">
+            <i class="fas fa-exclamation-triangle"></i> Error al cargar los datos
+            <p style="margin-top:10px;color:#666;">${errorMessage}</p>
+            <button onclick="cargarDatosDesdeServidor()" class="btn btn-primary mt-2">
+              <i class="fas fa-sync-alt"></i> Reintentar
+            </button>
+            <p style="margin-top:15px;font-size:12px;">
+              Si el problema persiste, contacte al administrador.
+            </p>
+          </td>
+        </tr>`;
     }
   }
 }
@@ -617,22 +741,86 @@ function updateSummaryCards(leads = []) {
         return false;
     }).length;
     
+    // Función para normalizar fechas a formato YYYY-MM-DD manejando correctamente la zona horaria
+    const normalizeDateString = (dateStr) => {
+        if (!dateStr) return null;
+        
+        try {
+            let date;
+            
+            // Si es un objeto Date
+            if (dateStr instanceof Date) {
+                date = dateStr;
+            } 
+            // Si es un string ISO (2025-09-15T00:00:00.000Z)
+            else if (typeof dateStr === 'string' && dateStr.includes('T')) {
+                // Crear fecha ajustando por zona horaria local
+                const d = new Date(dateStr);
+                // Ajustar la fecha sumando el offset de la zona horaria
+                date = new Date(d.getTime() + (d.getTimezoneOffset() * 60000));
+            }
+            // Si está en formato DD/MM/YYYY
+            else if (typeof dateStr === 'string' && dateStr.includes('/')) {
+                const [day, month, year] = dateStr.split('/');
+                // Crear fecha en zona horaria local
+                date = new Date(year, month - 1, day);
+            } else {
+                return null;
+            }
+            
+            // Formatear a YYYY-MM-DD
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            console.error('Error normalizando fecha:', dateStr, e);
+            return null;
+        }
+    };
+    
     // Contar ventas del mes actual
     const ventasMes = leads.filter(lead => {
         const fechaVenta = lead.dia_venta || lead.fecha_venta || lead.fecha_contratacion || lead.creadoEn || lead.fecha_creacion;
         if (!fechaVenta) return false;
         
-        const fechaNormalizada = normalizeDate(fechaVenta);
+        const fechaNormalizada = normalizeDateString(fechaVenta) || normalizeDate(fechaVenta);
         if (!fechaNormalizada) return false;
         
         // Para depuración
         if (fechaNormalizada.startsWith(monthStr)) {
             console.log(`[VENTA MES] ${lead.nombre_cliente} - Fecha: ${fechaVenta} (${fechaNormalizada})`);
+            return true;
         }
         
-        return fechaNormalizada.startsWith(monthStr);
+        return false;
     }).length;
-    const pendientes = leads.filter(l => getStatus(l) === 'pendiente' || getStatus(l) === 'pending').length;
+    
+    // Contar pendientes (incluyendo de meses anteriores)
+    const pendientes = leads.filter(lead => {
+        const status = getStatus(lead);
+        if (status !== 'pendiente' && status !== 'pending') return false;
+        
+        // Verificar si la fecha es de un mes anterior
+        const fechaVenta = lead.dia_venta || lead.fecha_venta || lead.fecha_contratacion || lead.creadoEn || lead.fecha_creacion;
+        if (!fechaVenta) return true; // Si no hay fecha, lo contamos como pendiente
+        
+        const fechaNormalizada = normalizeDateString(fechaVenta) || normalizeDate(fechaVenta);
+        if (!fechaNormalizada) return true; // Si no se pudo normalizar, lo contamos como pendiente
+        
+        // Si la fecha es del mes actual, no es un pendiente de meses anteriores
+        if (fechaNormalizada.startsWith(monthStr)) return false;
+        
+        // Verificar si la fecha es de un mes anterior
+        const fechaObj = new Date(fechaNormalizada);
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        
+        return fechaObj.getMonth() < currentMonth || fechaObj.getFullYear() < currentYear;
+    }).length;
+    
     const cancelados = leads.filter(l => getStatus(l) === 'cancelado' || getStatus(l) === 'cancelled').length;
 
     document.getElementById('costumer-ventas-hoy').textContent = ventasHoy;
@@ -658,12 +846,12 @@ function parseDate(dateStr) {
     
     // Si ya es un objeto Date, usarlo directamente
     if (dateStr instanceof Date) {
-        date = new Date(dateStr);
+        return new Date(dateStr);
     } 
-    // Si es string con formato DD/MM/YYYY
+    // Si es una cadena con formato DD/MM/YYYY
     else if (typeof dateStr === 'string' && dateStr.includes('/')) {
         const [day, month, year] = dateStr.split('/').map(Number);
-        date = new Date(year, month - 1, day);
+        return new Date(year, month - 1, day);
     }
     // Para otros formatos (ISO, etc.)
     else {
@@ -675,10 +863,6 @@ function parseDate(dateStr) {
         console.warn('[ADVERTENCIA] No se pudo parsear la fecha:', dateStr);
         return new Date(0);
     }
-    
-    // Ajustar por zona horaria (UTC-6 para Honduras)
-    const offset = date.getTimezoneOffset() + 360; // 6 horas * 60 minutos
-    date = new Date(date.getTime() + (offset * 60 * 1000));
     
     return date;
 }
@@ -693,111 +877,179 @@ function renderCostumerTable(leads = []) {
         return;
     }
     
-    // Función mejorada para obtener la fecha de un lead con soporte para zona horaria de Honduras (UTC-6)
-    const getLeadDate = (lead) => {
+    // Función para obtener la fecha de un lead con manejo de zona horaria
+   const getLeadDate = (lead) => {
         try {
-            // Priorizar siempre el campo dia_venta
-            if (lead.dia_venta) {
-                // Si es una fecha ISO (viene del servidor)
-                if (lead.dia_venta instanceof Date) {
-                    return new Date(lead.dia_venta);
+            // Función para crear una fecha en la zona horaria local
+            const createLocalDate = (year, month, day) => {
+                // Asegurar que el mes esté en el rango 1-12 y convertirlo a 0-11
+                const monthIndex = Math.max(0, Math.min(11, month - 1));
+                // Crear fecha en la zona horaria local
+                return new Date(year, monthIndex, day);
+            };
+
+            // Función para parsear fecha desde string
+            const parseDateString = (dateStr) => {
+                if (!dateStr) return null;
+
+                // Si es una fecha (viene del servidor)
+                if (dateStr instanceof Date) {
+                    return new Date(dateStr);
                 }
-                
+
                 // Si es un string con formato YYYY-MM-DD
-                if (typeof lead.dia_venta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(lead.dia_venta)) {
-                    const [year, month, day] = lead.dia_venta.split('-').map(Number);
-                    // Crear fecha en UTC-6 (Honduras)
-                    return new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    return createLocalDate(year, month, day);
                 }
                 
                 // Si es un string con formato DD/MM/YYYY
-                if (typeof lead.dia_venta === 'string' && lead.dia_venta.includes('/')) {
-                    const [day, month, year] = lead.dia_venta.split('/').map(Number);
-                    // Asegurar año de 4 dígitos
-                    const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
-                    // Crear fecha en UTC-6 (Honduras)
-                    return new Date(Date.UTC(fullYear, month - 1, day, 6, 0, 0));
+                if (dateStr.includes('/')) {
+                    const parts = dateStr.split('/');
+                    if (parts.length === 3) {
+                        const [day, month, year] = parts.map(Number);
+                        const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
+                        return createLocalDate(fullYear, month, day);
+                    }
                 }
                 
-                // Si es una fecha ISO
-                if (typeof lead.dia_venta === 'string' && lead.dia_venta.includes('T')) {
-                    return new Date(lead.dia_venta);
-                }
-            }
-            
-            // Si no hay dia_venta o hubo un error, intentar con otros campos
-            const dateStr = lead.fecha_venta || lead.fecha_contratacion || 
-                           lead.creadoEn || lead.fecha_creacion || lead.createdAt || lead.fecha;
-            
-            if (!dateStr) {
-                console.log('[DEBUG] Lead sin fecha:', { id: lead._id, nombre: lead.nombre_cliente });
-                return new Date(0); // Fecha antigua para ordenar al final
-            }
-            
-            // Si es una fecha ISO (viene del servidor)
-            if (dateStr instanceof Date) {
-                return new Date(dateStr);
-            }
-            
-            if (typeof dateStr === 'string') {
-                // Intentar con formato ISO
+                // Si es una fecha ISO con T
                 if (dateStr.includes('T')) {
+                    // Crear la fecha desde ISO sin ajustes de zona horaria
                     return new Date(dateStr);
                 }
                 
-                // Intentar con formato DD/MM/YYYY o MM/DD/YYYY
-                const dateParts = dateStr.split(/[\/\s-]+/);
-                if (dateParts.length === 3) {
-                    // Asumir formato DD/MM/YYYY
-                    const day = parseInt(dateParts[0], 10);
-                    const month = parseInt(dateParts[1], 10) - 1; // Los meses en JS van de 0-11
-                    const year = parseInt(dateParts[2], 10);
-                    
-                    // Ajustar para años de dos dígitos
-                    const fullYear = year < 100 ? (year < 80 ? 2000 + year : 1900 + year) : year;
-                    
-                    // Crear fecha en UTC-6 (Honduras)
-                    return new Date(Date.UTC(fullYear, month, day, 6, 0, 0));
+                return null;
+            };
+
+            // Intentar con los campos de fecha en orden de prioridad
+            const dateFields = [
+                'dia_venta', 'fecha_venta', 'fecha_contratacion', 
+                'creadoEn', 'fecha_creacion', 'createdAt', 'fecha',
+                'dia_instalacion', 'fecha_contrato', 'fecha_ingreso'
+            ];
+
+            for (const field of dateFields) {
+                if (lead[field]) {
+                    const parsedDate = parseDateString(lead[field]);
+                    if (parsedDate) {
+                        console.log(`[DEBUG] Usando fecha de '${field}':`, parsedDate);
+                        // Devolver la fecha sin ajustes de zona horaria
+                        return parsedDate;
+                    }
                 }
             }
-            
-            // Si no se pudo parsear, devolver fecha actual en Honduras
-            const ahora = new Date();
-            const ahoraHonduras = new Date(ahora.getTime() + (ahora.getTimezoneOffset() * 60000) + (-6 * 60 * 60000));
-            return ahoraHonduras;
+
+            // Si no se encontró fecha válida, usar fecha actual
+            console.warn('Lead sin fecha válida, usando fecha actual');
+            return new Date();
             
         } catch (e) {
-            console.error('Error al procesar fecha del lead:', e, lead);
-            // En caso de error, devolver fecha actual en Honduras
-            const ahora = new Date();
-            const ahoraHonduras = new Date(ahora.getTime() + (ahora.getTimezoneOffset() * 60000) + (-6 * 60 * 60000));
-            return ahoraHonduras;
+            console.error('Error al procesar fecha del lead:', e);
+            // En caso de error, devolver fecha actual
+            return new Date();
         }
     };
     
-    // Ordenar los leads por fecha (más recientes primero)
-    const sortedLeads = [...leads].sort((a, b) => {
-        const dateA = getLeadDate(a);
-        const dateB = getLeadDate(b);
-        return dateB - dateA; // Orden descendente (más recientes primero)
+    // Depuración de fechas
+    console.group('=== DEPURACIÓN DE FECHAS ===');
+    console.log('Total de clientes cargados:', leads.length);
+    
+    // Verificar fechas de los primeros 10 clientes
+    leads.slice(0, 10).forEach((lead, index) => {
+      console.group(`Cliente #${index + 1}`);
+      console.log('ID:', lead._id || lead.id || 'Sin ID');
+      console.log('Nombre:', lead.nombre_cliente || 'Sin nombre');
+      console.log('Campos de fecha:');
+      
+      // Mostrar todos los campos de fecha
+      const dateFields = [
+        'dia_venta', 'fecha_venta', 'fecha_contratacion', 
+        'creadoEn', 'fecha_creacion', 'createdAt', 'fecha',
+        'dia_instalacion', 'fecha_contrato', 'fecha_ingreso'
+      ];
+      
+      dateFields.forEach(field => {
+        if (lead[field]) {
+          console.log(`- ${field}:`, lead[field]);
+        }
+      });
+      
+      // Mostrar fecha interpretada
+      console.log('Fecha interpretada:', getLeadDate(lead));
+      console.groupEnd();
     });
+    
+    // Contar clientes con fecha 14
+    const clientesConFecha14 = leads.filter(lead => {
+      try {
+        const fecha = getLeadDate(lead);
+        return fecha.getDate() === 14 && fecha.getMonth() === 8; // Mes 8 = Septiembre (0-indexed)
+      } catch (e) {
+        console.error('Error al procesar fecha:', e);
+        return false;
+      }
+    });
+    
+    console.log('=== RESUMEN ===');
+    console.log(`Clientes con fecha 14/09/2025: ${clientesConFecha14.length}`);
+    console.groupEnd();
+    
+    // Ordenar los leads por fecha (más recientes primero)
+    const sortedLeads = [...leads].map(lead => {
+        // Asegurarse de que dia_venta esté en el formato correcto para mostrar
+        if (lead.dia_venta) {
+            // Si la fecha está en formato YYYY-MM-DD, convertirla a DD/MM/YYYY para mostrar
+            if (/^\d{4}-\d{2}-\d{2}$/.test(lead.dia_venta)) {
+                const [year, month, day] = lead.dia_venta.split('-');
+                lead.dia_venta_mostrar = `${day}/${month}/${year}`;
+            } else {
+                lead.dia_venta_mostrar = lead.dia_venta;
+            }
+        }
+        
+        return {
+            ...lead,
+            _fechaParseada: getLeadDate(lead) // Guardar la fecha parseada para ordenar
+        };
+    }).sort((a, b) => b._fechaParseada - a._fechaParseada);
+    
+    // Función para obtener mes y año en formato 'Mes Año' (ej: 'Septiembre 2025')
+    const getMesAño = (fecha) => {
+        const meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        
+        // Asegurarse de usar la hora de Honduras (UTC-6)
+        const fechaHonduras = new Date(fecha);
+        const mes = fechaHonduras.getUTCMonth(); // getUTCMonth devuelve 0-11
+        const año = fechaHonduras.getUTCFullYear();
+        
+        return `${meses[mes]} ${año}`;
+    };
+    
+    // Función para obtener solo el mes y año en formato 'YYYY-MM' para comparación
+    const getMesAñoClave = (fecha) => {
+        const d = new Date(fecha);
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    };
     
     // Log detallado de fechas para depuración
     console.log('=== RESUMEN DE FECHAS DE LEADS ===');
     console.log(`Total de leads: ${leads.length}`);
     
-    // Contar leads por fecha
-    const leadsPorFecha = {};
+    // Contar leads por mes/año
+    const leadsPorMes = {};
     sortedLeads.forEach(lead => {
-        const fecha = getLeadDate(lead);
-        const fechaStr = fecha.toISOString().split('T')[0];
-        if (!leadsPorFecha[fechaStr]) {
-            leadsPorFecha[fechaStr] = 0;
+        const mesAño = getMesAño(lead._fechaParseada);
+        if (!leadsPorMes[mesAño]) {
+            leadsPorMes[mesAño] = 0;
         }
-        leadsPorFecha[fechaStr]++;
+        leadsPorMes[mesAño]++;
     });
     
-    console.log('Leads por fecha:', leadsPorFecha);
+    console.log('Leads por mes:', leadsPorMes);
     
     // Mostrar los primeros 10 leads para depuración
     console.log('=== PRIMEROS 10 LEADS ===');
@@ -806,8 +1058,8 @@ function renderCostumerTable(leads = []) {
             id: lead._id,
             nombre: lead.nombre_cliente,
             telefono: lead.telefono_principal,
-            fecha_cruda: lead.dia_venta || lead.fecha_venta || lead.fecha_contratacion || lead.creadoEn || lead.fecha_creacion || lead.createdAt,
-            fecha_parseada: getLeadDate(lead).toISOString(),
+            fecha_parseada: lead._fechaParseada.toISOString(),
+            mes_año: getMesAño(lead._fechaParseada),
             estado: lead.status || 'sin_estado'
         });
     });
@@ -820,13 +1072,13 @@ function renderCostumerTable(leads = []) {
     const headHtml = `<tr>${columns.map(c => `<th>${c.title}</th>`).join('')}</tr>`;
     thead.innerHTML = headHtml;
 
-    // 3) Renderizar filas
+    // 3) Renderizar filas sin agrupación por mes
     tbody.innerHTML = '';
     if (sortedLeads.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${columns.length}" style="text-align:center;padding:2em;">No hay clientes para mostrar.</td></tr>`;
         return;
     }
-
+    
     const fragment = document.createDocumentFragment();
     sortedLeads.forEach((lead, index) => {
         try {
@@ -835,8 +1087,18 @@ function renderCostumerTable(leads = []) {
             const cleanLead = lead._normalized ? lead : normalizeLeadData(lead);
             
             // Función para formatear fechas en formato DD/MM/YYYY
-            const formatDate = (date) => {
+            const formatDate = (date, fieldName = '') => {
                 if (!date) return '';
+                
+                // Si el campo es dia_venta y ya tenemos un formato de visualización, usarlo
+                if (fieldName === 'dia_venta' && lead.dia_venta_mostrar) {
+                    return lead.dia_venta_mostrar;
+                }
+                
+                // Si ya es un string con el formato correcto, devolverlo tal cual
+                if (typeof date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(date)) {
+                    return date;
+                }
                 
                 // Función para verificar si una fecha es hoy en Honduras (UTC-6)
                 const esHoy = (fecha) => {
@@ -945,9 +1207,9 @@ function renderCostumerTable(leads = []) {
                     // Formatear el valor
                     let displayValue = val;
                     if (val !== undefined && val !== null && val !== '') {
-                        if (isDateField) {
-                            // Formatear fechas
-                            displayValue = formatDate(val);
+                        if (isDateField) {  
+                            // Formatear fechas, pasando el nombre del campo para manejo especial de dia_venta
+                            displayValue = formatDate(val, key);
                         } else {
                             // Para otros valores, convertir a string
                             displayValue = String(val);
@@ -1264,6 +1526,296 @@ function escapeHTML(str) {
         '"': '&quot;',
         '/': '&#x2F;'
     }[tag]));
+}
+
+// Función para buscar clientes por fecha de venta
+async function buscarClientesPorFecha(fecha) {
+  try {
+    console.log(`[DEBUG] Buscando clientes con fecha de venta: ${fecha}`);
+    
+    // Formatear la fecha para la búsqueda (aceptar múltiples formatos)
+    const formatosFecha = [
+      fecha, // Formato original
+      fecha.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'), // DD/MM/YYYY a YYYY-MM-DD
+      fecha.replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1'), // YYYY-MM-DD a DD/MM/YYYY
+      new Date(fecha).toISOString().split('T')[0], // Formato ISO
+      new Date(fecha).toLocaleDateString() // Formato local
+    ];
+
+    // Eliminar duplicados y valores inválidos
+    const fechasUnicas = [...new Set(formatosFecha)].filter(Boolean);
+    
+    console.log('[DEBUG] Formatos de fecha a buscar:', fechasUnicas);
+    
+    // Construir consulta para buscar en múltiples formatos
+    const query = {
+      $or: [
+        { dia_venta: { $in: fechasUnicas } },
+        { fecha_venta: { $in: fechasUnicas } },
+        { 'fecha_contratacion': { $in: fechasUnicas } }
+      ]
+    };
+
+    // Obtener token de autenticación
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      console.error('No se encontró token de autenticación');
+      return [];
+    }
+
+    // Realizar la búsqueda a través de la API
+    const response = await fetch(`/api/leads?fechaInicio=${encodeURIComponent(fecha)}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error en la búsqueda: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[DEBUG] Resultados de búsqueda (${data.data?.length || 0} clientes):`, data.data || data);
+    
+    // Si no hay resultados, intentar con formato alternativo
+    if (!data.data || data.data.length === 0) {
+      console.log('[DEBUG] No se encontraron resultados, intentando con formato alternativo...');
+      const altResponse = await fetch(`/api/leads?fechaInicio=${encodeURIComponent(fechasUnicas[1] || '')}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (altResponse.ok) {
+        const altData = await altResponse.json();
+        console.log(`[DEBUG] Resultados con formato alternativo (${altData.data?.length || 0} clientes):`, altData.data || altData);
+        return altData.data || [];
+      }
+    }
+    
+    return data.data || [];
+    
+  } catch (error) {
+    console.error('Error al buscar clientes por fecha:', error);
+    return [];
+  }
+}
+
+// Función para buscar y mostrar clientes por fecha de venta
+async function buscarYMostrarClientesPorFecha(fecha) {
+  try {
+    console.log(`[BÚSQUEDA] Buscando clientes con fecha de venta: ${fecha}`);
+    
+    // Mostrar mensaje de carga
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="20" style="text-align:center;padding:2em;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Buscando clientes con fecha ${fecha}...</span>
+            </div>
+            <p>Buscando clientes con fecha de venta: ${fecha}</p>
+          </td>
+        </tr>`;
+    }
+    
+    // Buscar clientes por fecha
+    const clientes = await buscarClientesPorFecha(fecha);
+    
+    if (clientes.length === 0) {
+      console.warn('[BÚSQUEDA] No se encontraron clientes con la fecha especificada');
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="20" style="text-align:center;padding:2em;">
+              <div class="alert alert-warning">
+                No se encontraron clientes con fecha de venta: ${fecha}
+              </div>
+              <button class="btn btn-primary mt-2" onclick="cargarDatosDesdeServidor()">
+                <i class="fas fa-arrow-left"></i> Volver a la vista completa
+              </button>
+            </td>
+          </tr>`;
+      }
+      return;
+    }
+    
+    console.log(`[BÚSQUEDA] Se encontraron ${clientes.length} clientes:`);
+    clientes.forEach((cliente, index) => {
+      console.log(`[${index + 1}] ${cliente.nombre_cliente || 'Sin nombre'} - ` + 
+                 `Tel: ${cliente.telefono_principal || 'N/A'} - ` +
+                 `Fecha Venta: ${cliente.dia_venta || cliente.fecha_venta || 'N/A'}`);
+    });
+    
+    // Actualizar la tabla con los resultados
+    renderCostumerTable(clientes);
+    
+  } catch (error) {
+    console.error('[ERROR] Error al buscar clientes por fecha:', error);
+    
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="20" style="text-align:center;padding:2em;">
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle"></i> Error al buscar clientes
+              <p class="mb-0">${error.message || 'Verifica la consola para más detalles'}</p>
+            </div>
+            <button class="btn btn-primary mt-2" onclick="cargarDatosDesdeServidor()">
+              <i class="fas fa-arrow-left"></i> Volver a la vista completa
+            </button>
+          </td>
+        </tr>`;
+    }
+  }
+}
+
+// Función para buscar clientes por fecha de venta específica
+async function buscarClientesPorFechaVenta(fecha) {
+  try {
+    console.log(`[BÚSQUEDA] Buscando clientes con fecha de venta: ${fecha}`);
+    
+    // Mostrar mensaje de carga
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="20" style="text-align:center;padding:2em;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Buscando clientes con fecha de venta ${fecha}...</span>
+            </div>
+            <p>Buscando clientes con fecha de venta: ${fecha}</p>
+          </td>
+        </tr>`;
+    }
+
+    // Obtener token de autenticación
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      throw new Error('No se encontró token de autenticación');
+    }
+
+    // Obtener todos los clientes sin filtro de fecha
+    console.log('[BÚSQUEDA] Obteniendo todos los clientes...');
+    const response = await fetch('/api/leads', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error en la búsqueda: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const todosLosClientes = data.data || [];
+    console.log(`[BÚSQUEDA] Se encontraron ${todosLosClientes.length} clientes en total`);
+    
+    // Función para normalizar fechas para comparación
+    const normalizarFecha = (fechaStr) => {
+      if (!fechaStr) return '';
+      // Convertir a string, eliminar espacios y convertir a minúsculas
+      return String(fechaStr).trim().toLowerCase();
+    };
+    
+    // Normalizar la fecha de búsqueda para comparación
+    const fechaBusquedaNormalizada = normalizarFecha(fecha);
+    
+    // Lista de campos de fecha a verificar
+    const camposFecha = [
+      'dia_venta', 'Dia_venta', 'fecha_venta', 'fecha_contratacion', 
+      'creadoEn', 'fecha_creacion', 'createdAt', 'fecha',
+      'dia_instalacion', 'fecha_contrato', 'fecha_ingreso'
+    ];
+    
+    // Filtrar clientes por fecha en cualquiera de los campos de fecha
+    const clientesFiltrados = todosLosClientes.filter(cliente => {
+      // Verificar cada campo de fecha
+      for (const campo of camposFecha) {
+        const valorCampo = cliente[campo];
+        if (!valorCampo) continue;
+        
+        const fechaNormalizada = normalizarFecha(valorCampo);
+        console.log(`[DEBUG] Comparando ${campo}: ${fechaNormalizada} con ${fechaBusquedaNormalizada}`);
+        
+        // Verificar coincidencia exacta o en diferentes formatos
+        const formatosAFiltrar = [
+          fechaBusquedaNormalizada, // Formato original
+          fechaBusquedaNormalizada.replace(/-/g, '/'), // Cambiar guiones por barras
+          fechaBusquedaNormalizada.replace(/\//g, '-') // Cambiar barras por guiones
+        ];
+        
+        // Verificar si alguna de las variantes de formato coincide
+        const coincide = formatosAFiltrar.some(formato => 
+          fechaNormalizada.includes(formato)
+        );
+        
+        if (coincide) {
+          console.log(`[BÚSQUEDA] Coincidencia encontrada en ${campo}:`, valorCampo);
+          return true; // Si coincide en algún campo, incluir el cliente
+        }
+      }
+      
+      return false; // No se encontró coincidencia en ningún campo de fecha
+    });
+    
+    console.log(`[BÚSQUEDA] ${clientesFiltrados.length} clientes encontrados con fecha ${fecha}`);
+    
+    // Mostrar resultados en la consola
+    clientesFiltrados.forEach((cliente, index) => {
+      console.log(`[${index + 1}] ${cliente.nombre_cliente || 'Sin nombre'} - ` + 
+                 `Tel: ${cliente.telefono_principal || 'N/A'} - ` +
+                 `Día Venta: ${cliente.dia_venta || 'N/A'} - ` +
+                 `Fecha Venta: ${cliente.fecha_venta || 'N/A'}`);
+    });
+    
+    // Actualizar la tabla con los resultados
+    if (clientesFiltrados.length > 0) {
+      renderCostumerTable(clientesFiltrados);
+    } else {
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="20" style="text-align:center;padding:2em;">
+              <div class="alert alert-warning">
+                No se encontraron clientes con fecha de venta: ${fecha}
+              </div>
+              <button class="btn btn-primary mt-2" onclick="cargarDatosDesdeServidor()">
+                <i class="fas fa-arrow-left"></i> Volver a la vista completa
+              </button>
+            </td>
+          </tr>`;
+      }
+    }
+    
+    return clientesFiltrados;
+    
+  } catch (error) {
+    console.error('[ERROR] Error al buscar clientes por fecha de venta:', error);
+    
+    const tbody = document.getElementById('costumer-tbody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="20" style="text-align:center;padding:2em;">
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle"></i> Error al buscar clientes
+              <p class="mb-0">${error.message || 'Verifica la consola para más detalles'}</p>
+            </div>
+            <button class="btn btn-primary mt-2" onclick="cargarDatosDesdeServidor()">
+              <i class="fas fa-arrow-left"></i> Volver a la vista completa
+            </button>
+          </td>
+        </tr>`;
+    }
+    
+    return [];
+  }
 }
 
 // --- LÓGICA DE MODALES (Comentarios, Acciones, etc.) ---

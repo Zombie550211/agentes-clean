@@ -81,86 +81,168 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
     if (fechaInicio || fechaFin) {
       const fechaFiltro = {};
       
-      // Función para convertir fecha Honduras a UTC
-      const hondurasToUTC = (dateStr) => {
-        console.log('[DEBUG] Convirtiendo fecha Honduras a UTC:', dateStr);
-        const [year, month, day] = dateStr.split('-').map(Number);
-        // Crear fecha en UTC que represente la medianoche en Honduras (00:00 Honduras = 06:00 UTC)
-        const fechaUTC = new Date(Date.UTC(year, month - 1, day, 6, 0, 0, 0));
-        console.log(`[DEBUG] Fecha convertida a UTC: ${fechaUTC.toISOString()}`);
-        return fechaUTC;
+      // Función para convertir fecha local de El Salvador a UTC
+      const localElSalvadorToUTC = (fechaStr, inicioDia = true) => {
+        try {
+          if (!fechaStr) {
+            console.log('[DEBUG] Usando fecha actual para El Salvador');
+            const ahora = new Date();
+            const offsetElSalvador = 6 * 60 * 60 * 1000; // 6 horas en milisegundos (UTC-6)
+            return new Date(ahora.getTime() - offsetElSalvador);
+          }
+          
+          // Intentar con formato YYYY-MM-DD
+          const match = String(fechaStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (!match) {
+            throw new Error('Formato de fecha no válido, se esperaba YYYY-MM-DD: ' + fechaStr);
+          }
+          
+          const [_, year, month, day] = match;
+          
+          // Crear fecha en UTC (sin ajuste de zona horaria)
+          let fechaUTC;
+          if (inicioDia) {
+            // Para inicio del día: 00:00:00 El Salvador = 06:00:00 UTC
+            fechaUTC = new Date(Date.UTC(year, month - 1, day, 6, 0, 0));
+          } else {
+            // Para fin del día: 23:59:59.999 El Salvador = 05:59:59.999 UTC del día siguiente
+            fechaUTC = new Date(Date.UTC(year, month - 1, day, 29, 59, 59, 999));
+          }
+          
+          console.log(`[DEBUG] localElSalvadorToUTC: ${fechaStr} -> ${fechaUTC.toISOString()}`);
+          return fechaUTC;
+          
+        } catch (error) {
+          console.error('[ERROR] Error al convertir fecha:', fechaStr, error);
+          throw error;
+        }
       };
-
-      if (fechaInicio) {
-        const inicio = hondurasToUTC(fechaInicio);
-        fechaFiltro.$gte = inicio;
-        console.log(`[DEBUG] Filtro fecha inicio (Honduras): ${fechaInicio} -> UTC: ${inicio.toISOString()}`);
-      }
       
-      if (fechaFin) {
-        // Usar la misma función para convertir la fecha de fin
-        const fin = hondurasToUTC(fechaFin);
-        // Ajustar al final del día (23:59:59.999)
-        fin.setUTCHours(29, 59, 59, 999); // 23:59:59.999 Honduras = 05:59:59.999 UTC del día siguiente
-        fechaFiltro.$lte = fin;
-        console.log(`[DEBUG] Filtro fecha fin (Honduras): ${fechaFin} -> UTC: ${fin.toISOString()}`);
-      }
+      // Obtener fecha actual en El Salvador (UTC-6)
+      const ahora = new Date();
+      const offsetElSalvador = 6 * 60 * 60 * 1000; // 6 horas en milisegundos (UTC-6)
       
-      // Crear filtros para diferentes campos de fecha
-      const filtrosFecha = [];
+      // Obtener componentes de la fecha actual en UTC
+      const diaUTC = ahora.getUTCDate();
+      const mesUTC = ahora.getUTCMonth();
+      const anioUTC = ahora.getUTCFullYear();
+      const horaUTC = ahora.getUTCHours();
       
-      // 1. Primero, buscar por dia_venta exacto (formato YYYY-MM-DD)
-      if (fechaInicio) {
-        // Filtro simple para dia_venta exacto
-        const filtroDiaVenta = {
-          'dia_venta': fechaInicio
-        };
-        console.log('[DEBUG] Aplicando filtro exacto para dia_venta:', filtroDiaVenta);
-        filtrosFecha.push(filtroDiaVenta);
+      // Calcular la fecha actual en El Salvador
+      const ahoraElSalvador = new Date(ahora);
+      ahoraElSalvador.setHours(ahoraElSalvador.getHours() - 6);
+      
+      // Obtener componentes de la fecha en El Salvador
+      const diaElSalvador = ahoraElSalvador.getDate();
+      const mesElSalvador = ahoraElSalvador.getMonth();
+      const anioElSalvador = ahoraElSalvador.getFullYear();
+      
+      // Crear fecha de hoy a medianoche en El Salvador (00:00:00 El Salvador = 06:00:00 UTC)
+      const hoyElSalvador = new Date(Date.UTC(anioElSalvador, mesElSalvador, diaElSalvador, 6, 0, 0));
+      
+      // Crear fecha de mañana a medianoche en El Salvador
+      const mananaElSalvador = new Date(Date.UTC(anioElSalvador, mesElSalvador, diaElSalvador + 1, 6, 0, 0));
+      
+      // Formatear fechas como YYYY-MM-DD
+      const hoyStr = hoyElSalvador.toISOString().split('T')[0];
+      
+      console.log('[DEBUG] Fechas calculadas:', {
+        servidorUTC: ahora.toISOString(),
+        horaUTC: `${horaUTC}:${ahora.getUTCMinutes()}:${ahora.getUTCSeconds()}`,
+        elSalvador: ahoraElSalvador.toISOString(),
+        hoyElSalvador: hoyElSalvador.toISOString(),
+        mananaElSalvador: mananaElSalvador.toISOString(),
+        hoyStr,
+        diaElSalvador,
+        mesElSalvador: mesElSalvador + 1,
+        anioElSalvador
+      });
+      
+      // Usar la fecha de hoy si no se especifica fechaInicio
+      const fechaInicioAjustada = fechaInicio || hoyStr;
+      
+      // Usar la fecha de hoy si no se especifica fechaFin
+      const fechaFinAjustada = fechaFin || hoyStr;
+      
+      console.log('[DEBUG] ====== MANEJO DE FECHAS ======');
+      console.log(`- Fecha/hora servidor: ${ahora.toISOString()}`);
+      console.log(`- Fecha/hora El Salvador: ${ahoraElSalvador.toISOString()}`);
+      console.log(`- Fecha actual El Salvador: ${hoyStr}`);
+      console.log(`- Filtro inicio: ${fechaInicioAjustada} (${fechaInicio ? 'especificada' : 'hoy'})`);
+      console.log(`- Filtro fin: ${fechaFinAjustada} (${fechaFin ? 'especificada' : 'hoy'})`);
+      console.log('====================================');
+      
+      // Aplicar filtros de fecha
+      if (fechaInicioAjustada || fechaFinAjustada) {
+        const filtroFecha = {};
         
-        // Filtro para documentos sin dia_venta pero con fechas en otros campos
-        const filtroCamposFecha = {
-          $and: [
-            { 
-              $or: [
-                { 'fecha_venta': { ...fechaFiltro } },
-                { 'fecha_contratacion': { ...fechaFiltro } },
-                { 'creadoEn': { ...fechaFiltro } },
-                { 'createdAt': { ...fechaFiltro } },
-                { 'fecha_creacion': { ...fechaFiltro } },
-                { 'fecha': { ...fechaFiltro } }
-              ]
-            },
-            {
-              $or: [
-                { 'dia_venta': { $exists: false } },
-                { 'dia_venta': null },
-                { 'dia_venta': '' },
-                { 'dia_venta': { $not: { $type: 'string' } } }
-              ]
-            }
-          ]
-        };
+        if (fechaInicioAjustada) {
+          const inicio = localElSalvadorToUTC(fechaInicioAjustada, true);
+          filtroFecha.$gte = inicio;
+          console.log(`[DEBUG] Filtro fecha inicio (El Salvador): ${fechaInicioAjustada} -> UTC: ${inicio.toISOString()}`);
+        } else {
+          // Si no se especifica fecha de inicio, usar hoy a medianoche
+          const inicio = hoyElSalvador;
+          filtroFecha.$gte = inicio;
+          console.log(`[DEBUG] Fecha inicio no especificada, usando hoy: ${inicio.toISOString()}`);
+        }
         
-        console.log('[DEBUG] Aplicando filtro para campos de fecha estándar');
-        filtrosFecha.push(filtroCamposFecha);
-      }
-      
-      // 2. Filtro para campos de fecha que son objetos Date
-      // Solo aplicar si hay filtros de fecha definidos
-      if (Object.keys(fechaFiltro).length > 0) {
-        const camposFecha = [
-          'fecha', 'createdAt', 'fecha_creacion', 'fechaCreacion', 
-          'fecha_lead', 'fecha_venta', 'fechaVenta', 'fecha_contratacion',
-          'fechaContratacion', 'creadoEn', 'fecha_registro', 'fechaRegistro'
+        if (fechaFinAjustada) {
+          const fin = localElSalvadorToUTC(fechaFinAjustada, false);
+          filtroFecha.$lte = fin;
+          console.log(`[DEBUG] Filtro fecha fin (El Salvador): ${fechaFinAjustada} -> UTC: ${fin.toISOString()}`);
+        } else {
+          // Si no se especifica fecha de fin, usar mañana a medianoche (exclusivo)
+          const fin = mananaElSalvador;
+          filtroFecha.$lt = fin; // Usar $lt para no incluir la medianoche de mañana
+          console.log(`[DEBUG] Fecha fin no especificada, usando mañana: ${fin.toISOString()}`);
+        }
+        
+        // Crear un array de condiciones OR para los campos de fecha
+        const condicionesFecha = [
+          { 'fecha_contratacion': { ...filtroFecha } },
+          { 'fechaContratacion': { ...filtroFecha } },
+          { 'fecha': { ...filtroFecha } },
+          { 'createdAt': { ...filtroFecha } },
+          { 'fecha_creacion': { ...filtroFecha } },
+          { 'fechaCreacion': { ...filtroFecha } },
+          { 'fecha_lead': { ...filtroFecha } },
+          { 'dia_venta': { ...filtroFecha } }
         ];
         
-        camposFecha.forEach(campo => {
-          filtrosFecha.push({ [campo]: { ...fechaFiltro } });
-        });
+        console.log('[DEBUG] Condiciones de fecha a aplicar:', JSON.stringify(condicionesFecha, null, 2));
+        
+        // Si no hay condiciones OR previas, crear un nuevo array
+        if (!filtro.$or) {
+          filtro.$or = condicionesFecha;
+        } else {
+          // Si ya hay condiciones OR, combinarlas con AND
+          filtro = { $and: [
+            { $or: condicionesFecha },
+            { $or: filtro.$or }
+          ]};
+        }
       }
       
-      console.log('[DEBUG] Filtros de fecha aplicados:', JSON.stringify(filtrosFecha, null, 2));
+      // Campos de fecha para búsqueda adicional (si es necesario)
+      const camposFecha = [
+        'fecha', 
+        'createdAt', 
+        'fecha_creacion', 
+        'fechaCreacion', 
+        'fecha_lead',
+        'dia_venta',
+        'fecha_venta',
+        'fechaVenta',
+        'fecha_contratacion',
+        'fechaContratacion',
+        'creadoEn',
+        'fecha_registro',
+        'fechaRegistro'
+      ];
+      const filtrosFecha = camposFecha.map(campo => ({
+        [campo]: fechaFiltro
+      }));
       
       // Combinar con filtros existentes
       if (Object.keys(filtro).length > 0) {
@@ -212,7 +294,7 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
           zip_code: '',
           telefono_alterno: '',
           autopago: 'No',
-          cantidad_lineas: 0,
+          cantidad_lineas: 1,
           pin_seguridad: '',
           numero_cuenta: ''
         };
@@ -239,183 +321,149 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
     // Si se solicitan datos para gráficas, formatear la salida
     if (paraGrafica === 'true') {
       console.log('[DEBUG] Procesando datos para gráfica...');
-      console.log(`[DEBUG] Total de registros a procesar: ${customers.length}`);
       
-      const datosPorFecha = new Map(); // Usamos Map para mejor rendimiento
-      let totalVentas = 0; // Contador de ventas totales
+      const datosPorFecha = {};
       
-      // Función para extraer fecha de un objeto de cliente
-      const extraerFecha = (cliente) => {
-        // Función para crear fecha en zona horaria de Honduras (UTC-6)
-        const crearFechaHonduras = (year, month, day) => {
-          // Crear fecha en UTC-6 (Honduras)
-          const fecha = new Date(Date.UTC(year, month - 1, day, 6, 0, 0, 0));
-          console.log(`[DEBUG] Fecha creada para Honduras: ${year}-${month}-${day} -> ${fecha.toISOString()}`);
-          return fecha;
-        };
-
-        // Primero verificar si existe el campo dia_venta
-        if (cliente.dia_venta) {
-          try {
-            // Si es un string con formato YYYY-MM-DD
-            if (typeof cliente.dia_venta === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(cliente.dia_venta)) {
-              const [year, month, day] = cliente.dia_venta.split('-').map(Number);
-              const fecha = crearFechaHonduras(year, month, day);
-              console.log('[DEBUG] Fecha extraída de dia_venta (YYYY-MM-DD):', {
-                original: cliente.dia_venta,
-                parsed: fecha.toISOString(),
-                local: fecha.toString()
-              });
-              return fecha;
-            }
-            // Si es un string con formato DD/MM/YYYY
-            else if (typeof cliente.dia_venta === 'string' && cliente.dia_venta.includes('/')) {
-              const [day, month, year] = cliente.dia_venta.split('/').map(Number);
-              // Asegurar año de 4 dígitos
-              const fullYear = year < 100 ? (year < 50 ? 2000 + year : 1900 + year) : year;
-              const fecha = crearFechaHonduras(fullYear, month, day);
-              console.log('[DEBUG] Fecha extraída de dia_venta (DD/MM/YYYY):', {
-                original: cliente.dia_venta,
-                parsed: fecha.toISOString(),
-                local: fecha.toString()
-              });
-              return fecha;
-            }
-            // Si es una fecha ISO o timestamp
-            else {
-              const fecha = new Date(cliente.dia_venta);
-              if (!isNaN(fecha.getTime())) {
-                // Ajustar a zona horaria de Honduras (UTC-6)
-                const fechaHonduras = new Date(fecha.getTime() + (fecha.getTimezoneOffset() * 60000) + (-6 * 60 * 60000));
-                console.log('[DEBUG] Fecha extraída de dia_venta (ISO):', {
-                  original: cliente.dia_venta,
-                  parsed: fechaHonduras.toISOString(),
-                  local: fechaHonduras.toString()
-                });
-                return fechaHonduras;
-              }
-            }
-          } catch (e) {
-            console.warn('[ADVERTENCIA] Error al procesar campo dia_venta:', e);
-          }
-        }
-        
-        // Si no se pudo obtener de dia_venta, intentar con otros campos
-        const otrosCamposFecha = [
-          'fecha_venta', 'fechaVenta',
-          'fecha_contratacion', 'fechaContratacion',
-          'fecha_creacion', 'fechaCreacion', 'createdAt',
-          'fecha_registro', 'fechaRegistro', 'creadoEn',
-          'fecha', 'updatedAt', 'fecha_actualizacion'
-        ];
-        
-        for (const campo of otrosCamposFecha) {
-          if (cliente[campo]) {
-            try {
-              const fecha = new Date(cliente[campo]);
-              if (!isNaN(fecha.getTime())) {
-                // Ajustar a la zona horaria local (Honduras UTC-6)
-                const localTime = new Date(fecha.getTime() - (6 * 60 * 60 * 1000));
-                console.log(`[ADVERTENCIA] Usando campo alternativo ${campo} en lugar de dia_venta`);
-                return localTime;
-              }
-            } catch (e) {
-              console.warn(`[ADVERTENCIA] Error al procesar campo ${campo}:`, e);
-            }
-          }
-        }
-        
-        // Si no se encuentra ninguna fecha válida, devolver la fecha actual
-        const now = new Date();
-        const localNow = new Date(now.getTime() - (6 * 60 * 60 * 1000));
-        console.warn('[ADVERTENCIA] No se encontró una fecha válida, usando fecha actual:', localNow);
-        return localNow;
-      };
-
-      // Procesar cada cliente
-      customers.forEach((customer, index) => {
+      // Función para obtener la fecha en formato YYYY-MM-DD (Honduras UTC-6)
+      const toHondurasDate = (fechaInput) => {
         try {
-          // Obtener la fecha del registro usando la función mejorada
-          const fecha = extraerFecha(customer);
+          let fecha;
           
-          // Si no se pudo determinar la fecha, omitir este registro
-          if (!fecha) {
-            console.warn(`[ADVERTENCIA] Registro ${index}: No se pudo determinar la fecha para el cliente:`, 
-              customer._id || 'ID no disponible');
-            return; // Saltar a la siguiente iteración
+          // Si no hay fecha de entrada, usar la fecha actual en Honduras
+          if (!fechaInput) {
+            console.log('[DEBUG] Usando fecha actual de Honduras');
+            const ahora = new Date();
+            // Ajustar a zona horaria de Honduras (UTC-6)
+            const offsetHonduras = 6 * 60 * 60 * 1000; // 6 horas en milisegundos
+            fecha = new Date(ahora.getTime() - offsetHonduras);
+          } else {
+            // Intentar crear fecha a partir del input
+            fecha = new Date(fechaInput);
+            
+            // Si no es una fecha válida, intentar con formato YYYY-MM-DD
+            if (isNaN(fecha.getTime())) {
+              const partes = String(fechaInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+              if (partes) {
+                const [_, year, month, day] = partes;
+                fecha = new Date(Date.UTC(year, month - 1, day, 6, 0, 0)); // 00:00 Honduras = 06:00 UTC
+              }
+            }
+            
+            // Si sigue sin ser válida, usar la fecha actual en Honduras
+            if (isNaN(fecha.getTime())) {
+              console.warn('[WARN] No se pudo parsear la fecha, usando actual:', fechaInput);
+              const ahora = new Date();
+              const offsetHonduras = 6 * 60 * 60 * 1000; // 6 horas en milisegundos
+              fecha = new Date(ahora.getTime() - offsetHonduras);
+            }
           }
           
-          // Formatear la fecha a YYYY-MM-DD
-          const fechaFormateada = fecha.toISOString().split('T')[0];
+          // Asegurarse de que la fecha esté en la zona horaria correcta
+          const fechaHonduras = new Date(fecha.getTime() - (6 * 60 * 60 * 1000));
           
-          // Obtener o inicializar los datos para esta fecha
-          if (!datosPorFecha.has(fechaFormateada)) {
-            datosPorFecha.set(fechaFormateada, {
-              fecha: fechaFormateada,
-              ventas: 0,
+          // Obtener componentes de la fecha en formato local
+          const year = fechaHonduras.getUTCFullYear();
+          const month = String(fechaHonduras.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(fechaHonduras.getUTCDate()).padStart(2, '0');
+          
+          const fechaFormateada = `${year}-${month}-${day}`;
+          console.log(`[DEBUG] toHondurasDate: ${fechaInput} -> ${fechaFormateada}`);
+          return fechaFormateada;
+        } catch (e) {
+          console.error('[ERROR] Error al convertir fecha:', fechaInput, e);
+          return 'error-fecha';
+        }
+      };
+      
+      // Procesar clientes para la gráfica
+      customers.forEach(customer => {
+        try {
+          // Obtener la fecha del registro (probar diferentes campos de fecha)
+          const posiblesCamposFecha = [
+            'fecha_creacion', 'fecha', 'createdAt', 'updatedAt', 
+            'fecha_venta', 'dia_venta', 'fechaContratacion', 'fecha_contratacion'
+          ];
+          
+          // Buscar el primer campo de fecha válido
+          let fechaHonduras = 'fecha-no-encontrada';
+          
+          for (const campo of posiblesCamposFecha) {
+            if (customer[campo]) {
+              const fechaConvertida = toHondurasDate(customer[campo]);
+              if (fechaConvertida && !fechaConvertida.startsWith('error') && 
+                  !fechaConvertida.startsWith('fecha-no')) {
+                fechaHonduras = fechaConvertida;
+                break;
+              }
+            }
+          }
+          
+          // Si no se encontró fecha válida, usar la fecha actual de Honduras
+          if (fechaHonduras === 'fecha-no-encontrada') {
+            const ahora = new Date();
+            const offsetHonduras = 6 * 60 * 60 * 1000;
+            const ahoraHonduras = new Date(ahora.getTime() - offsetHonduras);
+            const [fechaActual] = ahoraHonduras.toISOString().split('T');
+            fechaHonduras = fechaActual;
+            console.log(`[DEBUG] Usando fecha actual para cliente sin fecha: ${fechaHonduras}`);
+          }
+          
+          // Inicializar el objeto para esta fecha si no existe
+          if (!datosPorFecha[fechaHonduras]) {
+            datosPorFecha[fechaHonduras] = {
+              fecha: fechaHonduras,
+              total: 0,
+              icon: 0,
+              bamo: 0,
               puntaje: 0,
-              registros: []
-            });
+              registros: 0 // Contador de registros por fecha para depuración
+            };
           }
           
-          const datosDia = datosPorFecha.get(fechaFormateada);
+          // Incrementar contador de registros para esta fecha
+          datosPorFecha[fechaHonduras].registros += 1;
           
-          // Calcular cantidad de ventas (líneas) para este cliente
-          const cantidadVentas = Math.max(1, parseInt(customer.cantidad_lineas) || 1);
-          const puntajeVenta = parseFloat(customer.puntaje) || 0;
+          // Sumar al total
+          datosPorFecha[fechaHonduras].total += 1;
           
-          // Actualizar contadores
-          datosDia.ventas += cantidadVentas;
-          datosDia.puntaje += puntajeVenta;
-          totalVentas += cantidadVentas;
-          
-          // Mantener registro de los datos originales (opcional, para depuración)
-          if (datosDia.registros.length < 5) { // Limitar para no sobrecargar memoria
-            datosDia.registros.push({
-              id: customer._id,
-              nombre: customer.nombre_cliente || 'Sin nombre',
-              lineas: cantidadVentas,
-              puntaje: puntajeVenta
-            });
+          // Contar ICON/BAMO (insensible a mayúsculas/minúsculas)
+          if (customer.mercado && typeof customer.mercado === 'string') {
+            if (customer.mercado.toLowerCase() === 'icon') {
+              datosPorFecha[fechaHonduras].icon += 1;
+            } else if (customer.mercado.toLowerCase() === 'bamo') {
+              datosPorFecha[fechaHonduras].bamo += 1;
+            }
           }
           
-          // Debug detallado para los primeros 5 registros
-          if (index < 5) {
-            console.log(`[DEBUG] Registro ${index + 1}:`, {
-              fecha: fechaFormateada,
-              cliente: customer.nombre_cliente || 'Sin nombre',
-              lineas: cantidadVentas,
-              puntaje: puntajeVenta,
-              totalVentasHastaAhora: datosDia.ventas
-            });
+          // Sumar puntaje (manejar diferentes formatos de puntaje)
+          let puntaje = 0;
+          if (typeof customer.puntaje === 'number') {
+            puntaje = customer.puntaje;
+          } else if (typeof customer.puntaje === 'string') {
+            puntaje = parseFloat(customer.puntaje) || 0;
           }
+          
+          datosPorFecha[fechaHonduras].puntaje += puntaje;
+          
         } catch (error) {
-          console.error(`[ERROR] Error al procesar registro ${index}:`, error);
+          console.error('[ERROR] Error procesando cliente:', error);
         }
       });
-
-      // Convertir el Map a array y ordenar por fecha
-      const resultado = Array.from(datosPorFecha.values())
-        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
       
-      console.log(`[DEBUG] Resumen de ventas por fecha:`, resultado.map(r => ({
-        fecha: r.fecha, 
-        ventas: r.ventas,
-        registros: r.registros.length
-      })));
+      // Convertir el objeto de fechas a un array para la respuesta
+      const resultado = Object.values(datosPorFecha);
       
-      console.log(`[DEBUG] Total de ventas procesadas: ${totalVentas}`);
+      // Ordenar por fecha (más reciente primero)
+      resultado.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
       
       return res.json({
         success: true,
         data: resultado,
-        totalVentas: totalVentas,
-        totalDias: resultado.length
+        total: resultado.length
       });
-      
-    } // Fin del if (paraGrafica === 'true')
-
-    // Si no es para gráfica, devolver los clientes sin procesar
+    }
+    
+    // Si no es para gráfica, devolver los datos completos
     return res.json({
       success: true,
       data: customers,

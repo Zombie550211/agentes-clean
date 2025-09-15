@@ -1759,7 +1759,11 @@
     } catch {}
 
         // Actualizar la interfaz
-        renderCostumerTable(normalizedLeads);
+        if (typeof window.renderCostumerTable === 'function') {
+            window.renderCostumerTable(normalizedLeads);
+        } else {
+            console.error('La función renderCostumerTable no está disponible');
+        }
         // Logs de diagnóstico de asignación (por TEAM y agente)
         try { if (typeof logDiagnosticoAsignacion === 'function') logDiagnosticoAsignacion(normalizedLeads); } catch(_) {}
         updateSummaryCards(normalizedLeads);
@@ -2022,8 +2026,8 @@
       }
     }
 
-    // Función para renderizar la tabla de clientes
-    function renderCostumerTable(leads) {
+    // Función deshabilitada - Usando la versión de script.js
+    function renderCostumerTable_OLD(leads) {
       console.log('renderCostumerTable llamada con leads:', leads);
       
       // Asegurarse de que leads sea un array
@@ -2616,7 +2620,13 @@
               if (active) { b.style.background = '#1d4ed8'; b.style.color = '#ffffff'; b.style.borderColor = '#1d4ed8'; }
               b.addEventListener('click', () => {
                 window.supervisorAgentFilter = value; // null = Todos
-                try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+                try { 
+                    if (typeof window.renderCostumerTable === 'function') {
+                        window.renderCostumerTable(window.ultimaListaLeads || []);
+                    } else {
+                        console.error('La función renderCostumerTable no está disponible');
+                    }
+                } catch(e) { console.error('Error al renderizar tabla:', e); }
               });
               return b;
             };
@@ -2782,7 +2792,13 @@
                 }
                 b.addEventListener('click', () => {
                   window.supervisorAgentFilter = value; // null = Todos
-                  try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+                  try { 
+                    if (typeof window.renderCostumerTable === 'function') {
+                        window.renderCostumerTable(window.ultimaListaLeads || []);
+                    } else {
+                        console.error('La función renderCostumerTable no está disponible');
+                    }
+                } catch(e) { console.error('Error al renderizar tabla:', e); }
                 });
                 return b;
               };
@@ -3098,7 +3114,13 @@
             b.style.fontSize = '12px';
             b.addEventListener('click', () => {
               window.adminTeamFilter = value || null;
-              try { renderCostumerTable(window.ultimaListaLeads || []); } catch(_) {}
+              try { 
+                if (typeof window.renderCostumerTable === 'function') {
+                  window.renderCostumerTable(window.ultimaListaLeads || []);
+                } else {
+                  console.error('La función renderCostumerTable no está disponible');
+                }
+              } catch(e) { console.error('Error al renderizar tabla:', e); }
             });
             return b;
           };
