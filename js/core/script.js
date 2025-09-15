@@ -166,9 +166,13 @@ async function cargarDatosDesdeServidor() {
       debugInfo('No se encontró token de autenticación');
     }
 
-    // Evitar caché y diagnosticar respuestas
-    // Backend principal (Mongo) corre en 10000; evitar usar location.origin si apunta a otro server (p.ej. 3000)
-    const API_BASE = (window.API_BASE || 'http://localhost:10000').replace(/\/$/, '');
+    // Configuración de la URL base de la API
+    // En producción, usar la URL de Render, en desarrollo localhost:10000
+    const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    const API_BASE = window.API_BASE || (isProduction 
+      ? 'https://agentes-49dr.onrender.com' 
+      : 'http://localhost:10000');
+    console.log('[DEBUG] Modo producción:', isProduction, 'API_BASE:', API_BASE);
     debugInfo(`Conectando a: ${API_BASE}`);
     // Obtener la fecha actual en la zona horaria de Honduras (UTC-6)
     // 1. Crear fecha actual en la zona local
@@ -216,12 +220,34 @@ async function cargarDatosDesdeServidor() {
           </td>
         </tr>`;
     }
-    let response = await fetch(url, {
-      method: 'GET',
-      credentials: 'include',
-      headers,
-      cache: 'no-store'
-    });
+    console.log('[DEBUG] Headers de la petición:', headers);
+    console.log('[DEBUG] URL de la petición:', url);
+    
+    let response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+        cache: 'no-store',
+        mode: 'cors'
+      });
+      
+      console.log('[DEBUG] Estado de la respuesta:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ERROR] Error en la respuesta del servidor:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('[ERROR] Error en la petición fetch:', error);
+      throw new Error(`No se pudo conectar al servidor. Verifica tu conexión a internet o inténtalo más tarde. Detalles: ${error.message}`);
+    }
     
     // Si el servidor responde 304 (caché), reintentar con cache-busting
     if (response.status === 304) {
@@ -387,6 +413,7 @@ async function cargarDatosDesdeServidor() {
           </td>
         </tr>`;
     }
+    throw error; // Relanzar el error para que pueda ser manejado por el llamador
   }
 }
 

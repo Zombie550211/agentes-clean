@@ -62,25 +62,39 @@ function cookieOptionsForReq(req, baseOpts) {
   return defaultOpts;
 }
 
-// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + origen propio en Render
+// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + orígenes conocidos
 const parseAllowedOrigins = (raw) => (raw || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
+
+// Lista blanca de orígenes permitidos
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 const defaultAllowed = [
   'http://localhost:10000',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  'http://127.0.0.1:10000'
+  'http://127.0.0.1:10000',
+  'https://agentes-49dr.onrender.com',
+  'https://agentes-frontend.onrender.com'
 ];
-// Tomar el origen público si está configurado (Render expone RENDER_EXTERNAL_URL)
-const selfOriginRaw = (process.env.PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL || '').trim();
-const selfOrigin = selfOriginRaw ? selfOriginRaw.replace(/\/$/, '') : '';
-const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS) || [];
-if (selfOrigin && !allowedOrigins.includes(selfOrigin)) {
-  allowedOrigins.push(selfOrigin);
+
+// Si estamos en producción, añadir el dominio de Render a la lista blanca
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  const renderDomains = [
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.RENDER_INSTANCE && `https://${process.env.RENDER_INSTANCE}.onrender.com`,
+    'https://agentes-49dr.onrender.com'
+  ].filter(Boolean);
+  
+  allowedOrigins.push(...renderDomains);
+  console.log('[CORS] Orígenes permitidos en producción:', allowedOrigins);
 }
-const whitelist = allowedOrigins.length ? allowedOrigins : defaultAllowed;
+
+const whitelist = [...new Set([...allowedOrigins, ...defaultAllowed])]; // Eliminar duplicados
+console.log('[CORS] Lista blanca final:', whitelist);
+
 const corsOptions = {
   origin: (origin, callback) => {
     // Permitir solicitudes sin origen (navegación directa) y orígenes en whitelist
