@@ -236,7 +236,19 @@ app.post('/api/lineas', protect, async (req, res) => {
 });
 const loginLimiter = makeLimiter({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
 
-// Servir archivos estáticos
+// Ruta protegida para Costumer.html (solo administradores) - DEBE IR ANTES de express.static
+app.get('/Costumer.html', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (req.user && req.user.role === 'admin') {
+    // Si es administrador, servir el archivo directamente
+    return res.sendFile(path.join(publicPath, 'Costumer.html'));
+  } else {
+    // Si no es administrador, redirigir a página de inicio con mensaje de error
+    return res.redirect('/inicio?error=Acceso denegado. Se requiere rol de administrador.');
+  }
+});
+
+// Servir archivos estáticos (EXCEPTO Costumer.html que ya está protegido)
 app.use(express.static(staticPath, {
   extensions: ['html', 'htm'],
   setHeaders: (res, filePath) => {
@@ -246,8 +258,16 @@ app.use(express.static(staticPath, {
     } else if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
     }
-  }
+  },
+  // Evitar que se sirva directamente Costumer.html
+  index: false,
+  redirect: false
 }));
+
+// Bloquear acceso directo a Costumer.html si se intenta acceder después de express.static
+app.get('/Costumer.html', (req, res) => {
+  res.redirect('/inicio?error=Acceso denegado. Se requiere autenticación como administrador.');
+});
 
 // Handle CORS preflight for all routes
 app.options('*', cors(corsOptions));
@@ -483,9 +503,18 @@ app.get('/api/comments', async (req, res) => {
   }
 });
 
-// Endpoints de comentarios por lead (usados por js/core/costumer-comments.js)
+// Endpoints de comentarios por lead (solo administradores)
 // Listar comentarios
-app.get('/api/leads/:id/comentarios', async (req, res) => {
+app.get('/api/leads/:id/comentarios', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requiere rol de administrador.'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     const leadId = req.params.id;
     if (!db) await connectToMongoDB();
@@ -681,15 +710,33 @@ app.put('/api/leads/:id/status', protect, authorize('admin','backoffice','b:o','
   }
 });
 
-// Alias para compatibilidad: /api/leads redirige a /api/customers
-app.get('/api/leads', protect, authorize('admin','supervisor','agent'), async (req, res) => {
+// Alias para compatibilidad: /api/leads redirige a /api/customers (solo administradores)
+app.get('/api/leads', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requiere rol de administrador.'
+    });
+  }
+  next();
+}, async (req, res) => {
   // Redirigir a /api/customers con los mismos parámetros
   const queryParams = new URLSearchParams(req.query).toString();
   res.redirect(307, `/api/customers?${queryParams}`);
 });
 
-// Endpoint para obtener clientes desde la base de datos (PROTEGIDO + RBAC)
-app.get('/api/customers', protect, authorize('admin','supervisor','agent'), async (req, res) => {
+// Endpoint para obtener clientes desde la base de datos (solo administradores)
+app.get('/api/customers', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requiere rol de administrador.'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     console.log('Solicitud recibida en /api/customers');
     
@@ -1356,6 +1403,18 @@ app.get('/inicio', (req, res) => {
   res.sendFile(path.join(publicPath, 'lead.html'));
 });
 
+// Ruta protegida para Costumer.html (solo administradores)
+app.get('/Costumer.html', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (req.user && req.user.role === 'admin') {
+    // Si es administrador, servir el archivo
+    return res.sendFile(path.join(publicPath, 'Costumer.html'));
+  } else {
+    // Si no es administrador, redirigir a página de inicio con mensaje de error
+    return res.redirect('/inicio?error=Acceso denegado. Se requiere rol de administrador.');
+  }
+});
+
 // Manejar rutas de la aplicación (SPA)
 app.get('*', (req, res) => {
   // Si la ruta es una extensión de archivo, devolver 404
@@ -1373,7 +1432,17 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/crmage
 // La función connectToMongoDB ahora se importa desde ./config/db.js
 
 // Endpoint unificado para obtener clientes con soporte para paginación y datos de gráficas
-app.get('/api/leads', async (req, res) => {
+// Solo accesible para administradores
+app.get('/api/leads', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requiere rol de administrador.'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     const { 
       page, 
@@ -1799,8 +1868,17 @@ app.post('/api/customers', protect, async (req, res) => {
   }
 });
 
-// Endpoint para obtener leads con filtros
-app.get('/api/leads', async (req, res) => {
+// Endpoint para obtener leads con filtros (solo administradores)
+app.get('/api/leads', protect, (req, res, next) => {
+  // Verificar si el usuario es administrador
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado. Se requiere rol de administrador.'
+    });
+  }
+  next();
+}, async (req, res) => {
   try {
     const { agente, fechaInicio, fechaFin } = req.query;
     

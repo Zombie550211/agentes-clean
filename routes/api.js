@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ObjectId } = require('mongodb');
-const { protect } = require('../middleware/auth');
+const { protect, hasTableAccess } = require('../middleware/auth');
 const User = require('../models/User');
 const { connectToMongoDB, getDb } = require('../config/db');
 
@@ -28,8 +28,8 @@ const withDatabase = async (req, res, next) => {
   }
 };
 
-// Ruta para obtener leads completos (o datos para gráficas si paraGrafica=true)
-router.get('/leads', protect, withDatabase, async (req, res) => {
+// Ruta para obtener leads completos (solo accesible para administradores)
+router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => {
   const db = req.db;
   let filtro = {}; 
   let usuarioAutenticado = req.user || null;
@@ -65,11 +65,34 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
     // Construir el filtro de consulta
     const allFilters = [];
     
-    // Aplicar filtro por agente si se especificó
-    if (agenteQuery) {
-      allFilters.push({ agente: agenteQuery });
-      allFilters.push({ agenteNombre: agenteQuery });
-      allFilters.push({ createdBy: agenteQuery });
+    // Determinar si el usuario es administrador
+    const esAdmin = usuarioAutenticado && usuarioAutenticado.role === 'admin';
+    
+    console.log('[DEBUG] Rol del usuario:', usuarioAutenticado?.role || 'no autenticado');
+    
+    // Si no es administrador, no permitir ver ningún cliente
+    if (!esAdmin) {
+      console.log('[DEBUG] Usuario no es administrador, denegando acceso a clientes');
+      return res.status(200).json({
+        success: true,
+        data: [],
+        total: 0,
+        message: 'Acceso denegado. Se requiere rol de administrador.'
+      });
+    }
+    // Si se especificó un agente en la consulta (solo para administradores)
+    else if (agenteQuery && esAdmin) {
+      console.log('[DEBUG] Filtro de agente para administrador:', agenteQuery);
+      allFilters.push({ 
+        $or: [
+          { agente: agenteQuery },
+          { agenteNombre: agenteQuery },
+          { createdBy: agenteQuery },
+          { agente: { $regex: agenteQuery, $options: 'i' } },
+          { agenteNombre: { $regex: agenteQuery, $options: 'i' } },
+          { createdBy: { $regex: agenteQuery, $options: 'i' } }
+        ]
+      });
     }
     
     // Aplicar filtro por estado si se especificó

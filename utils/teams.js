@@ -96,44 +96,25 @@
         'riquelmi torres'
       ]
     },
-    // Equipo histórico unificado (compatibilidad). Se mantiene, pero se añaden equipos 1 y 2 abajo.
+    // EQUIPO LINEAS UNIFICADO
     'team lineas': {
       displayName: 'TEAM LINEAS',
+      // Mantenemos ambos supervisores
       supervisor: 'jonathan figueroa',
+      // Segundo supervisor se manejará internamente
+      additionalSupervisors: ['luis gutierrez'],
+      // Lista completa de agentes
       agents: [
         'lineas-carlos',
         'lineas-cristian r',
         'lineas-edward',
         'lineas-jocelyn',
-        'lineas-luis g',
         'lineas-oscar r',
         'lineas-daniel',
         'lineas-karla',
         'lineas-sandy',
-        'lineas-angie'
-      ]
-    },
-    // TEAM LINEAS 1
-    'team lineas 1': {
-      displayName: 'TEAM LINEAS 1',
-      supervisor: 'jonathan figueroa',
-      agents: [
-        'lineas-carlos',
-        'lineas-cristian r',
-        'lineas-edward',
-        'lineas-jocelyn',
-        'lineas-oscar r'
-      ]
-    },
-    // TEAM LINEAS 2
-    'team lineas 2': {
-      displayName: 'TEAM LINEAS 2',
-      supervisor: 'luis gutierrez',
-      agents: [
-        'lineas-daniel',
-        'lineas-karla',
-        'lineas-sandy',
-        'lineas-angie'
+        'lineas-angie',
+        'luis gutierrez'  // Añadido como agente también para mantener la jerarquía
       ]
     }
   };
@@ -168,6 +149,12 @@
       }
     });
     if (sup) canonicalNames.add(sup);
+    if (def.additionalSupervisors) {
+      def.additionalSupervisors.forEach(sup => {
+        const supNorm = norm(sup);
+        canonicalNames.add(supNorm);
+      });
+    }
   });
 
   // Canoniza un nombre a uno de los canónicos conocidos (por tokens incluidos)
@@ -199,15 +186,40 @@
   const getTeamDef = (teamKey) => TEAMS[norm(teamKey)] || null;
   const getTeamByAgent = (agentName) => agentToTeam.get(canonicalFromName(agentName)) || '';
   const getTeamBySupervisor = (supName) => supervisorToTeam.get(canonicalFromName(supName)) || '';
-  const isSupervisor = (name) => !!supervisorToTeam.get(canonicalFromName(name));
+  const isSupervisor = (name) => {
+    const normName = canonicalFromName(name);
+    // Verificar si es supervisor principal
+    if (supervisorToTeam.get(normName)) return true;
+    
+    // Verificar si es supervisor adicional en algún equipo
+    for (const team of Object.values(TEAMS)) {
+      if (team.additionalSupervisors && 
+          team.additionalSupervisors.some(sup => canonicalFromName(sup) === normName)) {
+        return true;
+      }
+    }
+    return false;
+  };
   const getAgentsByTeam = (teamKey) => (getTeamDef(teamKey)?.agents || []).slice();
   const getAgentsBySupervisor = (supName) => {
     const team = getTeamBySupervisor(supName);
     return team ? getAgentsByTeam(team) : [];
   };
   const getSupervisorByAgent = (agentName) => {
-    const team = getTeamByAgent(agentName);
-    return team ? (getTeamDef(team)?.supervisor || '') : '';
+    const normAgent = canonicalFromName(agentName);
+    const teamKey = getTeamByAgent(normAgent);
+    const team = getTeamDef(teamKey);
+    
+    if (!team) return '';
+    
+    // Si el agente es un supervisor adicional, devolverlo a sí mismo
+    if (team.additionalSupervisors && 
+        team.additionalSupervisors.some(sup => canonicalFromName(sup) === normAgent)) {
+      return normAgent;
+    }
+    
+    // Si no, devolver el supervisor principal del equipo
+    return team.supervisor || '';
   };
 
   // Convierte a Title Case simple

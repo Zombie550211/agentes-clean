@@ -131,6 +131,26 @@ exports.protect = async (req, res, next) => {
   }
 };
 
+// Middleware para verificar si el usuario tiene acceso a la tabla de clientes
+exports.hasTableAccess = (req, res, next) => {
+  console.log('[AUTH] Verificando acceso a la tabla de clientes');
+  
+  // Solo los administradores pueden ver la tabla de clientes
+  if (req.user && req.user.role === 'admin') {
+    console.log(`[AUTH] Acceso concedido a la tabla de clientes para ${req.user.username}`);
+    return next();
+  }
+  
+  console.warn(`[AUTH] Acceso denegado a la tabla de clientes para ${req.user?.username || 'usuario no autenticado'}`);
+  return res.status(403).json({
+    success: false,
+    message: 'Acceso denegado: No tienes permisos para ver la tabla de clientes',
+    code: 'ACCESS_DENIED',
+    requiredRole: 'admin',
+    currentRole: req.user?.role || 'no autenticado'
+  });
+};
+
 // Middleware para autorizar por roles
 exports.authorize = (...roles) => {
   const allowed = roles.map(r => r.toString().toLowerCase());

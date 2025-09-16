@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CRM Agente - Team Líneas</title>
+  <script>
+    // Versionado para romper caché
+    window.__APP_VERSION__ = '20250915-1200';
+    console.info('[lead-lineas.html] version', window.__APP_VERSION__);
+  </script>
+  
+  <!-- Hojas de estilo -->
+  <link rel="stylesheet" href="css/theme.css?v=20250915-1200" />
+  <link rel="stylesheet" href="css/sidebar.css?v=20250915-1200" />
+  <link rel="stylesheet" href="css/costumer-page.css?v=20250915-1200" />
+  
+  <!-- Scripts de terceros -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-modal/0.9.1/jquery.modal.min.js"></script>
+  
+  <!-- Scripts de la aplicación -->
+  <script>
+    // Verificación de autenticación
+    window.authChecked = true;
+    
+    // Opción para silenciar logs
+    (function() {
+      try {
+        const shouldSilence = typeof localStorage !== 'undefined' && localStorage.getItem('silenceLogs') === '1';
+        if (shouldSilence && typeof console !== 'undefined') {
+          const noop = function(){};
+          console.log = noop;
+          console.info = noop;
+        }
+      } catch (e) {
+        // Ignorar si localStorage no está disponible
+      }
+    })();
+  </script>
+  
+  <!-- Scripts locales -->
+  <script src="agentes/js/auth-check.js?v=20250915-1200"></script>
+  <script src="/js/logout-handler.js?v=20250915-1200"></script>
+  <script src="/js/user-info.js?v=20250915-1200"></script>
+  <script src="/js/sidebar-loader.js?v=20250915-1200"></script>
+  <script src="/utils/teams.js?v=20250915-1200"></script>
+  
+  <!-- Estilos específicos para Team Líneas -->
+  <style>
+    /* Estilos específicos para el formulario de Team Líneas */
+    .form-section {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-section h2 {
+      color: #2c3e50;
+      margin-bottom: 1.5rem;
+      text-align: center;
+      font-size: 1.8rem;
+    }
+    
+    .form-fields-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5rem;
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #34495e;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .btn-submit {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: background 0.3s;
+      display: block;
+      width: 100%;
+      max-width: 300px;
+      margin: 2rem auto 0;
+    }
+    
+    .btn-submit:hover {
+      background: #2980b9;
+    }
+    
+    .btn-submit:disabled {
+      background: #95a5a6;
+      cursor: not-allowed;
+    }
+    
+    /* Estilos para el contenedor de teléfonos dinámicos */
+    .telefonos-container {
+      grid-column: 1 / -1;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+    
+    .telefono-item {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid #eee;
+    }
+    
+    .telefono-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+  </style>
+</head>
+<body class="team-lineas">
+<div class="layout">
+  <!-- SIDEBAR (cargado dinámicamente) -->
+  <nav class="sidebar sidebar-inicio" data-active="lead"></nav>
+  
+  <main class="main-content">
+    <div class="lead-content-row">
+      <!-- FORMULARIO TEAM LÍNEAS -->
+      <section class="form-section" id="form-panel">
+        <h2>Formulario Team Líneas</h2>
+        <form id="crmLineasForm">
+          <!-- Contenedor de campos con scroll -->
+          <div class="form-fields-container">
+            <!-- Los campos del formulario se agregarán aquí -->
+            <div class="form-group">
+              <label for="nombre-cliente">Nombre del Cliente *</label>
+              <input type="text" id="nombre-cliente" name="nombre_cliente" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="telefono-principal">Teléfono Principal *</label>
+              <input type="tel" id="telefono-principal" name="telefono_principal" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="numero-cuenta">Número de Cuenta *</label>
+              <input type="text" id="numero-cuenta" name="numero_cuenta" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="pin-seguridad">PIN de Seguridad *</label>
+              <input type="password" id="pin-seguridad" name="pin_seguridad" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="direccion">Dirección *</label>
+              <input type="text" id="direccion" name="direccion" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="autopay">Autopago *</label>
+              <select id="autopay" name="autopay" class="form-control" required>
+                <option value="">Seleccione</option>
+                <option value="SI">Sí</option>
+                <option value="NO">No</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="cantidad-lineas">Cantidad de Líneas *</label>
+              <select id="cantidad-lineas" name="cantidad_lineas" class="form-control" required>
+                <option value="">Seleccione</option>
+                <option value="1">1 Línea</option>
+                <option value="2">2 Líneas</option>
+                <option value="3">3 Líneas</option>
+                <option value="4">4 Líneas</option>
+                <option value="5">5 Líneas</option>
+              </select>
+            </div>
+            
+            <!-- Contenedor para teléfonos adicionales (se llenará dinámicamente) -->
+            <div id="telefonos-container" class="telefonos-container" style="display: none;">
+              <h4>Teléfonos Adicionales</h4>
+              <div id="telefonos-lista">
+                <!-- Los campos de teléfono se agregarán aquí dinámicamente -->
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="dia-venta">Día de Venta *</label>
+              <input type="date" id="dia-venta" name="dia_venta" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="dia-instalacion">Día de Instalación *</label>
+              <input type="date" id="dia-instalacion" name="dia_instalacion" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="mercado">Mercado *</label>
+              <select id="mercado" name="mercado" class="form-control" required>
+                <option value="">Seleccione</option>
+                <option value="ICON">ICON</option>
+                <option value="BAMO">BAMO</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="supervisor">Supervisor *</label>
+              <select id="supervisor" name="supervisor" class="form-control" required>
+                <option value="">Seleccione</option>
+                <option value="JONATHAN">JONATHAN</option>
+                <option value="LUIS">LUIS</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Status *</label>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="status" value="PENDING" checked required>
+                  <span>PENDIENTE</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="status" value="REPRO">
+                  <span>REPRO</span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="comentarios">Comentarios (Opcional)</label>
+              <textarea id="comentarios" name="comentarios" class="form-control" rows="3"></textarea>
+            </div>
+          </div>
+          
+          <button type="submit" class="btn-submit">Guardar Registro</button>
+        </form>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Script para manejar el formulario de Team Líneas -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar la fecha actual en los campos de fecha
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dia-venta').value = today;
+    
+    // Manejar cambios en la cantidad de líneas
+    const cantidadLineasSelect = document.getElementById('cantidad-lineas');
+    const telefonosContainer = document.getElementById('telefonos-container');
+    const telefonosLista = document.getElementById('telefonos-lista');
+    
+    cantidadLineasSelect.addEventListener('change', function() {
+      const cantidad = parseInt(this.value) || 0;
+      
+      // Limpiar lista de teléfonos
+      telefonosLista.innerHTML = '';
+      
+      if (cantidad > 1) {
+        // Mostrar contenedor de teléfonos adicionales
+        telefonosContainer.style.display = 'block';
+        
+        // Agregar campos para teléfonos adicionales (desde 2 hasta la cantidad seleccionada)
+        for (let i = 1; i < cantidad; i++) {
+          const telefonoDiv = document.createElement('div');
+          telefonoDiv.className = 'telefono-item';
+          telefonoDiv.innerHTML = `
+            <div class="form-group">
+              <label for="telefono-${i}">Teléfono ${i + 1} *</label>
+              <input type="tel" id="telefono-${i}" name="telefono_${i}" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="servicio-${i}">Tipo de Servicio *</label>
+              <select id="servicio-${i}" name="servicio_${i}" class="form-control" required>
+                <option value="">Seleccione</option>
+                <option value="SIM WIRELESS">SIM WIRELESS</option>
+                <option value="WIRELESS">WIRELESS</option>
+              </select>
+            </div>
+          `;
+          telefonosLista.appendChild(telefonoDiv);
+        }
+      } else {
+        // Ocultar contenedor si solo es 1 línea o ninguna
+        telefonosContainer.style.display = 'none';
+      }
+    });
+    
+    // Manejar el envío del formulario
+    const form = document.getElementById('crmLineasForm');
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // Validar formulario
+      if (!form.checkValidity()) {
+        alert('Por favor complete todos los campos requeridos.');
+        return;
+      }
+      
+      // Mostrar indicador de carga
+      const submitButton = form.querySelector('button[type="submit"]');
+      const originalText = submitButton.textContent;
+      submitButton.disabled = true;
+      submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+      
+      try {
+        // Recolectar datos del formulario
+        const formData = new FormData(form);
+        const data = {};
+        
+        // Convertir FormData a objeto
+        formData.forEach((value, key) => {
+          data[key] = value;
+        });
+        
+        // Recolectar teléfonos adicionales
+        const telefonosAdicionales = [];
+        const cantidadLineas = parseInt(cantidadLineasSelect.value) || 1;
+        
+        for (let i = 1; i < cantidadLineas; i++) {
+          const telefono = document.getElementById(`telefono-${i}`)?.value;
+          const servicio = document.getElementById(`servicio-${i}`)?.value;
+          
+          if (telefono && servicio) {
+            telefonosAdicionales.push({
+              numero: telefono,
+              servicio: servicio
+            });
+          }
+        }
+        
+        // Agregar teléfonos adicionales al objeto de datos
+        if (telefonosAdicionales.length > 0) {
+          data.telefonos_adicionales = telefonosAdicionales;
+        }
+        
+        // Agregar información del agente
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+        const user = JSON.parse(userStr);
+        data.agente = user.username || 'SIN_AGENTE';
+        data.team = 'TEAM LINEAS';
+        
+        console.log('Datos a enviar:', data);
+        
+        // Aquí iría la lógica para enviar los datos al servidor
+        // const response = await fetch('/api/lineas', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Content-Type': 'application/json',
+        //     'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        //   },
+        //   body: JSON.stringify(data)
+        // });
+        // 
+        // if (!response.ok) {
+        //   throw new Error('Error al guardar el registro');
+        // }
+        
+        // Simular éxito
+        alert('Registro guardado exitosamente');
+        form.reset();
+        
+      } catch (error) {
+        console.error('Error al enviar el formulario:', error);
+        alert(`Error: ${error.message || 'No se pudo guardar el registro'}`);
+      } finally {
+        // Restaurar botón
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

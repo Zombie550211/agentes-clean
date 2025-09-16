@@ -478,11 +478,15 @@ function getTeamName(lead) {
   
   // Mapeo de supervisores a nombres de equipos
   const supervisorMap = {
-    'IRANA': 'TEAM IRANA',
-    'BRYAN FLETEZ': 'TEAM BRYAN FLETEZ', 
+    'IRANA': 'TEAM IRANIA',
+    'BRYAN PLEITEZ': 'TEAM BRYAN PLEITEZ',
     'MARISOL BELTRAN': 'TEAM MARISOL BELTRAN',
     'ROBERTO VELASQUEZ': 'TEAM ROBERTO VELASQUEZ',
-    'RANDAL MARTINEZ': 'TEAM RANDAL MARTINEZ'
+    'RANDAL MARTINEZ': 'TEAM RANDAL MARTINEZ',
+    'JONATHAN FIGUEROA': 'TEAM LINEAS',
+    'LUIS GUTIERREZ': 'TEAM LINEAS',
+    'LUIS G.': 'TEAM LINEAS',
+    'LINEAS': 'TEAM LINEAS'
   };
   
   // Buscar por supervisor
@@ -495,9 +499,9 @@ function getTeamName(lead) {
   // Team Líneas (casos especiales)
   if (supervisor.toUpperCase().includes('LINEAS') || 
       agente.toLowerCase().includes('lineas') ||
-      supervisor.toUpperCase().includes('FIGUEROA')) {
-    if (supervisor.includes('1')) return 'TEAM LINEAS 1';
-    if (supervisor.includes('2')) return 'TEAM LINEAS 2';
+      supervisor.toUpperCase().includes('FIGUEROA') ||
+      supervisor.toUpperCase().includes('GUTIERREZ') ||
+      agente.toLowerCase().startsWith('lineas-')) {
     return 'TEAM LINEAS';
   }
   
