@@ -589,15 +589,32 @@
                         messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
                         messageDiv.className = 'alert alert-success';
                         
-                        // Redirigir a la página solicitada o a la página por defecto
-                        const redirectUrl = getUrlParameter('redirect') || '/inicio.html';
+                        // Determinar la URL de redirección basada en el rol del usuario
+                        let redirectUrl = getUrlParameter('redirect');
+                        
+                        // Si el usuario es de Team Líneas, forzar redirección a lead-lineas.html
+                        const isTeamLineas = username.toLowerCase().startsWith('lineas-') || 
+                                          (data.user?.role || '').toLowerCase() === 'teamlineas';
+                        
+                        if (isTeamLineas) {
+                            // Actualizar el rol en los datos del usuario
+                            userInfo.role = 'teamlineas';
+                            storage.setItem('user', JSON.stringify(userInfo));
+                            
+                            console.log('[LOGIN] Usuario de Team Líneas detectado, redirigiendo a lead-lineas.html');
+                            redirectUrl = '/lead-lineas.html';
+                        } else if (!redirectUrl) {
+                            redirectUrl = '/inicio.html';
+                        }
+                        
                         console.log(`[LOGIN] Redirigiendo a: ${redirectUrl}`);
                         
                         // Pequeño retraso para mostrar el mensaje de éxito
                         setTimeout(() => {
                             // Usar replace para evitar problemas con el botón de retroceso
+                            console.log(`[LOGIN] Redirigiendo a: ${redirectUrl}`);
                             window.location.replace(redirectUrl);
-                        }, 800);
+                        }, 500);
                         
                     } catch (storageError) {
                         console.error('[LOGIN] Error al guardar datos de sesión:', storageError);

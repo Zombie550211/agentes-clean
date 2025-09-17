@@ -538,15 +538,19 @@ app.get('/api/leads/:id/comentarios', protect, (req, res, next) => {
 app.post('/api/leads/:id/comentarios', protect, async (req, res) => {
   try {
     const leadId = req.params.id;
-    const { texto, comentario, autor } = req.body || {};
+    const { texto, comentario, autor: autorBody } = req.body || {};
     if (!db) await connectToMongoDB();
     let leadObjectId;
-    try { leadObjectId = new ObjectId(leadId); } catch { return res.status(400).json({ success: false, message: 'leadId inválido' }); }
+    try { 
+      leadObjectId = new ObjectId(leadId); 
+    } catch { 
+      return res.status(400).json({ success: false, message: 'leadId inválido' }); 
+    }
     const now = new Date();
     const doc = {
       leadId: leadObjectId,
       texto: (texto ?? comentario ?? '').toString().slice(0, 1000),
-      autor: autor || req.user?.username || 'Sistema',
+      autor: autorBody || req.user?.username || 'Sistema',
       createdAt: now,
       updatedAt: now
     };

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="css/costumer-table-comments.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/sidebar-inicio.css">
-  <!-- Protección de autenticación en frontend -->
+  <!-- Protecci¨®n de autenticaci¨®n en frontend -->
   <script src="agentes/js/auth-check.js"></script>
   <script src="/js/logout-handler.js"></script>
   <script src="/js/user-info.js"></script>
   <script src="js/sidebar-loader.js"></script>
-  <!-- Teams API: definición de equipos, supervisores y agentes -->
+  <!-- Teams API: definici¨®n de equipos, supervisores y agentes -->
   <script src="utils/teams.js?v=20250904"></script>
   <style>
     /* Estilos del sidebar unificados en css/sidebar.css */
@@ -78,7 +78,7 @@
       position: relative;
     }
     
-    /* Estilos para el menú desplegable */
+    /* Estilos para el men¨² desplegable */
     .has-submenu {
       position: relative;
     }
@@ -215,7 +215,7 @@
       margin-right: 6px;
     }
     
-    /* Estilos específicos para cada tarjeta */
+    /* Estilos espec¨ªficos para cada tarjeta */
     .sales-today .card-icon {
       background: linear-gradient(135deg, #4caf50, #66bb6a);
     }
@@ -241,10 +241,10 @@
       margin-top: 24px;
       border: 1px solid #e6eef5;
       max-width: 100%;
-      /* Fijar el área de tabla para que solo el listado haga scroll */
+      /* Fijar el ¨¢rea de tabla para que solo el listado haga scroll */
       display: flex;
       flex-direction: column;
-      /* Ajusta el valor según tu layout (altura visible menos tarjetas/márgenes) */
+      /* Ajusta el valor seg¨²n tu layout (altura visible menos tarjetas/m¨¢rgenes) */
       height: calc(100vh - 280px);
     }
     
@@ -364,7 +364,7 @@
       background-color: #fbfdff;
     }
 
-    /* Hover sin líneas laterales */
+    /* Hover sin l¨ªneas laterales */
     .costumer-table tbody tr:hover td {
       background-color: #f6fafe;
       box-shadow: none;
@@ -436,7 +436,7 @@
       border-color: #bfdbfe;
     }
 
-    /* Modo compacto: reduce paddings y tamaño de fuente */
+    /* Modo compacto: reduce paddings y tama?o de fuente */
     body.compact .costumer-table th,
     body.compact .costumer-table td {
       padding: 8px 10px;
@@ -480,7 +480,7 @@
   </style>
 <body>
   <div class="layout">
-    <!-- SIDEBAR (cargado dinámicamente) -->
+    <!-- SIDEBAR (cargado din¨¢micamente) -->
     <nav class="sidebar sidebar-inicio" data-active="costumer"></nav>
 
     <!-- Main Content -->
@@ -564,7 +564,7 @@
             <button id="refresh-table" class="action-btn" title="Refrescar">
               <i class="fas fa-sync-alt"></i>
             </button>
-            <!-- Botón para alternar ver todos/mis clientes (solo visible para admin/supervisor/backoffice) -->
+            <!-- Bot¨®n para alternar ver todos/mis clientes (solo visible para admin/supervisor/backoffice) -->
             <button id="toggle-forceall" class="action-btn" title="Ver todos" style="display:none">
               <i class="fas fa-users"></i>
             </button>
@@ -576,16 +576,16 @@
             <thead>
               <tr>
                 <th>Nombre cliente</th>
-                <th>Teléfono principal</th>
-                <th>Teléfono alterno</th>
+                <th>Tel¨¦fono principal</th>
+                <th>Tel¨¦fono alterno</th>
                 <th>Numero de cuenta</th>
                 <th>Autopago</th>
-                <th>Dirección</th>
+                <th>Direcci¨®n</th>
                 <th>Tipo de servicios</th>
                 <th>Sistema</th>
                 <th>Riesgo</th>
                 <th>Dia de venta</th>
-                <th>Día de instalación</th>
+                <th>D¨ªa de instalaci¨®n</th>
                 <th>Status</th>
                 <th>Servicios</th>
                 <th>Mercado</th>
@@ -602,11 +602,11 @@
                     </button>
                   </div>
                 </th>
-                <th>Acción</th>
+                <th>Acci¨®n</th>
               </tr>
             </thead>
             <tbody id="costumer-tbody">
-              <!-- Las filas se llenarán dinámicamente con JavaScript -->
+              <!-- Las filas se llenar¨¢n din¨¢micamente con JavaScript -->
             </tbody>
           </table>
         </div>
@@ -628,10 +628,10 @@
       
       <!-- Lista de comentarios -->
       <div id="comentariosContainer" style="flex: 1; overflow-y: auto; padding: 20px;">
-        <!-- Los comentarios se cargarán aquí dinámicamente -->
+        <!-- Los comentarios se cargar¨¢n aqu¨ª din¨¢micamente -->
       </div>
       
-      <!-- Área para nuevo comentario -->
+      <!-- ?rea para nuevo comentario -->
       <div style="padding: 15px; border-top: 1px solid #eaeaea; background-color: #f8f9fa;">
         <div class="comment-composer" style="margin-bottom:10px;">
           <div class="composer-avatar">
@@ -640,37 +640,37 @@
           <div class="composer-input-wrap">
             <textarea id="nuevoComentario" class="composer-textarea" placeholder="Escribe un comentario..."></textarea>
             <div class="composer-actions">
-              <button id="emojiToggleBtn" class="emoji-btn" onclick="toggleEmojiPicker(event)" title="Emojis">😊</button>
+              <button id="emojiToggleBtn" class="emoji-btn" onclick="toggleEmojiPicker(event)" title="Emojis">?</button>
               <button class="composer-send" onclick="agregarComentario()">Enviar</button>
             </div>
             <!-- Picker compacto -->
             <div id="emojiPicker" class="emoji-picker" style="display:none;">
               <div class="title">Emojis</div>
               <div class="emoji-grid">
-                <button class="emoji-item" onclick="insertEmoji('😀')">😀</button>
-                <button class="emoji-item" onclick="insertEmoji('😁')">😁</button>
-                <button class="emoji-item" onclick="insertEmoji('😂')">😂</button>
-                <button class="emoji-item" onclick="insertEmoji('🤣')">🤣</button>
-                <button class="emoji-item" onclick="insertEmoji('😊')">😊</button>
-                <button class="emoji-item" onclick="insertEmoji('😍')">😍</button>
-                <button class="emoji-item" onclick="insertEmoji('😎')">😎</button>
-                <button class="emoji-item" onclick="insertEmoji('🥳')">🥳</button>
-                <button class="emoji-item" onclick="insertEmoji('👍')">👍</button>
-                <button class="emoji-item" onclick="insertEmoji('🙏')">🙏</button>
-                <button class="emoji-item" onclick="insertEmoji('👏')">👏</button>
-                <button class="emoji-item" onclick="insertEmoji('💪')">💪</button>
-                <button class="emoji-item" onclick="insertEmoji('🔥')">🔥</button>
-                <button class="emoji-item" onclick="insertEmoji('✨')">✨</button>
-                <button class="emoji-item" onclick="insertEmoji('✅')">✅</button>
-                <button class="emoji-item" onclick="insertEmoji('❗')">❗</button>
-                <button class="emoji-item" onclick="insertEmoji('📞')">📞</button>
-                <button class="emoji-item" onclick="insertEmoji('📅')">📅</button>
-                <button class="emoji-item" onclick="insertEmoji('💼')">💼</button>
-                <button class="emoji-item" onclick="insertEmoji('🏷️')">🏷️</button>
-                <button class="emoji-item" onclick="insertEmoji('🚀')">🚀</button>
-                <button class="emoji-item" onclick="insertEmoji('⏳')">⏳</button>
-                <button class="emoji-item" onclick="insertEmoji('🕙')">🕙</button>
-                <button class="emoji-item" onclick="insertEmoji('📍')">📍</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('??')">??</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
+                <button class="emoji-item" onclick="insertEmoji('?')">?</button>
               </div>
             </div>
           </div>
@@ -706,11 +706,11 @@
           if (typeof v === 'object') return String(v.$oid||v.id||v._id||v.value||'');
           const s = String(v); const m = s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s;
         };
-        // Abort de fetches previos si el usuario cambia de chip rápidamente
+        // Abort de fetches previos si el usuario cambia de chip r¨¢pidamente
         if (__currentFetchController) { try { __currentFetchController.abort(); } catch(_) {} }
         __currentFetchController = new AbortController();
         const { signal } = __currentFetchController;
-        // Intentar primero agenteId, si no hay datos probar agentId inmediatamente después
+        // Intentar primero agenteId, si no hay datos probar agentId inmediatamente despu¨¦s
         const tryOnce = async ([key, val]) => {
           const url = `/api/customers?page=1&limit=200&${key}=${encodeURIComponent(val)}`;
           const res = await fetch(url, { headers, signal });
@@ -798,7 +798,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <script src="utils/teams.js"></script>
   <script>
-    // Función para verificar el rol del usuario y mostrar/ocultar elementos según corresponda
+    // Funci¨®n para verificar el rol del usuario y mostrar/ocultar elementos seg¨²n corresponda
     function checkUserRole() {
       try {
         const teamMenuItem = document.getElementById('teamMenuItem');
@@ -806,7 +806,7 @@
           teamMenuItem.style.display = 'none';
         }
 
-    // Helper GLOBAL: matcher para agente seleccionado (canónico y heurísticas)
+    // Helper GLOBAL: matcher para agente seleccionado (can¨®nico y heur¨ªsticas)
     if (!window.matchSelectedAgent) {
       window.matchSelectedAgent = function(l, selectedCanon) {
         try {
@@ -865,7 +865,7 @@
       }
     }
     
-    // Inicializar cuando el DOM esté listo
+    // Inicializar cuando el DOM est¨¦ listo
     document.addEventListener('DOMContentLoaded', function() {
       checkUserRole();
     });
@@ -873,7 +873,7 @@
   <script src="js/core/script.js"></script>
   <!-- Eliminada la referencia a costumer-comments.js que no existe -->
   <script>
-    // Inicialización de UI: toggle compacto y refrescar tabla
+    // Inicializaci¨®n de UI: toggle compacto y refrescar tabla
     document.addEventListener('DOMContentLoaded', function() {
       const toggleBtn = document.getElementById('toggle-compact');
       const refreshBtn = document.getElementById('refresh-table');
@@ -923,9 +923,9 @@
         else url.searchParams.delete('forceAll');
         window.location.href = url.toString();
       }
-      // Mostrar botón solo para admin/supervisor/backoffice (no para agent)
+      // Mostrar bot¨®n solo para admin/supervisor/backoffice (no para agent)
       const role = getRole();
-      // admin/backoffice/supervisor pueden ver el botón
+      // admin/backoffice/supervisor pueden ver el bot¨®n
       const allowed = new Set(['admin','supervisor','backoffice','b:o','b.o','b-o','bo']);
       if (forceAllBtn) {
         if (allowed.has(role)) {
@@ -1013,18 +1013,18 @@
       } catch { return false; }
     }
   
-        // Función para verificar si el usuario puede editar el estado de un lead
+        // Funci¨®n para verificar si el usuario puede editar el estado de un lead
     function canEditStatus() {
       try {
         // Obtener datos del usuario desde localStorage o sessionStorage
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
         const userRole = (userData.role || '').toLowerCase();
         
-        // Permitir edición a administradores y supervisores
+        // Permitir edici¨®n a administradores y supervisores
         return ['admin', 'supervisor', 'backoffice'].includes(userRole);
       } catch (error) {
-        console.error('Error al verificar permisos de edición:', error);
-        return false; // Por defecto, no permitir edición si hay un error
+        console.error('Error al verificar permisos de edici¨®n:', error);
+        return false; // Por defecto, no permitir edici¨®n si hay un error
       }
     }
 
@@ -1077,7 +1077,7 @@
             }
           }
         } catch (e) {
-          console.warn('Fallo al obtener comentarios del backend, se usará cache/local:', e);
+          console.warn('Fallo al obtener comentarios del backend, se usar¨¢ cache/local:', e);
         }
 
         // 2) Mezclar con comentarios locales en cache (optimista)
@@ -1087,7 +1087,7 @@
           comments = [...comments, ...cached];
         }
 
-        // 3) Si vacío, intentar inferir último comentario textual del lead para mostrar algo
+        // 3) Si vac¨ªo, intentar inferir ¨²ltimo comentario textual del lead para mostrar algo
         if ((!comments || comments.length === 0) && Array.isArray(window.ultimaListaLeads)) {
           const lead = window.ultimaListaLeads.find(l => (l._id || '') === leadId);
           if (lead && lead.comentarios_venta) {
@@ -1099,7 +1099,7 @@
           }
         }
 
-        // Normalización y render tipo chat
+        // Normalizaci¨®n y render tipo chat
         const usuario = obtenerUsuarioActual();
         const mensajes = (comments || []).map(c => ({
           autor: c.autor || c.user || 'Desconocido',
@@ -1110,7 +1110,7 @@
         // ...
         let html = '';
         
-        // Ordenar comentarios por fecha (más antiguos primero para chat natural)
+        // Ordenar comentarios por fecha (m¨¢s antiguos primero para chat natural)
         const comentariosOrdenados = [...mensajes].sort((a, b) => 
           new Date(a.fecha) - new Date(b.fecha)
         );
@@ -1135,7 +1135,7 @@
               ` : ''}
               <div class="chat-bubble ${lado}" style="max-width:70%; padding:10px 12px; border-radius:14px; ${lado==='me' ? 'background:#e3f2fd; color:#0d47a1; border-top-right-radius:4px;' : 'background:#f1f3f5; color:#333; border-top-left-radius:4px;'}">
                 <div class="chat-author-time" style="font-size:11px; color:${lado==='me' ? '#1565c0' : '#6c757d'}; margin-bottom:4px;">
-                  ${escapeHtml(comentario.autor)} • ${fechaFormateada}
+                  ${escapeHtml(comentario.autor)} ? ${fechaFormateada}
                 </div>
                 <div class="chat-text" style="white-space:pre-wrap; word-wrap:break-word;">${escapeHtml(comentario.texto)}</div>
               </div>
@@ -1147,12 +1147,12 @@
           <div style="display:flex; align-items:center; justify-content:center; height:100%; color:#666;">
             <div>
               <i class="fas fa-comments" style="font-size:28px; opacity:0.6;"></i>
-              <p style="margin-top:8px;">Sin comentarios aún. ¡Sé el primero en comentar!</p>
+              <p style="margin-top:8px;">Sin comentarios a¨²n. ?S¨¦ el primero en comentar!</p>
             </div>
           </div>
         `;
 
-        // Hacer scroll al final (último mensaje visible)
+        // Hacer scroll al final (¨²ltimo mensaje visible)
         setTimeout(() => {
           try { container.scrollTop = container.scrollHeight; } catch(_e) {}
         }, 50);
@@ -1274,7 +1274,7 @@
       }
     });
 
-    // Función para actualizar el último comentario en la tabla
+    // Funci¨®n para actualizar el ¨²ltimo comentario en la tabla
     function actualizarUltimoComentarioEnTabla(leadId, comentario) {
       // Encontrar la fila del lead
       const filas = document.querySelectorAll('#costumer-tbody tr');
@@ -1317,7 +1317,7 @@
     // Variable global para almacenar los leads
     window.ultimaListaLeads = [];
     
-    // Normalización de leads desde el backend a la estructura usada en frontend
+    // Normalizaci¨®n de leads desde el backend a la estructura usada en frontend
     function escapeAttr(s) {
       try {
         return String(s)
@@ -1381,7 +1381,7 @@
         return undefined;
       } catch { return undefined; }
     }
-    // Helper: búsqueda profunda por clave (case-insensitive). Escanea objetos/arrays.
+    // Helper: b¨²squeda profunda por clave (case-insensitive). Escanea objetos/arrays.
     function deepFindByKey(obj, candidates, opts = {}) {
       const MAX_DEPTH = typeof opts.maxDepth === 'number' ? opts.maxDepth : 4;
       const seen = new WeakSet();
@@ -1389,7 +1389,7 @@
       function matchKey(k) {
         const kl = String(k).toLowerCase();
         if (candSet.has(kl)) return true;
-        // También coincide si la variante upper/lower/cap es igual
+        // Tambi¨¦n coincide si la variante upper/lower/cap es igual
         for (const c of candSet) {
           if (kl === c || kl === c.toUpperCase() || kl === c.toLowerCase()) return true;
         }
@@ -1438,7 +1438,7 @@
             if (v != null && String(v).trim() !== '') return v;
           }
         }
-        // Búsqueda profunda como último recurso (obj y _raw)
+        // B¨²squeda profunda como ¨²ltimo recurso (obj y _raw)
         const deep1 = deepFindByKey(obj, candidates);
         if (deep1 != null && String(deep1).trim() !== '') return deep1;
         if (obj && obj._raw) {
@@ -1451,7 +1451,7 @@
 
     function normalizeLead(raw) {
       const lead = raw || {};
-      // Mapear campos comunes provenientes del backend en MAYÚSCULAS u otras variantes
+      // Mapear campos comunes provenientes del backend en MAY?SCULAS u otras variantes
       const fechaVenta = pickField(lead, ['dia_venta','FECHA','fecha_venta','fecha']);
       const fechaInst = pickField(lead, ['dia_instalacion','FECHA_INSTALACION','fecha_instalacion']);
       const puntaje = pickField(lead, ['puntaje','PUNTAJE','score']) || 0;
@@ -1493,9 +1493,9 @@
         // Identificadores
         _id: id,
         id: id,
-        // Preservar crudo para diagnóstico/agrupación posterior
+        // Preservar crudo para diagn¨®stico/agrupaci¨®n posterior
         _raw: lead,
-        // Pasar posibles campos de IDs de agente y variantes (sin transformar) para facilitar detección aguas abajo
+        // Pasar posibles campos de IDs de agente y variantes (sin transformar) para facilitar detecci¨®n aguas abajo
         agenteId: lead.agenteId || lead.AGENTEID || lead.agente_id || lead.AGENTE_ID || lead.idAgente || lead.IDAGENTE || lead.agentId || lead.AGENTID || lead.creadoPor || lead.CREADO_POR || lead.creado_por || lead.createdBy || lead.ownerId || lead.assignedId || '',
         agente_id: lead.agente_id || lead.AGENTE_ID || '',
         idAgente: lead.idAgente || lead.IDAGENTE || '',
@@ -1514,8 +1514,8 @@
       return arr.map(normalizeLead);
     }
 
-    // Zona horaria de negocio (UTC-6). Ajusta si tu operación usa otra TZ.
-    const BUSINESS_TZ_OFFSET_MIN = -6 * 60; // América Central (UTC-6)
+    // Zona horaria de negocio (UTC-6). Ajusta si tu operaci¨®n usa otra TZ.
+    const BUSINESS_TZ_OFFSET_MIN = -6 * 60; // Am¨¦rica Central (UTC-6)
 
     // Helper: YYYY-MM-DD en TZ objetivo (no UTC/local del navegador)
     function toISOInTZ(date, tzOffsetMinutes) {
@@ -1572,10 +1572,10 @@
     async function fetchLeadsAgente() {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        // Nota: /api/customers es público; si no hay token, no abortar, solo omitir el header
+        // Nota: /api/customers es p¨²blico; si no hay token, no abortar, solo omitir el header
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // Construir URL con parámetros cuando el usuario sea agente
+        // Construir URL con par¨¢metros cuando el usuario sea agente
         let url = '/api/customers?page=1&limit=100';
         let alreadyFilteredByAgent = false;
         const urlParams = new URLSearchParams(window.location.search);
@@ -1598,7 +1598,7 @@
               console.log('[fetchLeadsAgente] Rol=agent. Usando agente(nombre) para URL:', nameCandidates[0]);
             }
           } else {
-            console.log('[fetchLeadsAgente] Rol detectado:', role || '(vacío)');
+            console.log('[fetchLeadsAgente] Rol detectado:', role || '(vac¨ªo)');
           }
         } catch(_) { /* noop */ }
 
@@ -1620,7 +1620,7 @@
         });
         let leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
 
-        // Fallback a mocks si no hay datos o la solicitud falló
+        // Fallback a mocks si no hay datos o la solicitud fall¨®
         if ((!Array.isArray(leadsRaw) || leadsRaw.length === 0) && typeof fetchCustomersData === 'function') {
           try {
             console.warn('[fetchLeadsAgente] Sin datos desde API. Intentando fallback a datos de prueba...');
@@ -1630,7 +1630,7 @@
               console.log('[fetchLeadsAgente] Fallback a datos de prueba exitoso. Cantidad:', leadsRaw.length);
             }
           } catch (e) {
-            console.warn('[fetchLeadsAgente] Fallback a datos de prueba falló:', e?.message);
+            console.warn('[fetchLeadsAgente] Fallback a datos de prueba fall¨®:', e?.message);
           }
         }
 
@@ -1638,7 +1638,7 @@
         let normalizedLeads = normalizeLeads(leadsRaw);
         console.log('[fetchLeadsAgente] normalizedLeads.length =', (normalizedLeads && normalizedLeads.length) || 0);
 
-    // Filtrar por agente si el usuario es role 'agent' SOLO si no se filtró ya en el backend
+    // Filtrar por agente si el usuario es role 'agent' SOLO si no se filtr¨® ya en el backend
     if (!alreadyFilteredByAgent && !forceAll) {
       try {
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
@@ -1713,7 +1713,7 @@
       }
     }
 
-    // Filtrar por equipo si el usuario es 'supervisor' y NO está activo forceAll
+    // Filtrar por equipo si el usuario es 'supervisor' y NO est¨¢ activo forceAll
     if (!forceAll) {
       try {
         const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
@@ -1724,7 +1724,7 @@
           const norm = window.Teams.norm || ((s)=>String(s||'').toLowerCase().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim());
           const canonicalFromName = window.Teams.canonicalFromName || ((name)=> norm(name));
           if (Array.isArray(agents) && agents.length) {
-            // Conjunto de agentes canónicos del supervisor
+            // Conjunto de agentes can¨®nicos del supervisor
             const teamAgentsCanon = new Set((agents || []).map(a => canonicalFromName(a)));
             const getName = (l) => {
               if (typeof getAgentName === 'function') return getAgentName(l);
@@ -1762,9 +1762,9 @@
         if (typeof window.renderCostumerTable === 'function') {
             window.renderCostumerTable(normalizedLeads);
         } else {
-            console.error('La función renderCostumerTable no está disponible');
+            console.error('La funci¨®n renderCostumerTable no est¨¢ disponible');
         }
-        // Logs de diagnóstico de asignación (por TEAM y agente)
+        // Logs de diagn¨®stico de asignaci¨®n (por TEAM y agente)
         try { if (typeof logDiagnosticoAsignacion === 'function') logDiagnosticoAsignacion(normalizedLeads); } catch(_) {}
         updateSummaryCards(normalizedLeads);
 
@@ -1776,7 +1776,7 @@
       }
     }
 
-    // Función para manejar la ausencia de datos
+    // Funci¨®n para manejar la ausencia de datos
     function mostrarMensajeSinDatos() {
       const tableBody = document.querySelector('#costumer-tbody');
       if (tableBody) {
@@ -1784,7 +1784,7 @@
           <tr>
             <td colspan="13" style="text-align: center; padding: 20px;">
               <p>No se encontraron datos disponibles.</p>
-              <p>Por favor, verifica tu conexión o contacta al administrador.</p>
+              <p>Por favor, verifica tu conexi¨®n o contacta al administrador.</p>
             </td>
           </tr>
         `;
@@ -1794,7 +1794,7 @@
       updateSummaryCards([]);
     }
 
-    // Función para cargar los datos iniciales
+    // Funci¨®n para cargar los datos iniciales
     async function cargarDatosIniciales() {
       console.log('[DEBUG] Iniciando cargarDatosIniciales...');
       // Mostrar indicador de carga si existe
@@ -1807,7 +1807,7 @@
           console.log('[DEBUG] Mostrando indicador de carga');
           loadingIndicator.style.display = 'block';
         }
-        // Cargar datos del servidor usando la función unificada
+        // Cargar datos del servidor usando la funci¨®n unificada
         console.log('[DEBUG] Llamando a cargarDatosDesdeServidor...');
         if (typeof cargarDatosDesdeServidor === 'function') {
           await cargarDatosDesdeServidor();
@@ -1816,7 +1816,7 @@
             console.log('[DEBUG] Datos de clientes cargados correctamente:', arr.length, 'registros');
             try { console.log('[DEBUG] Primer lead de ejemplo:', JSON.stringify(arr[0], null, 2)); } catch(_) {}
           } else {
-            console.warn('[DEBUG] No se encontraron leads o el arreglo está vacío tras cargarDatosDesdeServidor');
+            console.warn('[DEBUG] No se encontraron leads o el arreglo est¨¢ vac¨ªo tras cargarDatosDesdeServidor');
             mostrarMensajeSinDatos();
           }
         } else if (typeof fetchLeadsAgente === 'function') {
@@ -1825,7 +1825,7 @@
           const leads = await fetchLeadsAgente();
           if (!leads || leads.length === 0) mostrarMensajeSinDatos();
         } else {
-          console.warn('[DEBUG] No hay función de carga disponible');
+          console.warn('[DEBUG] No hay funci¨®n de carga disponible');
           mostrarMensajeSinDatos();
         }
       } catch (error) {
@@ -1841,7 +1841,7 @@
     
 
 
-    // Manejar búsqueda
+    // Manejar b¨²squeda
     document.getElementById('costumer-search').addEventListener('input', function(e) {
       const searchTerm = e.target.value.toLowerCase();
       const rows = document.querySelectorAll('#costumer-tbody tr');
@@ -1852,7 +1852,7 @@
       });
     });
 
-    // Función para formatear fechas con el formato 'día_de_la_semana número_del_día' (ej: 'mié 13')
+    // Funci¨®n para formatear fechas con el formato 'd¨ªa_de_la_semana n¨²mero_del_d¨ªa' (ej: 'mi¨¦ 13')
     function formatearFechaSinDesfase(fechaStr) {
       try {
         // Si no es string, devolver valor por defecto
@@ -1864,7 +1864,7 @@
         // Limpiar la cadena de espacios en blanco
         const fechaLimpia = fechaStr.trim();
         
-        // Extraer día, mes y año directamente del string
+        // Extraer d¨ªa, mes y a?o directamente del string
         let day, month, year;
         
         // Intentar con formato YYYY-MM-DD
@@ -1876,48 +1876,48 @@
         else if ((match = fechaLimpia.match(/^(\d{2})\/(\d{2})\/(\d{4})/))) {
           [_, day, month, year] = match;
         }
-        // Si no coincide con ningún formato conocido
+        // Si no coincide con ning¨²n formato conocido
         else {
           console.warn('Formato de fecha no reconocido (se espera YYYY-MM-DD o DD/MM/YYYY):', fechaLimpia);
           return 'N/A';
         }
         
-        // Convertir a números
+        // Convertir a n¨²meros
         year = parseInt(year);
         month = parseInt(month) - 1; // Los meses en JavaScript van de 0 a 11
         day = parseInt(day);
         
-        // Crear fecha sin conversión de zona horaria
+        // Crear fecha sin conversi¨®n de zona horaria
         const fecha = new Date(Date.UTC(year, month, day, 12, 0, 0));
         
-        // Verificar si la fecha es válida
+        // Verificar si la fecha es v¨¢lida
         if (isNaN(fecha.getTime())) {
-          console.warn('Fecha inválida (no válida):', fechaLimpia);
+          console.warn('Fecha inv¨¢lida (no v¨¢lida):', fechaLimpia);
           return 'N/A';
         }
         
-        // Días de la semana en español
-        const diasSemana = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+        // D¨ªas de la semana en espa?ol
+        const diasSemana = ['dom', 'lun', 'mar', 'mi¨¦', 'jue', 'vie', 's¨¢b'];
         
-        // Obtener día de la semana (0 = domingo, 1 = lunes, etc.)
+        // Obtener d¨ªa de la semana (0 = domingo, 1 = lunes, etc.)
         const diaSemana = diasSemana[fecha.getUTCDay()];
         
-        // Obtener día del mes
+        // Obtener d¨ªa del mes
         const diaMes = fecha.getUTCDate();
         
-        // Mostrar la fecha en la consola para depuración
+        // Mostrar la fecha en la consola para depuraci¨®n
         console.log(`Formateando fecha: ${fechaLimpia} -> ${diaSemana} ${diaMes}`);
         
         return `${diaSemana} ${diaMes}`;
         
       } catch (error) {
         console.error('Error al formatear fecha:', error, 'Valor:', fechaStr);
-        return 'Fecha inválida';
+        return 'Fecha inv¨¢lida';
       }
     }
     
     // Helper (local): obtener rol actual normalizado
-    // NOTA: Renombrado a getUserRole_local para no sobreescribir la versión global de script.js
+    // NOTA: Renombrado a getUserRole_local para no sobreescribir la versi¨®n global de script.js
     function getUserRole_local() {
       try {
         const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
@@ -1926,7 +1926,7 @@
     }
 
     // Helper (local): verificar si el usuario puede editar status (Administrador / B.O)
-    // NOTA: Renombrado a canEditStatus_local para no sobreescribir la versión global de script.js
+    // NOTA: Renombrado a canEditStatus_local para no sobreescribir la versi¨®n global de script.js
     function canEditStatus_local() {
       const r = getUserRole_local();
       // Aceptar variantes comunes desde frontend (referencial, no usada por la tabla)
@@ -1949,7 +1949,7 @@
       return pick.charAt(0).toUpperCase() + pick.slice(1);
     }
 
-    // Helper: clase de badge según nuevo set de estados
+    // Helper: clase de badge seg¨²n nuevo set de estados
     function statusToBadgeClass(label) {
       const lower = (label||'').toString().toLowerCase();
       if (lower === 'pending') return 'badge-warning';
@@ -1961,14 +1961,14 @@
     }
 
     // Llamada al backend para actualizar el status (local)
-    // NOTA: Renombrado a updateLeadStatusLocal para no sobreescribir la versión global de script.js
+    // NOTA: Renombrado a updateLeadStatusLocal para no sobreescribir la versi¨®n global de script.js
     async function updateLeadStatusLocal(selectEl, leadId) {
       try {
         // Validar ID antes de continuar
         if (!leadId) {
           const old = selectEl.getAttribute('data-prev');
           if (old) selectEl.value = old;
-          alert('No se pudo determinar el ID del lead. Recarga la página e inténtalo nuevamente.');
+          alert('No se pudo determinar el ID del lead. Recarga la p¨¢gina e int¨¦ntalo nuevamente.');
           return;
         }
         // Sanitizar y normalizar ID
@@ -1976,16 +1976,16 @@
         if (!cleanId) {
           const old = selectEl.getAttribute('data-prev');
           if (old) selectEl.value = old;
-          alert('ID de lead vacío o inválido.');
+          alert('ID de lead vac¨ªo o inv¨¢lido.');
           return;
         }
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) {
-          alert('No hay token de autenticación. Inicia sesión nuevamente.');
+          alert('No hay token de autenticaci¨®n. Inicia sesi¨®n nuevamente.');
           return;
         }
         const newVal = selectEl.value; // Etiqueta capitalizada
-        // Deshabilitar durante la petición
+        // Deshabilitar durante la petici¨®n
         const prevDisabled = selectEl.disabled; selectEl.disabled = true;
         try {
           const url = `/api/leads/${encodeURIComponent(cleanId)}/status`;
@@ -1998,8 +1998,8 @@
           let data = {};
           try { data = await res.json(); } catch { data = {}; }
           if (!res.ok || !data?.success) {
-            // Manejo específico por códigos comunes
-            if (res.status === 401) throw new Error('No autorizado (401). Verifica el token de sesión.');
+            // Manejo espec¨ªfico por c¨®digos comunes
+            if (res.status === 401) throw new Error('No autorizado (401). Verifica el token de sesi¨®n.');
             if (res.status === 403) throw new Error('Permisos insuficientes (403). Solo admin/supervisor pueden actualizar.');
             if (res.status === 404) throw new Error(data?.message || 'Lead no encontrado (404). Verifica que el ID exista en la base de datos.');
             throw new Error(data?.message || `Error ${res.status || ''}: No se pudo actualizar el estado`);
@@ -2026,7 +2026,7 @@
       }
     }
 
-    // Función deshabilitada - Usando la versión de script.js
+    // Funci¨®n deshabilitada - Usando la versi¨®n de script.js
     function renderCostumerTable_OLD(leads) {
       console.log('renderCostumerTable llamada con leads:', leads);
       
@@ -2036,15 +2036,15 @@
         : (leads && leads.leads && Array.isArray(leads.leads)) 
           ? leads.leads 
           : [];
-      // Guardar la última lista para re-renderizados por filtros/toolbar
+      // Guardar la ¨²ltima lista para re-renderizados por filtros/toolbar
       try { window.ultimaListaLeads = leadsArray.slice(); } catch(_) {}
-      // Migración de compatibilidad: renombrar filtro legado a nombre neutral
+      // Migraci¨®n de compatibilidad: renombrar filtro legado a nombre neutral
       try {
         if (window.iraniaAgentFilter != null && window.supervisorAgentFilter == null) {
           window.supervisorAgentFilter = window.iraniaAgentFilter;
         }
       } catch(_) {}
-      // Construir/actualizar mapas GLOBAL: id -> canónico y canónico -> ids
+      // Construir/actualizar mapas GLOBAL: id -> can¨®nico y can¨®nico -> ids
       try {
         const teamsApi = (window && window.Teams) ? window.Teams : null;
         const canonical = (name) => {
@@ -2085,19 +2085,19 @@
           ids.forEach(id => { try { idMap.set(id, canon); } catch(_) {} });
           try { l.__agentCanon = l.__agentCanon || canon; } catch(_) {}
         });
-        // Override explícito conocido: Eduardo Rivas (ID actualizado)
+        // Override expl¨ªcito conocido: Eduardo Rivas (ID actualizado)
     try { idMap.set('68bb1ddd0d4d7cdcb6eb3605', 'eduardo rivas'); } catch(_) {}
     window.__idToCanonGlobal = idMap;
-        console.log('[ID->Canon] Tamaño del mapa:', idMap.size);
+        console.log('[ID->Canon] Tama?o del mapa:', idMap.size);
       } catch(e) { console.warn('[ID->Canon] Error al construir mapa:', e); }
-      // Flag de depuración: si la URL contiene debugNoFilters=1, no aplicar filtros especiales ni vistas por TEAM
+      // Flag de depuraci¨®n: si la URL contiene debugNoFilters=1, no aplicar filtros especiales ni vistas por TEAM
       let __debugNoFilters = false;
       try {
         const usp = new URLSearchParams(window.location.search || '');
         __debugNoFilters = (usp.get('debugNoFilters') === '1' || usp.get('debugNoFilters') === 'true');
       } catch(_) { __debugNoFilters = false; }
 
-      // Construir mapa global id->agenteCanónico para mejorar detección por agenteId
+      // Construir mapa global id->agenteCan¨®nico para mejorar detecci¨®n por agenteId
       try {
         const teamsApiG = (window && window.Teams) ? window.Teams : null;
         const normG = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
@@ -2184,7 +2184,7 @@
             }
             return '';
           };
-          // Canonización por primer nombre (fallback) para TEAM IRANIA
+          // Canonizaci¨®n por primer nombre (fallback) para TEAM IRANIA
           const canonicalFromFirstName = (name) => {
             const n = norm(name);
             if (!n) return '';
@@ -2261,7 +2261,7 @@
           };
           // ordenAgentes ya fue declarado arriba
 
-          // Preservar lista original para fallback si el filtro quedara vacío
+          // Preservar lista original para fallback si el filtro quedara vac¨ªo
           const __originalLeads = Array.isArray(leadsArray) ? leadsArray.slice() : [];
 
           // Log de agentes detectados antes del filtro
@@ -2270,7 +2270,7 @@
             console.log('[TEAM IRANIA] Agentes detectados (normalizados):', agentesDetectados);
           } catch(_) {}
           
-          // Construir mapa agenteId -> agente canónico (aceptar múltiples variantes de campo)
+          // Construir mapa agenteId -> agente can¨®nico (aceptar m¨²ltiples variantes de campo)
           const getAgentId = (l) => {
             const raw = (
               l?.agenteId || l?._raw?.agenteId ||
@@ -2293,7 +2293,7 @@
               return String(raw || '').trim();
             }
           };
-          // 1) Mapa estático proporcionado (TEAM IRANIA)
+          // 1) Mapa est¨¢tico proporcionado (TEAM IRANIA)
           const idToCanon = new Map([
             ['68af44c3c61c405e2bb7b0cb', 'giselle diaz'],   // Giselle Diaz
             ['68af457bc61c405e2bb7b0ce', 'roxana martinez'], // Roxana Martinez
@@ -2301,7 +2301,7 @@
             ['68af44efc61c405e2bb7b0cc', 'josue renderos'],  // Josue Renderos
             ['68af4597c61c405e2bb7b0cf', 'tatiana ayala'],   // Tatiana Ayala
           ]);
-          // 2) Enriquecer con un mapa dinámico usando los leads con nombre detectable
+          // 2) Enriquecer con un mapa din¨¢mico usando los leads con nombre detectable
           try {
             (leadsArray||[]).forEach(l => {
               const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
@@ -2312,7 +2312,7 @@
             console.debug('[TEAM IRANIA] idToCanon generado:', Array.from(idToCanon.entries()));
           } catch(_) {}
           
-          // Filtro ESTRICTO con canonización: solo los agentes del TEAM IRANIA.
+          // Filtro ESTRICTO con canonizaci¨®n: solo los agentes del TEAM IRANIA.
           // Si no se detecta agente pero el lead pertenece al equipo TEAM IRANIA por campo `equipo`, NO lo descartamos para no perderlo.
           const filteredStrict = leadsArray.filter(l => {
             const agente = getAgentName(l);
@@ -2343,9 +2343,9 @@
             } catch(_) {}
             return false;
           });
-          // Si el filtro deja la lista vacía, mantener la lista original para no ocultar datos
+          // Si el filtro deja la lista vac¨ªa, mantener la lista original para no ocultar datos
           if (!filteredStrict || filteredStrict.length === 0) {
-            console.warn('[Filtro TEAM IRANIA] Resultado vacío; se mantiene lista original para no ocultar datos.');
+            console.warn('[Filtro TEAM IRANIA] Resultado vac¨ªo; se mantiene lista original para no ocultar datos.');
             leadsArray = __originalLeads;
           } else {
             leadsArray = filteredStrict;
@@ -2361,14 +2361,14 @@
       const tbody = document.getElementById('costumer-tbody');
       console.log('Elemento tbody encontrado:', tbody);
       if (!tbody) {
-        console.error('No se encontró el elemento con ID costumer-tbody');
+        console.error('No se encontr¨® el elemento con ID costumer-tbody');
         return;
       }
       
       tbody.innerHTML = '';
-      // Permitir que el rol supervisor vea la tabla (se removió el aviso de permisos)
+      // Permitir que el rol supervisor vea la tabla (se removi¨® el aviso de permisos)
       
-      // Función interna para añadir una fila de lead manteniendo el orden y estilos 
+      // Funci¨®n interna para a?adir una fila de lead manteniendo el orden y estilos 
       function appendLeadRow(lead) {
         const tr = document.createElement('tr');
         
@@ -2450,7 +2450,7 @@
         // Obtener tbody localmente (evitar ReferenceError si no existe en el scope)
         const tbody = document.getElementById('costumer-tbody');
         if (!tbody) {
-          console.warn('[appendLeadRow] No se encontró #costumer-tbody en el DOM');
+          console.warn('[appendLeadRow] No se encontr¨® #costumer-tbody en el DOM');
           return;
         }
         tbody.appendChild(tr);
@@ -2473,11 +2473,11 @@
         sorted.forEach(item => {
           const iso = getDateFromLead(item);
           let key = 'Sin fecha';
-          let title = 'Sin fecha — Clientes';
+          let title = 'Sin fecha ¡ª Clientes';
           if (iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)) {
             const [y, m] = iso.split('-').map(Number);
             key = `${y}-${('0'+m).slice(-2)}`;
-            title = `${monthNames[(m||1)-1]} ${y} — Clientes`;
+            title = `${monthNames[(m||1)-1]} ${y} ¡ª Clientes`;
           }
           if (key !== lastKey) {
             lastKey = key;
@@ -2490,7 +2490,7 @@
         });
       }
 
-      // Helper: obtener agente canónico desde múltiples campos y escaneo amplio
+      // Helper: obtener agente can¨®nico desde m¨²ltiples campos y escaneo amplio
       function getAgentCanonUniversal(l) {
         try {
           const teamsApi = (window && window.Teams) ? window.Teams : null;
@@ -2557,7 +2557,7 @@
         } catch { return ''; }
       }
 
-      // Forzar toolbar por TEAM vía query param: ?forceTeam=team%20marisol%20beltran
+      // Forzar toolbar por TEAM v¨ªa query param: ?forceTeam=team%20marisol%20beltran
       try {
         const uspFT = new URLSearchParams(window.location.search || '');
         const forceTeamRaw = (uspFT.get('forceTeam') || uspFT.get('team') || '').toString();
@@ -2569,7 +2569,7 @@
           if (teamsApiFT && typeof teamsApiFT.getAgentsByTeam==='function') {
             teamAgentsFT = teamsApiFT.getAgentsByTeam(teamKeyFT) || [];
           }
-          // Fallback: derivar agentes desde leads si la lista viene vacía
+          // Fallback: derivar agentes desde leads si la lista viene vac¨ªa
           if ((!teamAgentsFT || teamAgentsFT.length===0) && Array.isArray(leadsArray)) {
             const setFT = new Set();
             leadsArray.forEach(l => {
@@ -2581,7 +2581,7 @@
           }
           try {
             console.log('[Toolbar ForceTeam] teamKey =', teamKeyFT);
-            console.log('[Toolbar ForceTeam] agentes (canónicos) =', teamAgentsFT);
+            console.log('[Toolbar ForceTeam] agentes (can¨®nicos) =', teamAgentsFT);
             if (teamsApiFT && typeof teamsApiFT.getDisplayName==='function') {
               console.log('[Toolbar ForceTeam] etiquetas =', teamAgentsFT.map(a=>teamsApiFT.getDisplayName(a)));
             }
@@ -2624,7 +2624,7 @@
                     if (typeof window.renderCostumerTable === 'function') {
                         window.renderCostumerTable(window.ultimaListaLeads || []);
                     } else {
-                        console.error('La función renderCostumerTable no está disponible');
+                        console.error('La funci¨®n renderCostumerTable no est¨¢ disponible');
                     }
                 } catch(e) { console.error('Error al renderizar tabla:', e); }
               });
@@ -2687,7 +2687,7 @@
         const currentCanon = teamsApiRoot && typeof teamsApiRoot.canonicalFromName === 'function'
           ? teamsApiRoot.canonicalFromName(currentUserName)
           : (currentUserName || '').toString().trim().toLowerCase();
-        // Leer usuario/rol desde storage para mejorar la detección de supervisor
+        // Leer usuario/rol desde storage para mejorar la detecci¨®n de supervisor
         let userObj = {};
         try { userObj = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}'); } catch { userObj = {}; }
         const rawRole = (userObj.role || userObj?.usuario?.role || '').toString().toLowerCase();
@@ -2720,7 +2720,7 @@
                   teamAgents = (typeof teamsApi.getAgentsByTeam === 'function') ? (teamsApi.getAgentsByTeam(teamForUser) || []) : [];
                 }
                 if (!teamAgents || teamAgents.length === 0) {
-                  // Fallback por supervisor canónico
+                  // Fallback por supervisor can¨®nico
                   teamAgents = teamsApi.getAgentsBySupervisor(supervisorCanon) || [];
                 }
               }
@@ -2743,9 +2743,9 @@
                 }
               } catch(_) {}
               try {
-                console.log('[Toolbar Supervisor] Supervisor canónico =', supervisorCanon);
+                console.log('[Toolbar Supervisor] Supervisor can¨®nico =', supervisorCanon);
                 console.log('[Toolbar Supervisor] Team deducido para usuario =', teamForUser);
-                console.log('[Toolbar Supervisor] Agentes del equipo (canónicos) =', teamAgents);
+                console.log('[Toolbar Supervisor] Agentes del equipo (can¨®nicos) =', teamAgents);
                 if (teamsApi && typeof teamsApi.getDisplayName === 'function') {
                   const labels = teamAgents.map(a => teamsApi.getDisplayName(a));
                   console.log('[Toolbar Supervisor] Etiquetas UI (getDisplayName) =', labels);
@@ -2796,7 +2796,7 @@
                     if (typeof window.renderCostumerTable === 'function') {
                         window.renderCostumerTable(window.ultimaListaLeads || []);
                     } else {
-                        console.error('La función renderCostumerTable no está disponible');
+                        console.error('La funci¨®n renderCostumerTable no est¨¢ disponible');
                     }
                 } catch(e) { console.error('Error al renderizar tabla:', e); }
                 });
@@ -2817,10 +2817,10 @@
           // --- Aplicar filtro activo (si existe) y render plano  
           const norm = s => (s||'').toString().normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase().replace(/\s+/g,' ');
           const teamsApi2 = (window && window.Teams) ? window.Teams : null;
-          // Usar la misma lista de agentes que la toolbar calculó (con fallbacks)
+          // Usar la misma lista de agentes que la toolbar calcul¨® (con fallbacks)
           let teamCanon = Array.isArray(window.__teamAgentsCanon) ? window.__teamAgentsCanon.slice() : [];
           if (!teamCanon || teamCanon.length === 0) {
-            // Fallback de seguridad si no quedó poblado
+            // Fallback de seguridad si no qued¨® poblado
             teamCanon = teamsApi2 ? (teamsApi2.getAgentsBySupervisor(currentCanon) || []) : [];
             if ((!teamCanon || teamCanon.length===0) && Array.isArray(window.ultimaListaLeads)) {
               const set = new Set();
@@ -2854,7 +2854,7 @@
             const cand = l?.agenteNombre || l?.nombreAgente || l?.agente || l?._raw?.agenteNombre || l?._raw?.nombreAgente || l?._raw?.agente || '';
             return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(cand) : norm(cand);
           };
-          // Asegurar que el mapa ID->Canon exista y esté poblado antes de filtrar
+          // Asegurar que el mapa ID->Canon exista y est¨¦ poblado antes de filtrar
           try {
             if (!(window.__idToCanonGlobal instanceof Map)) window.__idToCanonGlobal = new Map();
             const idMap = window.__idToCanonGlobal;
@@ -2871,7 +2871,7 @@
               })(l);
               if (canon) ids.forEach(id=>{ try { idMap.set(id, canon); } catch(_) {} });
             });
-            // Override explícito Eduardo Rivas (id conocido, actualizado)
+            // Override expl¨ªcito Eduardo Rivas (id conocido, actualizado)
             try { idMap.set('68bb1ddd0d4d7cdcb6eb3605','eduardo rivas'); } catch(_) {}
             console.log('[Supervisor][ID->Canon] Mapa listo. size=', idMap.size);
           } catch(e) { console.warn('[Supervisor] No se pudo preparar ID->Canon:', e); }
@@ -2881,7 +2881,7 @@
             if (window.supervisorAgentFilter) {
               // Si hay agente seleccionado, filtrar directo por agente sobre todos los leads
               try { console.debug('[Supervisor] Filtrado estricto por agente seleccionado'); } catch(_) {}
-              // Diagnóstico: conteo por ID de Eduardo antes del filtro (incluye campos en español)
+              // Diagn¨®stico: conteo por ID de Eduardo antes del filtro (incluye campos en espa?ol)
               try {
                 const normId = (v) => { if(!v) return ''; if (typeof v==='object') return String(v.$oid||v.id||v._id||v.value||''); const s=String(v); const m=s.match(/^ObjectId\('([a-fA-F0-9]{24})'\)$/); return m?m[1]:s; };
                 const getAnyAgentId = (l) => normId(l?.ownerId) || normId(l?.agentId) || normId(l?.registeredById) || normId(l?.createdBy) || normId(l?.agenteId) || normId(l?.creadoPor) || normId(l?._raw?.ownerId) || normId(l?._raw?.agentId) || normId(l?._raw?.registeredById) || normId(l?._raw?.createdBy) || normId(l?._raw?.agenteId) || normId(l?._raw?.creadoPor);
@@ -2892,7 +2892,7 @@
               list = leadsArray.filter(l => matchSelectedAgent(l, window.supervisorAgentFilter));
               // Preferir consultar al servidor antes que buscar por tokens locales
               const PREFER_SERVER_FALLBACK = true;
-              // Fallback: si quedó vacío y NO preferimos servidor, intentar heurística dentro del TEAM
+              // Fallback: si qued¨® vac¨ªo y NO preferimos servidor, intentar heur¨ªstica dentro del TEAM
               if (!list.length && !PREFER_SERVER_FALLBACK) {
                 try {
                   const display = (teamsApi2 && typeof teamsApi2.getDisplayName==='function') ? teamsApi2.getDisplayName(window.supervisorAgentFilter) : window.supervisorAgentFilter;
@@ -2909,11 +2909,11 @@
                   console.info('[Supervisor][Fallback] Estricto=0. Fallback por tokens dentro del TEAM. Resultado:', list.length);
                 } catch(e) { console.warn('[Supervisor][Fallback] Error en fallback:', e); }
               }
-              // Fallback de servidor: si sigue vacío, pedir al backend por agentId
+              // Fallback de servidor: si sigue vac¨ªo, pedir al backend por agentId
               if (!list.length) {
                 try {
                   const selCanon = (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(window.supervisorAgentFilter) : window.supervisorAgentFilter;
-                  // Buscar agentId por canónico
+                  // Buscar agentId por can¨®nico
                   let agentId = null;
                   try {
                     const map = window.__canonToIdsGlobal;
@@ -2945,7 +2945,7 @@
                             return (teamsApi2 && typeof teamsApi2.canonicalFromName==='function') ? teamsApi2.canonicalFromName(nameCand) : normFree(nameCand);
                           } catch { return ''; }
                         };
-                        // Diagnóstico: mostrar cómo vienen los campos de ID y el nombre canónico
+                        // Diagn¨®stico: mostrar c¨®mo vienen los campos de ID y el nombre can¨®nico
                         try {
                           const diag = (serverLeads||[]).slice(0,10).map(l=>({
                             ownerId: normalizeId(l?.ownerId), agentId: normalizeId(l?.agentId),
@@ -2962,13 +2962,13 @@
                         const getAnyAgentId = (l) => normalizeId(l?.ownerId) || normalizeId(l?.agentId) || normalizeId(l?.registeredById) || normalizeId(l?.createdBy) || normalizeId(l?.agenteId) || normalizeId(l?.creadoPor) || normalizeId(l?._raw?.ownerId) || normalizeId(l?._raw?.agentId) || normalizeId(l?._raw?.registeredById) || normalizeId(l?._raw?.createdBy) || normalizeId(l?._raw?.agenteId) || normalizeId(l?._raw?.creadoPor);
                         let out = serverLeads.filter(l => getAnyAgentId(l) === agentId);
                         if (out.length === 0) {
-                          // Fase 2: por nombre canónico
+                          // Fase 2: por nombre can¨®nico
                           out = serverLeads.filter(l => getNameCanonFromLead(l) === selCanon);
-                          if (out.length) console.info('[Supervisor][Fallback servidor] match por nombre canónico:', out.length);
+                          if (out.length) console.info('[Supervisor][Fallback servidor] match por nombre can¨®nico:', out.length);
                         } else {
                           console.info('[Supervisor][Fallback servidor] match por ID:', out.length);
                         }
-                        // Si aún no hay resultados, intentar por nombre desde backend
+                        // Si a¨²n no hay resultados, intentar por nombre desde backend
                         if (out.length === 0) {
                           const displayName = (teamsApi2 && typeof teamsApi2.getDisplayName==='function') ? teamsApi2.getDisplayName(selCanon) : selCanon;
                           fetchLeadsByAgentName(displayName).then(byName => {
@@ -3118,7 +3118,7 @@
                 if (typeof window.renderCostumerTable === 'function') {
                   window.renderCostumerTable(window.ultimaListaLeads || []);
                 } else {
-                  console.error('La función renderCostumerTable no está disponible');
+                  console.error('La funci¨®n renderCostumerTable no est¨¢ disponible');
                 }
               } catch(e) { console.error('Error al renderizar tabla:', e); }
             });
@@ -3153,7 +3153,7 @@
             bar.appendChild(mkBtn(`${label} (${count})`, teamKey));
           });
 
-          // Helper para obtener agente canónico
+          // Helper para obtener agente can¨®nico
           const canonicalFromName = (name) => {
             if (teamsApi && typeof teamsApi.canonicalFromName === 'function') return teamsApi.canonicalFromName(name);
             return (name || '').toString().trim().toLowerCase();
@@ -3174,7 +3174,7 @@
             list = list.filter(l => agentsCanon.includes(getAgentCanon(l)));
           } else {
             // En 'Todos' mostrar TODOS los leads (sin restringir a 'Completed')
-            // Si se requiere un filtro por ventas, esto debería manejarse con un control separado
+            // Si se requiere un filtro por ventas, esto deber¨ªa manejarse con un control separado
             list = list;
           }
 
@@ -3188,7 +3188,7 @@
       }
     }
 
-    // Función para actualizar las tarjetas de resumen
+    // Funci¨®n para actualizar las tarjetas de resumen
     function updateSummaryCards(leads) {
       // Obtener referencias a los elementos del DOM primero
       const ventasHoyElement = document.getElementById('costumer-ventas-hoy');
@@ -3204,18 +3204,18 @@
       
       // Verificar si hay datos para procesar
       if (!leads || !Array.isArray(leads) || leads.length === 0) {
-        console.log('No hay datos para mostrar en los gráficos');
+        console.log('No hay datos para mostrar en los gr¨¢ficos');
       } else {
-        console.log('Procesando estadísticas con', leads.length, 'leads');
+        console.log('Procesando estad¨ªsticas con', leads.length, 'leads');
         
         const hoy = new Date();
         const diaActual = hoy.getDate();
         const mesActual = hoy.getMonth();
-        const añoActual = hoy.getFullYear();
+        const anioActual = hoy.getFullYear();
         
         console.log('Fecha actual:', hoy.toLocaleDateString());
         
-        // Normalizar fechas con la misma lógica de las gráficas (zona horaria de negocio)
+        // Normalizar fechas con la misma l¨®gica de las gr¨¢ficas (zona horaria de negocio)
         const todayISO = toISOInTZ(new Date(), BUSINESS_TZ_OFFSET_MIN); // YYYY-MM-DD
         const [yNow, mNow] = todayISO.split('-').map(Number);
 
@@ -3233,13 +3233,13 @@
             // Contar cancelados (soportar variantes y subcadenas)
             if (
               status.includes('cancel') ||    // engloba canceled/cancelled/cancelado
-              status.includes('anulad') ||    // español alternativo
+              status.includes('anulad') ||    // espa?ol alternativo
               status.includes('no instalado') // posibles estados combinados
             ) {
               cancelados++;
             }
 
-            // Usar la misma extracción de fecha que el gráfico
+            // Usar la misma extracci¨®n de fecha que el gr¨¢fico
             const leadISO = getDateFromLead(lead); // YYYY-MM-DD en TZ de negocio
             if (leadISO) {
               // Ventas hoy
@@ -3253,7 +3253,7 @@
           }
         });
         
-        console.log('Estadísticas calculadas:', {
+        console.log('Estad¨ªsticas calculadas:', {
           ventasHoy,
           ventasMes,
           pendientes,
@@ -3282,7 +3282,7 @@
         console.log('Actualizado cancelados:', cancelados);
       }
       
-      // Las variables de los elementos del DOM ya están declaradas al inicio de la función
+      // Las variables de los elementos del DOM ya est¨¢n declaradas al inicio de la funci¨®n
       
       if (ventasHoyElement) {
         ventasHoyElement.textContent = ventasHoy.toString();
@@ -3304,7 +3304,7 @@
         console.log('Actualizado cancelados en el DOM');
       }
       
-      // Datos para el gráfico de ventas por semana (fechas locales)
+      // Datos para el gr¨¢fico de ventas por semana (fechas locales)
       const ultimos7Dias = Array.from({ length: 7 }, (_, i) => {
         const fecha = new Date();
         fecha.setHours(0,0,0,0);
@@ -3312,8 +3312,8 @@
         return toLocalISO(fecha);
       });
 
-      // Etiquetas: días de la semana
-      const diasSemanaEtiquetas = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+      // Etiquetas: d¨ªas de la semana
+      const diasSemanaEtiquetas = ['dom', 'lun', 'mar', 'mi¨¦', 'jue', 'vie', 's¨¢b'];
       const labelsDias = ultimos7Dias.map(f => {
         const [y, m, d] = f.split('-').map(Number);
         const loc = new Date(y, m - 1, d);
@@ -3324,7 +3324,7 @@
         return leads.filter(lead => getDateFromLead(lead) === fechaISO).length;
       });
 
-      // Puntaje total por día (no promedio)
+      // Puntaje total por d¨ªa (no promedio)
       const puntajesPorDia = ultimos7Dias.map(fechaISO => {
         return leads.reduce((sum, lead) => {
           if (getDateFromLead(lead) === fechaISO) {
@@ -3334,7 +3334,7 @@
         }, 0);
       });
       
-      // Datos para el gráfico de distribución por producto
+      // Datos para el gr¨¢fico de distribuci¨®n por producto
       const productos = {};
       leads.forEach(lead => {
         const producto = lead.tipo_servicios || 'Sin especificar';
@@ -3350,9 +3350,9 @@
         '#858796', '#5a5c69', '#3a3b45', '#1a1a1a', '#000000'
       ].slice(0, etiquetasProductos.length);
       
-      // Renderizar o actualizar los gráficos
+      // Renderizar o actualizar los gr¨¢ficos
       if (typeof renderizarGraficoVentas === 'function' && typeof renderizarGraficoProductos === 'function') {
-        // Enviar etiquetas de días de la semana para la gráfica superior
+        // Enviar etiquetas de d¨ªas de la semana para la gr¨¢fica superior
         renderizarGraficoVentas(labelsDias, ventasPorDia, puntajesPorDia);
         renderizarGraficoProductos(etiquetasProductos, datosProductos, coloresProductos);
       }
@@ -3361,20 +3361,20 @@
     // Funciones de ejemplo para editar/eliminar
     function editarLead(id) {
       console.log('Editar lead:', id);
-      // Implementar lógica de edición
+      // Implementar l¨®gica de edici¨®n
     }
 
     function eliminarLead(id) {
-      if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+      if (confirm('?Est¨¢s seguro de que deseas eliminar este registro?')) {
         console.log('Eliminar lead:', id);
-        // Implementar lógica de eliminación
+        // Implementar l¨®gica de eliminaci¨®n
       }
     }
   </script>
-  <!-- Cargar primero el módulo de datos de clientes -->
+  <!-- Cargar primero el m¨®dulo de datos de clientes -->
   <script src="js/data/costumer-mock-data.js"></script>
   <script>
-    // Función para mostrar mensajes de depuración
+    // Funci¨®n para mostrar mensajes de depuraci¨®n
     function debugLog(message, data) {
       if (data !== undefined) {
         console.log(`[DEBUG] ${message}`, data);
@@ -3383,7 +3383,7 @@
       }
     }
 
-    // Logs de diagnóstico: conteo por TEAM y por agente (incluye "Sin asignar (TEAM IRANIA)")
+    // Logs de diagn¨®stico: conteo por TEAM y por agente (incluye "Sin asignar (TEAM IRANIA)")
     function logDiagnosticoAsignacion(leads) {
       try {
         const norm = (s) => {
@@ -3436,15 +3436,15 @@
         for (const [team, m] of perTeam.entries()) {
           resumen[team] = Object.fromEntries([...m.entries()].sort((a,b) => b[1]-a[1]));
         }
-        console.log('[DIAGNÓSTICO ASIGNACIÓN] Conteo por TEAM y agente:', resumen);
+        console.log('[DIAGN?STICO ASIGNACI?N] Conteo por TEAM y agente:', resumen);
 
-        // Log específico TEAM IRANIA
+        // Log espec¨ªfico TEAM IRANIA
         const keyIrania = [...perTeam.keys()].find(k => norm(k).includes('team irania'));
         if (keyIrania) {
-          console.log(`[AGRUPACIÓN TEAM IRANIA] Conteo por agente:`, Object.fromEntries(perTeam.get(keyIrania).entries()));
+          console.log(`[AGRUPACI?N TEAM IRANIA] Conteo por agente:`, Object.fromEntries(perTeam.get(keyIrania).entries()));
         }
       } catch (e) {
-        console.warn('logDiagnosticoAsignacion: error al generar diagnóstico', e);
+        console.warn('logDiagnosticoAsignacion: error al generar diagn¨®stico', e);
       }
     }
 
@@ -3488,12 +3488,12 @@
       }
     }
 
-    // Función para inicializar la página
+    // Funci¨®n para inicializar la p¨¢gina
     function initPage() {
-      debugLog('Inicializando página...');
+      debugLog('Inicializando p¨¢gina...');
       cargarInfoUsuario();
     }
-    // Función para cargar la información del usuario
+    // Funci¨®n para cargar la informaci¨®n del usuario
     function cargarInfoUsuario() {
       debugLog('Iniciando cargarInfoUsuario');
       
@@ -3517,7 +3517,7 @@
             userNameElement.style.color = '#2d3748'; // Asegurar que el color sea visible
             debugLog('Nombre de usuario actualizado correctamente');
           } else {
-            debugLog('No se encontró el elemento sidebar-user-name');
+            debugLog('No se encontr¨® el elemento sidebar-user-name');
           }
         }
         
@@ -3537,7 +3537,7 @@
             userRoleElement.style.display = 'inline-block'; // Asegurar que sea visible
             debugLog('Rol de usuario actualizado correctamente');
           } else {
-            debugLog('No se encontró el elemento sidebar-user-role');
+            debugLog('No se encontr¨® el elemento sidebar-user-role');
           }
         }
       } catch (error) {
@@ -3545,28 +3545,28 @@
       }
     }
 
-    // Configurar botón de cerrar sesión y cargar info del usuario
+    // Configurar bot¨®n de cerrar sesi¨®n y cargar info del usuario
     document.addEventListener('DOMContentLoaded', function() {
-      debugLog('DOM completamente cargado, inicializando página...');
-      // Inicializar la página
+      debugLog('DOM completamente cargado, inicializando p¨¢gina...');
+      // Inicializar la p¨¢gina
       initPage();
       
       // Cargar datos iniciales
       cargarDatosIniciales();
       
-      // Configurar botón de cerrar sesión
+      // Configurar bot¨®n de cerrar sesi¨®n
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
           e.preventDefault();
-          // Redirigir a la página de inicio de sesión
+          // Redirigir a la p¨¢gina de inicio de sesi¨®n
           window.location.href = 'index.html';
         });
       }
     });
   </script>
   
-  <!-- Script de cierre de sesión unificado -->
+  <!-- Script de cierre de sesi¨®n unificado -->
   <script src="js/auth-logout.js"></script>
 </body>
 </html>

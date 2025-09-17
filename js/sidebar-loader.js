@@ -33,45 +33,85 @@
   function normalizeRole(raw){
     try {
       const r = (raw || '').toString().toLowerCase().trim();
-      const map = { 'administrador': 'admin', 'admin': 'admin' };
+      const map = { 
+        'administrador': 'admin', 
+        'admin': 'admin',
+        'teamlineas': 'teamlineas',
+        'lineas': 'teamlineas'
+      };
       return map[r] || r;
     } catch { return ''; }
   }
 
-  function setActive(nav, preferKey){
+  function setActive(nav, preferKey) {
     try {
+      const role = normalizeRole(decodeTokenRole());
+      const isTeamLineas = role === 'teamlineas' || (() => {
+        try {
+          const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+          const username = (user.username || '').toLowerCase();
+          return username.startsWith('lineas-');
+        } catch { return false; }
+      })();
+      
+      // No hacer nada más si es un usuario de Team Líneas
+      if (isTeamLineas) {
+        return;
+      }
+
       // Mapa de claves soportadas
       const map = [
         { key: 'inicio', href: 'inicio.html' },
-        { key: 'lead', href: 'lead.html' },
+        { key: 'lead', href: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
         { key: 'costumer', href: 'Costumer.html' },
         { key: 'register', href: 'register.html' },
         { key: 'facturacion', href: 'facturacion.html' },
         { key: 'estadisticas', href: 'Estadisticas.html' }
       ];
+
       // 1) Prioridad: atributo data-active si viene de la página
       let target = null;
       const keyAttr = (preferKey || nav.getAttribute('data-active') || '').toLowerCase();
       if (keyAttr) target = map.find(m => m.key === keyAttr);
+
       // 2) Fallback por URL
       if (!target) {
         const path = (location.pathname || '').toLowerCase();
         const urlTarget = [
           { key: 'inicio', match: 'inicio.html' },
-          { key: 'lead', match: 'lead.html' },
+          { key: 'lead', match: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
+          { key: 'lead', match: 'lead.html' }, // Para compatibilidad con enlaces existentes
           { key: 'costumer', match: 'costumer.html' },
           { key: 'register', match: 'register.html' },
           { key: 'facturacion', match: 'facturacion.html' },
           { key: 'estadisticas', match: 'estadisticas.html' }
         ].find(m => path.endsWith(m.match));
-        if (urlTarget) target = map.find(m => m.key === urlTarget.key);
+        
+        if (urlTarget) {
+          target = map.find(m => m.key === urlTarget.key);
+        }
       }
+
+      // Actualizar el enlace de Lead en el sidebar
+      const leadLinks = nav.querySelectorAll('a[href$="lead.html"]');
+      leadLinks.forEach(link => {
+        if (isTeamLineas) {
+          link.href = 'lead-lineas.html';
+        }
+      });
+
+      // Actualizar clases activas
       const links = nav.querySelectorAll('a.btn.btn-sidebar');
       links.forEach(a => a.classList.remove('is-active'));
+      
       if (!target) return;
+      
       for (const a of links) {
         const ahref = (a.getAttribute('href') || '').toLowerCase();
-        if (ahref.endsWith(target.href.toLowerCase())) { a.classList.add('is-active'); break; }
+        if (ahref.endsWith(target.href.toLowerCase())) { 
+          a.classList.add('is-active'); 
+          break; 
+        }
       }
     } catch (e) { console.warn('sidebar active state error', e); }
   }
@@ -142,8 +182,12 @@
       const candidates = [
         '/components/sidebar.html',
         'components/sidebar.html',
-        './components/sidebar.html'
+        './components/sidebar.html',
+        '../components/sidebar.html',
+        window.location.pathname.replace(/\/[^/]*$/, '') + '/components/sidebar.html',
+        window.location.origin + '/components/sidebar.html'
       ];
+      console.log('Buscando sidebar en rutas:', candidates);
       const resp = await fetchFirstOk(candidates);
       const html = await resp.text();
       nav.innerHTML = html;

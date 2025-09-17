@@ -1,9 +1,38 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <script>
+    // Verificar autenticación y permisos
+    (function() {
+      try {
+        // Verificar si el usuario está autenticado
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) {
+          window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+          return;
+        }
+        
+        // Verificar si el usuario es de Team Líneas
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const username = (userData.username || '').toLowerCase();
+        const role = (userData.role || '').toLowerCase();
+        
+        // Si el usuario no es de Team Líneas, redirigir a la página de inicio
+        if (role !== 'teamlineas' && !username.startsWith('lineas-')) {
+          window.location.href = '/inicio.html';
+        }
+      } catch (e) {
+        console.error('Error de autenticación:', e);
+        window.location.href = '/login.html';
+      }
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CRM Agente - Team Líneas</title>
+  
+  <!-- Interceptor de API para manejo de permisos -->
+  <script src="js/api-interceptor.js"></script>
   <script>
     // Versionado para romper caché
     window.__APP_VERSION__ = '20250915-1200';
@@ -205,7 +234,7 @@
             </div>
             
             <!-- Contenedor para teléfonos adicionales (se llenará dinámicamente) -->
-            <div id="telefonos-container" class="telefonos-container" style="display: none;">
+            <div id="telefonos-container" class="telefonos-container">
               <h4>Teléfonos Adicionales</h4>
               <div id="telefonos-lista">
                 <!-- Los campos de teléfono se agregarán aquí dinámicamente -->
@@ -269,18 +298,59 @@
 
 <!-- Script para manejar el formulario de Team Líneas -->
 <script>
+  // Función para verificar permisos del usuario
+  function checkUserPermissions() {
+    try {
+      // Obtener datos del usuario
+      const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+      const username = (userData.username || '').toLowerCase();
+      const role = (userData.role || '').toLowerCase();
+      
+      // Verificar si es usuario de Team Líneas
+      const isTeamLineas = role === 'teamlineas' || username.startsWith('lineas-');
+      
+      // Si es Team Líneas, forzar el rol correspondiente
+      if (isTeamLineas) {
+        userData.role = 'teamlineas';
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
+      
+      return {
+        isTeamLineas: isTeamLineas,
+        username: username,
+        role: isTeamLineas ? 'teamlineas' : role
+      };
+    } catch (e) {
+      console.error('Error al verificar permisos:', e);
+      return { isTeamLineas: false, username: '', role: '' };
+    }
+  }
+
+  // Función para mostrar mensaje de error
+  function showError(message) {
+    alert(message);
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
+    // Verificar permisos al cargar la página
+    const { isTeamLineas, username } = checkUserPermissions();
+    if (!isTeamLineas) {
+      showError('No tienes permisos para acceder a esta página.');
+      window.location.href = '/inicio.html';
+      return;
+    }
     // Inicializar la fecha actual en los campos de fecha
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('dia-venta').value = today;
     
-    // Manejar cambios en la cantidad de líneas
+    // Referencias a los elementos del formulario
     const cantidadLineasSelect = document.getElementById('cantidad-lineas');
     const telefonosContainer = document.getElementById('telefonos-container');
     const telefonosLista = document.getElementById('telefonos-lista');
     
-    cantidadLineasSelect.addEventListener('change', function() {
-      const cantidad = parseInt(this.value) || 0;
+    // Función para actualizar los campos de teléfonos adicionales
+    const actualizarCamposTelefonicos = () => {
+      const cantidad = parseInt(cantidadLineasSelect.value) || 0;
       
       // Limpiar lista de teléfonos
       telefonosLista.innerHTML = '';
@@ -313,17 +383,22 @@
         // Ocultar contenedor si solo es 1 línea o ninguna
         telefonosContainer.style.display = 'none';
       }
-    });
+    };
     
-    // Manejar el envío del formulario
-    const form = document.getElementById('crmLineasForm');
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
+    // Inicializar los campos según el valor por defecto
+    actualizarCamposTelefonicos();
+    
+    // Escuchar cambios en el selector de cantidad de líneas
+    cantidadLineasSelect.addEventListener('change', actualizarCamposTelefonicos);
+    
+    // La funcionalidad se movió a la función actualizarCamposTelefonicos()
+    
+    // Función para enviar el formulario
+    async function submitForm() {
       // Validar formulario
       if (!form.checkValidity()) {
-        alert('Por favor complete todos los campos requeridos.');
-        return;
+        showError('Por favor complete todos los campos requeridos.');
+        return false;
       }
       
       // Mostrar indicador de carga
@@ -363,16 +438,52 @@
           data.telefonos_adicionales = telefonosAdicionales;
         }
         
-        // Agregar información del agente
-        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
-        const user = JSON.parse(userStr);
-        data.agente = user.username || 'SIN_AGENTE';
-        data.team = 'TEAM LINEAS';
+        // Verificar permisos antes de enviar
+        const { isTeamLineas, username } = checkUserPermissions();
+        if (!isTeamLineas) {
+          throw new Error('No tienes permisos para realizar esta acción.');
+        }
+        
+        // Agregar información del usuario
+        data.agente = username;
+        data.equipo = 'TEAM LINEAS';
+        
+        // Obtener token de autenticación
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación. Por favor, inicia sesión nuevamente.');
+        }
+        
+        // Configurar headers
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-User-Role': 'teamlineas' // Especificar el rol para el backend
+        };
         
         console.log('Datos a enviar:', data);
         
-        // Aquí iría la lógica para enviar los datos al servidor
-        // const response = await fetch('/api/lineas', {
+        // Enviar datos al servidor
+        const response = await fetch('/api/lineas', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.message || 'Error al enviar el formulario');
+        }
+        
+        // Mostrar mensaje de éxito
+        alert('¡Registro guardado exitosamente!');
+        
+        // Limpiar el formulario
+        form.reset();
+        actualizarCamposTelefonicos();
+        
+        return true;
         //   method: 'POST',
         //   headers: {
         //     'Content-Type': 'application/json',
@@ -386,17 +497,23 @@
         // }
         
         // Simular éxito
-        alert('Registro guardado exitosamente');
-        form.reset();
         
       } catch (error) {
         console.error('Error al enviar el formulario:', error);
-        alert(`Error: ${error.message || 'No se pudo guardar el registro'}`);
+        showError('Error al enviar el formulario: ' + (error.message || 'Error desconocido'));
+        return false;
       } finally {
-        // Restaurar botón
+        // Restaurar el botón
         submitButton.disabled = false;
-        submitButton.textContent = originalText;
+        submitButton.innerHTML = originalText;
       }
+    }
+    
+    // Manejar el envío del formulario
+    const form = document.getElementById('crmLineasForm');
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      await submitForm();
     });
   });
 </script>

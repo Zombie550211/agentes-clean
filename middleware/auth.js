@@ -135,19 +135,35 @@ exports.protect = async (req, res, next) => {
 exports.hasTableAccess = (req, res, next) => {
   console.log('[AUTH] Verificando acceso a la tabla de clientes');
   
-  // Solo los administradores pueden ver la tabla de clientes
-  if (req.user && req.user.role === 'admin') {
-    console.log(`[AUTH] Acceso concedido a la tabla de clientes para ${req.user.username}`);
+  // Verificar si el usuario está autenticado
+  if (!req.user) {
+    console.warn('[AUTH] Intento de acceso sin autenticación');
+    return res.status(401).json({
+      success: false,
+      message: 'Debe iniciar sesión para acceder a este recurso'
+    });
+  }
+  
+  // Obtener nombre de usuario en minúsculas para la verificación
+  const username = (req.user.username || '').toLowerCase();
+  const role = (req.user.role || '').toLowerCase();
+  
+  // Verificar si el usuario es administrador o de Team Líneas
+  const isAdmin = role === 'admin';
+  const isTeamLineas = role === 'teamlineas' || username.startsWith('lineas-');
+  
+  if (isAdmin || isTeamLineas) {
+    console.log(`[AUTH] Acceso concedido a la tabla de clientes para ${req.user.username} (Rol: ${role})`);
     return next();
   }
   
-  console.warn(`[AUTH] Acceso denegado a la tabla de clientes para ${req.user?.username || 'usuario no autenticado'}`);
+  console.warn(`[AUTH] Acceso denegado a la tabla de clientes para ${req.user.username} (Rol: ${role})`);
   return res.status(403).json({
     success: false,
     message: 'Acceso denegado: No tienes permisos para ver la tabla de clientes',
     code: 'ACCESS_DENIED',
-    requiredRole: 'admin',
-    currentRole: req.user?.role || 'no autenticado'
+    requiredRoles: ['admin', 'teamlineas'],
+    currentRole: role || 'no definido'
   });
 };
 
