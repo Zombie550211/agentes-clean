@@ -54,10 +54,7 @@
         } catch { return false; }
       })();
       
-      // No hacer nada más si es un usuario de Team Líneas
-      if (isTeamLineas) {
-        return;
-      }
+      // Para Team Líneas NO retornamos: necesitamos construir el mapa y marcar activos
 
       // Mapa de claves soportadas
       const map = [
@@ -138,6 +135,13 @@
       if (statsLi) {
         statsLi.style.display = allowedStats.includes(role) ? '' : 'none';
       }
+
+      // 4) Habilitar SIEMPRE Costumer para todos los roles (incluyendo Team Líneas)
+      const costumerLink = nav.querySelector('a[href$="Costumer.html"], a[href$="costumer.html"]');
+      const costumerLi = costumerLink ? (costumerLink.closest('li') || costumerLink.parentElement) : null;
+      if (costumerLi) {
+        costumerLi.style.display = '';
+      }
     } catch(e){ console.warn('sidebar admin visibility error', e); }
   }
 
@@ -179,14 +183,18 @@
         if (lastErr) throw lastErr;
         throw new Error('Ninguna ruta de sidebar.html respondió OK');
       }
+      // Usar rutas relativas a la raíz del sitio
+      const basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '/';
       const candidates = [
         '/components/sidebar.html',
         'components/sidebar.html',
         './components/sidebar.html',
         '../components/sidebar.html',
-        window.location.pathname.replace(/\/[^/]*$/, '') + '/components/sidebar.html',
-        window.location.origin + '/components/sidebar.html'
-      ];
+        basePath + '/components/sidebar.html',
+        window.location.origin + '/components/sidebar.html',
+        '/dashboard/components/sidebar.html',  // Ruta específica para el servidor local
+        window.location.origin + '/dashboard/components/sidebar.html'  // Ruta completa para el servidor local
+      ].filter(Boolean);
       console.log('Buscando sidebar en rutas:', candidates);
       const resp = await fetchFirstOk(candidates);
       const html = await resp.text();
@@ -195,6 +203,43 @@
       setActive(nav, desiredKey);
       applyAdminVisibility(nav);
       wireLogout(nav);
+      // Hardening: asegurar que el enlace de Costumer funcione para todos los roles
+      try {
+        const links = Array.from(nav.querySelectorAll('a'));
+        const costumerLink = links.find(a => {
+          const href = (a.getAttribute('href') || '').toLowerCase();
+          const txt = (a.textContent || '').toLowerCase().trim();
+          return href.endsWith('costumer.html') || txt.includes('costumer');
+        });
+        if (costumerLink) {
+          console.debug('[sidebar] Normalizando enlace Costumer:', costumerLink.outerHTML);
+          costumerLink.setAttribute('href', 'Costumer.html');
+          costumerLink.removeAttribute('onclick');
+          costumerLink.removeAttribute('target');
+          costumerLink.style.pointerEvents = '';
+          // Asegurar navegación directa al hacer click
+          costumerLink.addEventListener('click', function(ev){
+            try { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); } catch(_) {}
+            const abs = window.location.origin + '/Costumer.html';
+            window.location.assign(abs);
+          });
+        } else {
+          console.warn('[sidebar] No se encontró enlace Costumer en el sidebar');
+        }
+      } catch(err){ console.warn('[sidebar] Error normalizando Costumer:', err); }
+      // Delegated handler de respaldo: forzar navegación a Costumer.html
+      try {
+        nav.addEventListener('click', function(ev){
+          const a = ev.target && ev.target.closest ? ev.target.closest('a.btn.btn-sidebar') : null;
+          if (!a) return;
+          const txt = (a.textContent || '').toLowerCase().trim();
+          if (txt.includes('costumer')) {
+            try { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); } catch(_) {}
+            const abs = window.location.origin + '/Costumer.html';
+            window.location.replace(abs);
+          }
+        });
+      } catch(_){ /* noop */ }
       // Rellenar la info de usuario si el script está disponible
       try { if (typeof window.cargarInfoUsuario === 'function') window.cargarInfoUsuario(); } catch {}
       // let other scripts (user-info.js) populate name/role after injection

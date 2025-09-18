@@ -50,7 +50,7 @@ function getColumnsForMode(mode) {
         { key: 'riesgo', title: 'RIESGO' },
         { key: 'dia_venta', title: 'DÍA DE VENTA' },
         { key: 'dia_instalacion', title: 'DÍA DE INSTALACIÓN' },
-        { key: 'status', title: 'STATUS', render: (c) => c.status },
+        { key: 'status', title: 'STATUS', render: (c) => getStatusBadge(c.status) },
         { key: 'servicios', title: 'SERVICIOS' },
         { key: 'mercado', title: 'MERCADO' },
         { key: 'supervisor', title: 'SUPERVISOR' },
@@ -1033,7 +1033,8 @@ function renderCostumerTable(leads = []) {
             // Si la fecha está en formato YYYY-MM-DD, convertirla a DD/MM/YYYY para mostrar
             if (/^\d{4}-\d{2}-\d{2}$/.test(lead.dia_venta)) {
                 const [year, month, day] = lead.dia_venta.split('-');
-                lead.dia_venta_mostrar = `${day}/${month}/${year}`;
+                // Usar directamente los valores sin crear objeto Date para evitar problemas de zona horaria
+                lead.dia_venta_mostrar = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
             } else {
                 lead.dia_venta_mostrar = lead.dia_venta;
             }
@@ -1412,7 +1413,14 @@ function normalizeLeadData(lead) {
             
             // Si es un string de fecha ISO o similar
             if (typeof dateStr === 'string' && dateStr.includes('-')) {
-                date = new Date(dateStr);
+                // Si está en formato YYYY-MM-DD, procesarlo directamente para evitar problemas de zona horaria
+                if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                    const [year, month, day] = dateStr.split('-').map(Number);
+                    // Crear fecha en zona horaria local para evitar problemas de UTC
+                    date = new Date(year, month - 1, day);
+                } else {
+                    date = new Date(dateStr);
+                }
             } 
             // Si está en formato MM/DD/YYYY o similar
             else if (typeof dateStr === 'string' && dateStr.includes('/')) {
@@ -1483,8 +1491,8 @@ function normalizeLeadData(lead) {
         }
     });
     
-    // Asegurar que el campo status tenga un valor
-    normalized.status = getStatusBadge(normalized.status || 'pendiente');
+    // Asegurar que el campo status tenga un valor (mantener texto limpio)
+    normalized.status = normalized.status || 'pendiente';
     
     console.log('[DEBUG] Lead normalizado:', normalized);
     return normalized;

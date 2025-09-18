@@ -101,6 +101,45 @@ const corsOptions = {
     if (!origin || whitelist.includes(origin)) {
       return callback(null, true);
     }
+
+    // Aplicar visibilidad por rol: si NO es admin/backoffice, filtrar por su propio username
+    try {
+      const privileged = new Set(['admin','backoffice','b:o','b.o','b-o','bo']);
+      const isPrivileged = privileged.has(userRole);
+      if (!isPrivileged) {
+        const userName = String(req.user?.username || '').trim();
+        if (userName) {
+          const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const rx = new RegExp(`^${esc(userName)}$`, 'i');
+          const rxContains = new RegExp(esc(userName), 'i');
+          const selfFilters = [
+            { agente: { $regex: rx } },
+            { agenteNombre: { $regex: rx } },
+            { createdBy: { $regex: rx } },
+            { owner: { $regex: rx } },
+            { usuario: { $regex: rx } },
+            { vendedor: { $regex: rx } },
+            { salesAgent: { $regex: rx } },
+            { atendioPor: { $regex: rx } },
+            { asignadoA: { $regex: rx } },
+            { asignadoPor: { $regex: rx } },
+            { registradoPor: { $regex: rx } },
+            { registeredBy: { $regex: rx } },
+            // Contiene (por si guardaron solo nombre o apellido)
+            { agente: { $regex: rxContains } },
+            { agenteNombre: { $regex: rxContains } },
+            { createdBy: { $regex: rxContains } },
+            { owner: { $regex: rxContains } },
+          ];
+          if (Object.keys(query).length > 0) {
+            query = { $and: [ query, { $or: selfFilters } ] };
+          } else {
+            query = { $or: selfFilters };
+          }
+          console.log('[api/customers] Filtro por usuario aplicado para no-privilegiado:', userName);
+        }
+      }
+    } catch(e) { console.warn('[api/customers] No se pudo aplicar filtro por usuario:', e?.message); }
     console.warn('[CORS] Origen no permitido:', origin);
     return callback(new Error('Not allowed by CORS'));
   },
@@ -237,15 +276,9 @@ app.post('/api/lineas', protect, async (req, res) => {
 const loginLimiter = makeLimiter({ windowMs: 10 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Ruta protegida para Costumer.html (solo administradores) - DEBE IR ANTES de express.static
-app.get('/Costumer.html', protect, (req, res, next) => {
-  // Verificar si el usuario es administrador
-  if (req.user && req.user.role === 'admin') {
-    // Si es administrador, servir el archivo directamente
-    return res.sendFile(path.join(publicPath, 'Costumer.html'));
-  } else {
-    // Si no es administrador, redirigir a página de inicio con mensaje de error
-    return res.redirect('/inicio?error=Acceso denegado. Se requiere rol de administrador.');
-  }
+app.get('/Costumer.html', protect, (req, res) => {
+  // Servir Costumer.html a cualquier usuario autenticado (visibilidad de datos se controla en los endpoints)
+  return res.sendFile(path.join(publicPath, 'Costumer.html'));
 });
 
 // Servir archivos estáticos (EXCEPTO Costumer.html que ya está protegido)
@@ -264,13 +297,22 @@ app.use(express.static(staticPath, {
   redirect: false
 }));
 
-// Bloquear acceso directo a Costumer.html si se intenta acceder después de express.static
-app.get('/Costumer.html', (req, res) => {
-  res.redirect('/inicio?error=Acceso denegado. Se requiere autenticación como administrador.');
+// En caso de que esta ruta se evalúe después de static, servir igualmente a usuarios autenticados
+app.get('/Costumer.html', protect, (req, res) => {
+  return res.sendFile(path.join(publicPath, 'Costumer.html'));
 });
 
 // Handle CORS preflight for all routes
 app.options('*', cors(corsOptions));
+
+// Middleware para loggear todas las peticiones a /api/leads
+app.use('/api/leads', (req, res, next) => {
+  console.error('🔥🔥🔥 PETICIÓN A /api/leads INTERCEPTADA EN SERVER.JS 🔥🔥🔥');
+  console.error('Method:', req.method);
+  console.error('URL:', req.url);
+  console.error('Query:', req.query);
+  next();
+});
 
 // Usar rutas de autenticación (aplicar limiter suave al grupo si disponible)
 app.use('/api/auth', authLimiter, authRoutes);
@@ -714,33 +756,10 @@ app.put('/api/leads/:id/status', protect, authorize('admin','backoffice','b:o','
   }
 });
 
-// Alias para compatibilidad: /api/leads redirige a /api/customers (solo administradores)
-app.get('/api/leads', protect, (req, res, next) => {
-  // Verificar si el usuario es administrador
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Acceso denegado. Se requiere rol de administrador.'
-    });
-  }
-  next();
-}, async (req, res) => {
-  // Redirigir a /api/customers con los mismos parámetros
-  const queryParams = new URLSearchParams(req.query).toString();
-  res.redirect(307, `/api/customers?${queryParams}`);
-});
+// ELIMINADO: Endpoint duplicado que interfería con routes/api.js
 
 // Endpoint para obtener clientes desde la base de datos (solo administradores)
-app.get('/api/customers', protect, (req, res, next) => {
-  // Verificar si el usuario es administrador
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({
-      success: false,
-      message: 'Acceso denegado. Se requiere rol de administrador.'
-    });
-  }
-  next();
-}, async (req, res) => {
+app.get('/api/customers', protect, async (req, res) => {
   try {
     console.log('Solicitud recibida en /api/customers');
     

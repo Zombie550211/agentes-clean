@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -12,12 +12,56 @@
   <link rel="stylesheet" href="css/costumer-table-comments.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/sidebar-inicio.css">
-  <!-- Protecci¨®n de autenticaci¨®n en frontend -->
+  <!-- Guard temporal ANTES de cargar scripts: bloquear redirecciones a inicio -->
+  <script>
+    (function(){
+      try {
+        const blockMs = 12000; // ventana de protección ampliada
+        const isInicio = (u) => {
+          try {
+            const s = (u||'').toString().toLowerCase();
+            return s.includes('/inicio.html') || s.endsWith('inicio.html');
+          } catch { return false; }
+        };
+        const origAssign = window.location.assign ? window.location.assign.bind(window.location) : null;
+        const origReplace = window.location.replace ? window.location.replace.bind(window.location) : null;
+        const origHrefDesc = Object.getOwnPropertyDescriptor(Location.prototype, 'href');
+        if (origAssign) window.location.assign = function(u){ if (isInicio(u)) { console.warn('[Costumer] Bloqueada redirección a inicio'); return; } return origAssign(u); };
+        if (origReplace) window.location.replace = function(u){ if (isInicio(u)) { console.warn('[Costumer] Bloqueada redirección a inicio'); return; } return origReplace(u); };
+        if (origHrefDesc && origHrefDesc.set) {
+          Object.defineProperty(window.location, 'href', {
+            configurable: true,
+            get: origHrefDesc.get ? origHrefDesc.get.bind(window.location) : function(){ return document.URL; },
+            set: function(u){ if (isInicio(u)) { console.warn('[Costumer] Bloqueada redirección a inicio (href)'); return; } return origHrefDesc.set.call(window.location, u); }
+          });
+        }
+        // Interceptar document.location y parent/top
+        try { Object.defineProperty(document, 'location', { configurable: true, get: () => window.location, set: v => { if (!isInicio(v)) window.location.href = v; else console.warn('[Costumer] Bloqueada redirección via document.location'); } }); } catch {}
+        try { if (window.top && window.top.location) { const t = window.top.location; const oa = t.assign?.bind(t); if (oa) t.assign = (u)=>{ if (isInicio(u)) return console.warn('[Costumer] top.assign bloqueado'); oa(u); }; const orp = t.replace?.bind(t); if (orp) t.replace = (u)=>{ if (isInicio(u)) return console.warn('[Costumer] top.replace bloqueado'); orp(u); }; } } catch {}
+        try { if (window.parent && window.parent.location) { const p = window.parent.location; const pa = p.assign?.bind(p); if (pa) p.assign = (u)=>{ if (isInicio(u)) return console.warn('[Costumer] parent.assign bloqueado'); pa(u); }; const pr = p.replace?.bind(p); if (pr) p.replace = (u)=>{ if (isInicio(u)) return console.warn('[Costumer] parent.replace bloqueado'); pr(u); }; } } catch {}
+        // Interceptar history
+        try {
+          const hps = history.pushState.bind(history);
+          history.pushState = function(state, title, url){ if (isInicio(url)) { console.warn('[Costumer] pushState a inicio bloqueado'); return; } return hps(state, title, url); };
+          const hrs = history.replaceState.bind(history);
+          history.replaceState = function(state, title, url){ if (isInicio(url)) { console.warn('[Costumer] replaceState a inicio bloqueado'); return; } return hrs(state, title, url); };
+        } catch {}
+        // Eliminar meta refresh a inicio si existiera
+        try { document.querySelectorAll('meta[http-equiv="refresh"]').forEach(m=>{ const c=(m.getAttribute('content')||'').toLowerCase(); if (c.includes('inicio.html')) { m.parentNode.removeChild(m); console.warn('[Costumer] meta refresh eliminado'); } }); } catch{}
+        setTimeout(function(){
+          try { if (origAssign) window.location.assign = origAssign; } catch{}
+          try { if (origReplace) window.location.replace = origReplace; } catch{}
+          try { if (origHrefDesc) Object.defineProperty(window.location, 'href', origHrefDesc); } catch{}
+        }, blockMs);
+      } catch(e){ console.warn('[Costumer] Guard no pudo instalarse:', e); }
+    })();
+  </script>
+  <!-- Protección de autenticación en frontend -->
   <script src="agentes/js/auth-check.js"></script>
   <script src="/js/logout-handler.js"></script>
   <script src="/js/user-info.js"></script>
   <script src="js/sidebar-loader.js"></script>
-  <!-- Teams API: definici¨®n de equipos, supervisores y agentes -->
+  <!-- Teams API: definición de equipos, supervisores y agentes -->
   <script src="utils/teams.js?v=20250904"></script>
   <style>
     /* Estilos del sidebar unificados en css/sidebar.css */

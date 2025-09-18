@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ObjectId } = require('mongodb');
-const { protect, hasTableAccess } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const { connectToMongoDB, getDb } = require('../config/db');
 
@@ -28,8 +28,12 @@ const withDatabase = async (req, res, next) => {
   }
 };
 
-// Ruta para obtener leads completos (solo accesible para administradores)
-router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => {
+// Ruta para obtener leads completos (accesible a autenticados con filtros por rol)
+router.get('/leads', protect, withDatabase, async (req, res) => {
+  console.error('\n===========================================');
+  console.error('🚀 ENDPOINT /api/leads EJECUTÁNDOSE');
+  console.error('===========================================');
+  
   const db = req.db;
   let filtro = {}; 
   let usuarioAutenticado = req.user || null;
@@ -44,15 +48,15 @@ router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => 
       agente: agenteQuery
     } = req.query;
 
-    console.log('🔥 [ENDPOINT] /api/leads ejecutándose');
-    console.log('[DEBUG] Query params:', req.query);
-    console.log('[DEBUG] Usuario autenticado:', usuarioAutenticado || 'No autenticado');
+    console.error('🔥 [ENDPOINT] /api/leads ejecutándose');
+    console.error('[DEBUG] Query params:', req.query);
+    console.error('[DEBUG] Usuario autenticado:', usuarioAutenticado || 'No autenticado');
 
     // Obtener la colección
     let collection;
     try {
       collection = db.collection('costumers');
-      console.log('[DEBUG] Colección costumers obtenida correctamente');
+      console.error('[DEBUG] Colección costumers obtenida correctamente');
     } catch (error) {
       console.error('[ERROR] Error al obtener la colección costumers:', error);
       return res.status(500).json({ 
@@ -65,23 +69,49 @@ router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => 
     // Construir el filtro de consulta
     const allFilters = [];
     
-    // Determinar si el usuario es administrador
-    const esAdmin = usuarioAutenticado && usuarioAutenticado.role === 'admin';
+    // Determinar rol y normalizar
+    const rol = (usuarioAutenticado && usuarioAutenticado.role) ? String(usuarioAutenticado.role).toLowerCase() : '';
+    const esAdmin = rol === 'admin';
+    const esBackoffice = ['backoffice','b:o','b.o','b-o','bo'].includes(rol);
+    const esSupervisor = rol === 'supervisor';
+    const esTeamLineas = rol === 'teamlineas' || (usuarioAutenticado?.username || '').toLowerCase().startsWith('lineas-');
     
-    console.log('[DEBUG] Rol del usuario:', usuarioAutenticado?.role || 'no autenticado');
+    console.error('[DEBUG] Rol del usuario:', usuarioAutenticado?.role || 'no autenticado');
     
-    // Si no es administrador, no permitir ver ningún cliente
-    if (!esAdmin) {
-      console.log('[DEBUG] Usuario no es administrador, denegando acceso a clientes');
-      return res.status(200).json({
-        success: true,
-        data: [],
-        total: 0,
-        message: 'Acceso denegado. Se requiere rol de administrador.'
-      });
+    // Filtros de visibilidad por rol - REACTIVADO
+    if (!esAdmin && !esBackoffice) {
+      const userName = (usuarioAutenticado?.username || '').trim();
+      const userId = usuarioAutenticado?._id?.toString() || usuarioAutenticado?.id?.toString() || '';
+      
+      console.error('[DEBUG] Aplicando filtro individual para usuario:', userName);
+      console.error('[DEBUG] ID del usuario:', userId);
+      
+      // Crear filtro por ID del usuario (más confiable que nombres)
+      const filtroAgente = { 
+        $or: [
+          // Filtros por ID (más confiables)
+          { agenteId: userId },
+          { createdBy: userId },
+          { ownerId: userId },
+          { agentId: userId },
+          { registeredById: userId },
+          { creadoPor: userId },
+          // Filtros por nombre como fallback
+          { agenteNombre: userName },
+          { agente: userName },
+          { createdBy: userName },
+          { owner: userName },
+          { registradoPor: userName },
+          { usuario: userName }
+        ]
+      };
+      
+      console.error('[DEBUG] Filtro de agente creado:', JSON.stringify(filtroAgente, null, 2));
+      allFilters.push(filtroAgente);
     }
-    // Si se especificó un agente en la consulta (solo para administradores)
-    else if (agenteQuery && esAdmin) {
+
+    // Si se especificó un agente en la consulta (para administradores y backoffice)
+    if (agenteQuery && (esAdmin || esBackoffice)) {
       console.log('[DEBUG] Filtro de agente para administrador:', agenteQuery);
       allFilters.push({ 
         $or: [
@@ -288,14 +318,19 @@ router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => 
       };
     }
     
-    console.log('[DEBUG] Filtro aplicado:', JSON.stringify(filtro, null, 2));
+    console.error('[DEBUG] Filtro aplicado:', JSON.stringify(filtro, null, 2));
+    console.error('[DEBUG] Usuario:', usuarioAutenticado?.username);
+    console.error('[DEBUG] Rol:', rol);
+    console.error('[DEBUG] Es Admin:', esAdmin);
+    console.error('[DEBUG] Es Backoffice:', esBackoffice);
+    console.error('[DEBUG] Filtros de agente aplicados:', allFilters.length > 0);
     
     // Ejecutar la consulta
     let customers = [];
     try {
-      console.log('[DEBUG] Ejecutando consulta con filtro:', JSON.stringify(filtro, null, 2));
+      console.error('[DEBUG] Ejecutando consulta con filtro:', JSON.stringify(filtro, null, 2));
       customers = await collection.find(filtro).toArray();
-      console.log(`[DEBUG] Se encontraron ${customers.length} registros`);
+      console.error(`[DEBUG] Se encontraron ${customers.length} registros`);
       
       // Procesar los resultados
       customers = customers.map(customer => {
@@ -487,6 +522,8 @@ router.get('/leads', protect, hasTableAccess, withDatabase, async (req, res) => 
     }
     
     // Si no es para gráfica, devolver los datos completos
+    console.error(`[DEBUG] Devolviendo ${customers.length} registros al frontend`);
+    console.error('[DEBUG] Primeros 2 registros:', JSON.stringify(customers.slice(0, 2), null, 2));
     return res.json({
       success: true,
       data: customers,

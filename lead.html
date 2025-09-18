@@ -153,20 +153,23 @@
   <style>
     /* Estilos para el sidebar */
     .sidebar.sidebar-inicio {
-      width: 260px;
-      min-width: 260px;
-      height: 100vh;
-      position: fixed;
-      left: 0;
-      top: 0;
-      background: linear-gradient(180deg, #f8fbff 0%, #f3f7fb 100%);
-      border-right: 1px solid #e5e7eb;
-      box-shadow: 2px 0 10px rgba(0,0,0,0.06);
-      padding: 18px 0 24px;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
+      display: flex !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      transform: translateX(0) !important;
+      width: 260px !important;
+      min-width: 260px !important;
+      height: 100vh !important;
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      background: linear-gradient(180deg, #f8fbff 0%, #f3f7fb 100%) !important;
+      border-right: 1px solid #e5e7eb !important;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.06) !important;
+      padding: 18px 0 24px !important;
+      z-index: 1000 !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
     }
 
     .sidebar .user-info {
@@ -3800,10 +3803,20 @@
   // initializeApp ya fue registrado/protegido previamente
 }); // Cierre del event listener principal
 
-// Manejar el menú en dispositivos móviles
+// Forzar la visualización del sidebar
 document.addEventListener('DOMContentLoaded', function() {
+  // Asegurarse de que el sidebar esté visible
+  const sidebar = document.querySelector('.sidebar.sidebar-inicio');
+  if (sidebar) {
+    sidebar.style.display = 'flex';
+    sidebar.style.visibility = 'visible';
+    sidebar.style.opacity = '1';
+    sidebar.style.transform = 'translateX(0)';
+  }
+  
+  // Manejar el menú en dispositivos móviles
   const menuToggle = document.getElementById('menuToggle');
-  const sidebar = document.querySelector('.sidebar');
+  // Usar la variable sidebar ya declarada
   
   // Mostrar/ocultar menú en móviles
   function checkScreenSize() {
