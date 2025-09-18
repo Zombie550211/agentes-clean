@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empleado del Mes - CRM Agente</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/sidebar-inicio.css">
+  
+  <style>
+    .main-content {
+      margin-left: 260px;
+      padding: 20px;
+      min-height: 100vh;
+      background-color: #f8f9fa;
+    }
+    
+    .page-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .employee-card {
+      background: white;
+      border-radius: 15px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .employee-photo {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      color: white;
+    }
+
+
+    /* Top Employees Section */
+    .top-employees-section {
+      margin: 40px 0;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .section-title h2 {
+      color: #2d3748;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .section-title h2 i {
+      color: #ffd700;
+      margin-right: 10px;
+    }
+
+    .section-title p {
+      color: #718096;
+      font-size: 1.1rem;
+    }
+
+    /* Employees Grid */
+    .employees-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .employee-winner {
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      overflow: hidden;
+    }
+
+    .employee-winner:hover {
+      transform: translateY(-10px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Winner Badges */
+    .winner-badge {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      padding: 15px 25px;
+      border-radius: 0 20px 0 20px;
+      color: white;
+      font-weight: bold;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      z-index: 2;
+    }
+
+    .first-place .winner-badge {
+      background: linear-gradient(135deg, #ffd700, #ffed4e);
+      color: #8b4513;
+      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .second-place .winner-badge {
+      background: linear-gradient(135deg, #c0c0c0, #e5e5e5);
+      color: #4a5568;
+      box-shadow: 0 4px 15px rgba(192, 192, 192, 0.4);
+    }
+
+    /* Employee Frame */
+    .employee-frame {
+      margin-bottom: 25px;
+      position: relative;
+    }
+
+    .frame-decoration {
+      background: linear-gradient(145deg, #8b4513, #a0522d);
+      border-radius: 15px;
+      padding: 20px;
+      position: relative;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      box-sizing: border-box;
+    }
+
+    .photo-container {
+      width: 100%;
+      height: 380px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border: 3px solid #ddd;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }
+
+    .placeholder-photo {
+      text-align: center;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      z-index: 1;
+    }
+
+    .placeholder-photo:hover {
+      color: #667eea;
+    }
+
+    .placeholder-photo i {
+      font-size: 3rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .placeholder-photo p {
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .photo-container img {
+      max-width: 95%;
+      max-height: 95%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      object-position: center;
+      border-radius: 7px;
+    }
+
+    /* Employee Photo Frame - Para fotos guardadas */
+    .employee-photo-frame {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      border-radius: 7px;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .employee-photo-frame img {
+      max-width: 95%;
+      max-height: 95%;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      object-position: center;
+      display: block;
+      border-radius: 7px;
+    }
+
+    /* Adaptación inteligente para diferentes tipos de imagen */
+    .employee-photo-frame img.portrait {
+      max-width: 85%;
+      max-height: 95%;
+    }
+
+    .employee-photo-frame img.landscape {
+      max-width: 95%;
+      max-height: 85%;
+    }
+
+    .employee-photo-frame img.square {
+      max-width: 90%;
+      max-height: 90%;
+    }
+
+    /* Photo Controls */
+    .photo-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      gap: 5px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 3;
+    }
+
+    .employee-photo-frame:hover .photo-controls {
+      opacity: 1;
+    }
+
+    .photo-control-btn {
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 35px;
+      height: 35px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.9rem;
+    }
+
+    .photo-control-btn:hover {
+      background: rgba(0, 0, 0, 0.9);
+      transform: scale(1.1);
+    }
+
+    .photo-control-btn.change {
+      background: rgba(52, 152, 219, 0.8);
+    }
+
+    .photo-control-btn.change:hover {
+      background: rgba(52, 152, 219, 1);
+    }
+
+    .photo-control-btn.delete {
+      background: rgba(231, 76, 60, 0.8);
+    }
+
+    .photo-control-btn.delete:hover {
+      background: rgba(231, 76, 60, 1);
+    }
+
+    /* Custom Notification Modal */
+    .custom-notification {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .notification-content {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 450px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      transform: scale(0.7);
+      animation: scaleIn 0.3s ease forwards;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .notification-content::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+      background-size: 400% 400%;
+      animation: gradientShift 3s ease infinite;
+    }
+
+    .notification-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 25px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: white;
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+      animation: pulse 2s ease infinite;
+    }
+
+    .notification-icon.warning {
+      background: linear-gradient(135deg, #feca57, #ff9f43);
+      box-shadow: 0 10px 30px rgba(254, 202, 87, 0.4);
+    }
+
+    .notification-icon.success {
+      background: linear-gradient(135deg, #5f27cd, #341f97);
+      box-shadow: 0 10px 30px rgba(95, 39, 205, 0.4);
+    }
+
+    .notification-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 15px;
+    }
+
+    .notification-message {
+      font-size: 1.1rem;
+      color: #718096;
+      margin-bottom: 35px;
+      line-height: 1.5;
+    }
+
+    .notification-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .notification-btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 25px;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 120px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .notification-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .notification-btn:hover::before {
+      left: 100%;
+    }
+
+    .notification-btn.confirm {
+      background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+      color: white;
+      box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+    }
+
+    .notification-btn.confirm:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 107, 107, 0.6);
+    }
+
+    .notification-btn.cancel {
+      background: linear-gradient(135deg, #74b9ff, #0984e3);
+      color: white;
+      box-shadow: 0 5px 15px rgba(116, 185, 255, 0.4);
+    }
+
+    .notification-btn.cancel:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(116, 185, 255, 0.6);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Mejoras adicionales para el ajuste de imágenes */
+    .photo-container,
+    .employee-photo-frame {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+    }
+
+    .photo-container img,
+    .employee-photo-frame img {
+      transition: transform 0.3s ease;
+    }
+
+    .employee-photo-frame:hover img {
+      transform: scale(1.02);
+    }
+
+    /* Modo solo lectura - Ocultar controles de edición */
+    .view-only-mode .photo-controls {
+      display: none !important;
+    }
+
+    .view-only-mode .placeholder-photo:hover {
+      color: #9ca3af !important;
+    }
+
+    .view-only-mode .placeholder-photo {
+      cursor: default !important;
+    }
+
+    /* Award Ribbons */
+    .award-ribbon {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+      border: 2px solid;
+    }
+
+    .award-ribbon.gold {
+      background: linear-gradient(45deg, #ffd700, #ffa500);
+      color: #8b4513;
+      border-color: #ffd700;
+    }
+
+    .award-ribbon.silver {
+      background: linear-gradient(45deg, #c0c0c0, #e5e5e5);
+      color: #4a5568;
+      border-color: #c0c0c0;
+    }
+
+    /* Employee Info */
+    .employee-info {
+      text-align: center;
+    }
+
+    .employee-info h3 {
+      color: #2d3748;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .employee-info p {
+      color: #718096;
+      font-size: 1rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .achievement-stats {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 15px;
+      background: #f7fafc;
+      border-radius: 20px;
+      color: #4a5568;
+      font-size: 0.9rem;
+    }
+
+    .first-place .stat {
+      background: linear-gradient(135deg, #fff7ed, #fef3c7);
+      color: #92400e;
+    }
+
+    .second-place .stat {
+      background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+      color: #4a5568;
+    }
+
+    /* Modal Option Cards */
+    .option-card {
+      background: white;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 15px;
+    }
+
+    .option-card:hover {
+      border-color: #3b82f6;
+      background-color: #f8fafc;
+    }
+
+    .option-card i {
+      font-size: 2rem;
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .option-card h6 {
+      margin: 10px 0 5px 0;
+      color: #374151;
+    }
+
+    .option-card p {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* Upload Area Small */
+    .upload-area-small {
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      margin: 15px 0;
+    }
+
+    .upload-area-small .upload-placeholder i {
+      font-size: 1.5rem;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+
+    .upload-area-small .upload-placeholder p {
+      margin-bottom: 10px;
+      color: #6b7280;
+    }
+
+    
+    @media (max-width: 768px) {
+      .main-content {
+        margin-left: 0;
+        padding: 15px;
+      }
+      
+      .employees-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar sidebar-inicio" data-active="empleado-del-mes"></nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1><i class="fas fa-trophy me-3"></i>Empleados del Mes</h1>
+      <p>Reconocimiento a los mejores desempeños del equipo</p>
+    </div>
+
+    <!-- Top Employees Section -->
+    <div class="top-employees-section">
+      <div class="section-title">
+        <h2><i class="fas fa-star"></i> Top 2 Empleados del Mes</h2>
+        <p>Destacando la excelencia y dedicación de nuestro equipo</p>
+      </div>
+      
+      <div class="employees-grid">
+        <!-- Empleado del Mes -->
+        <div class="employee-winner first-place" id="first-place">
+          <div class="winner-badge">
+            <i class="fas fa-star"></i>
+            <span>EMPLEADO DEL MES</span>
+          </div>
+          <div class="employee-frame">
+            <div class="frame-decoration">
+              <div class="photo-container" id="first-photo-container">
+                <div class="placeholder-photo" onclick="openPhotoModal('first')">
+                  <i class="fas fa-user-plus"></i>
+                  <p>Agregar Foto</p>
+                </div>
+              </div>
+              <div class="award-ribbon gold">EMPLEADO DEL MES</div>
+            </div>
+          </div>
+          <div class="employee-info">
+            <h3 id="first-name">Empleado del Mes</h3>
+            <p id="first-description">Haz clic en "Agregar Foto" para subir imagen</p>
+            <div class="achievement-stats">
+              <div class="stat">
+                <i class="fas fa-chart-line"></i>
+                <span>Mejor Rendimiento</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empleado del Mes -->
+        <div class="employee-winner second-place" id="second-place">
+          <div class="winner-badge">
+            <i class="fas fa-star"></i>
+            <span>EMPLEADO DEL MES</span>
+          </div>
+          <div class="employee-frame">
+            <div class="frame-decoration">
+              <div class="photo-container" id="second-photo-container">
+                <div class="placeholder-photo" onclick="openPhotoModal('second')">
+                  <i class="fas fa-user-plus"></i>
+                  <p>Agregar Foto</p>
+                </div>
+              </div>
+              <div class="award-ribbon silver">EMPLEADO DEL MES</div>
+            </div>
+          </div>
+          <div class="employee-info">
+            <h3 id="second-name">Empleado del Mes</h3>
+            <p id="second-description">Haz clic en "Agregar Foto" para subir imagen</p>
+            <div class="achievement-stats">
+              <div class="stat">
+                <i class="fas fa-star"></i>
+                <span>Excelente Desempeño</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+    <!-- Custom Notification Modal -->
+    <div class="custom-notification" id="customNotification">
+      <div class="notification-content">
+        <div class="notification-icon" id="notificationIcon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3 class="notification-title" id="notificationTitle">Confirmar Acción</h3>
+        <p class="notification-message" id="notificationMessage">¿Estás seguro de que quieres realizar esta acción?</p>
+        <div class="notification-buttons">
+          <button class="notification-btn cancel" id="notificationCancel">
+            <i class="fas fa-times me-2"></i>Cancelar
+          </button>
+          <button class="notification-btn confirm" id="notificationConfirm">
+            <i class="fas fa-check me-2"></i>Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Add Options -->
+    <div class="modal fade" id="addContentModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modal-title">Agregar Foto - Primer Lugar</h5>
+            <button type="button" class="btn-close" onclick="closeModal()"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Photo Form -->
+            <div id="photo-form" class="content-form">
+              <h6><i class="fas fa-camera me-2"></i>Subir Foto del Empleado</h6>
+              <div class="upload-area-small" id="photo-upload-area">
+                <div class="upload-placeholder">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                  <p>Seleccionar imagen</p>
+                  <input type="file" id="photo-input" accept="image/*" style="display: none;">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('photo-input').click()">
+                    Elegir Archivo
+                  </button>
+                </div>
+                <div class="upload-preview" id="photo-preview" style="display: none;">
+                  <div style="width: 100%; height: 280px; background: #f8f9fa; border-radius: 8px; border: 2px solid #ddd; overflow: hidden; margin-bottom: 15px; position: relative; display: flex; align-items: center; justify-content: center;">
+                    <img id="preview-image" src="" alt="Preview" style="max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; object-position: center;">
+                  </div>
+                  <div class="mb-3">
+                    <label for="photo-title" class="form-label"><strong>Nombre del Empleado:</strong></label>
+                    <input type="text" class="form-control" id="photo-title" placeholder="Ej: Juan Pérez">
+                  </div>
+                  <div class="mb-3">
+                    <label for="photo-description" class="form-label"><strong>Descripción/Logros:</strong></label>
+                    <textarea class="form-control" id="photo-description" rows="3" placeholder="Describe los logros, metas alcanzadas, reconocimientos..."></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-success" onclick="saveContent()">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    </main>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Scripts -->
+  <script src="js/auth-logout.js"></script>
+  <script src="js/sidebar-loader.js"></script>
+  <script>
+    let selectedOption = 'photo';
+    let currentEmployee = null;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('Página Empleado del Mes cargada correctamente');
+      
+      // Debugging: mostrar estado inicial
+      console.log('🔍 Estado inicial de placeholders:', 
+        Array.from(document.querySelectorAll('.placeholder-photo')).map(p => p.innerHTML.substring(0, 100))
+      );
+      
+      // Intentar obtener datos del usuario desde localStorage primero
+      tryGetUserFromStorage();
+      
+      // También intentar desde el servidor
+      checkUserPermissions();
+      
+      setupPhotoUpload();
+      loadSavedEmployees();
+      setupCustomNotification();
+    });
+
+    // Escuchar cuando el sidebar se carga completamente
+    document.addEventListener('sidebar:loaded', function() {
+      console.log('📢 Evento sidebar:loaded recibido');
+      if (window.currentUser) {
+        updateUserInfo(window.currentUser.username, window.currentUser.role);
+        
+        // Verificar permisos y habilitar edición si es admin
+        const role = window.currentUser.role;
+        if (role === 'admin' || role === 'Administrativo' || role === 'Administrador') {
+          console.log('🔓 Habilitando edición desde sidebar:loaded para rol:', role);
+          enableEditingFeatures();
+        }
+      } else {
+        // Intentar obtener datos del localStorage primero
+        tryGetUserFromStorage();
+        // También intentar desde el servidor
+        checkUserPermissions();
+      }
+    });
+
+    // Intentar obtener información del usuario desde localStorage, sessionStorage o cookies
+    function tryGetUserFromStorage() {
+      try {
+        // Intentar localStorage primero
+        let userStr = localStorage.getItem('user');
+        let source = 'localStorage';
+        
+        // Si no está en localStorage, intentar sessionStorage
+        if (!userStr) {
+          userStr = sessionStorage.getItem('user');
+          source = 'sessionStorage';
+        }
+        
+        // Si no está en ningún storage, intentar decodificar desde cookies/token
+        if (!userStr) {
+          const token = getToken();
+          if (token) {
+            try {
+              // Intentar decodificar el JWT para obtener información del usuario
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              console.log('🔓 Payload del token:', payload);
+              
+              const username = payload.username || payload.user || payload.name || 'Usuario';
+              const role = payload.role || payload.rol || payload.userRole || 'Rol';
+              
+              updateUserInfo(username, role);
+              
+              if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador') {
+                disableEditingFeatures();
+              } else {
+                console.log('✅ Usuario con permisos de administrador detectado desde token:', role);
+                enableEditingFeatures();
+              }
+              return;
+            } catch (e) {
+              console.warn('❌ No se pudo decodificar el token:', e);
+            }
+          }
+        }
+        
+        console.log(`💾 Datos de usuario en ${source}:`, userStr);
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          console.log(`👤 Usuario desde ${source}:`, user);
+          
+          const username = user.username || user.name || 'Usuario';
+          const role = user.role || user.rol || 'Rol';
+          
+          updateUserInfo(username, role);
+          
+          // También verificar permisos
+          if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador') {
+            disableEditingFeatures();
+          } else {
+            console.log('✅ Usuario con permisos de administrador detectado desde storage:', role);
+            enableEditingFeatures();
+          }
+        } else {
+          console.warn('❌ No hay datos de usuario en localStorage, sessionStorage ni token decodificable');
+          
+          // Como último recurso, usar datos de prueba para que el sidebar no quede vacío
+          console.log('🔧 Usando datos de respaldo para el sidebar');
+          updateUserInfo('Daniel Martinez', 'admin');
+          enableEditingFeatures();
+        }
+      } catch (error) {
+        console.error('💥 Error leyendo datos de usuario:', error);
+      }
+    }
+
+    // Sistema de respaldo: verificar periódicamente si podemos actualizar la info del usuario
+    let userInfoCheckInterval = setInterval(() => {
+      if (window.userInfoUpdated) {
+        clearInterval(userInfoCheckInterval);
+        return;
+      }
+      
+      if (window.currentUser && document.getElementById('user-name') && document.getElementById('user-role')) {
+        console.log('🔄 Sistema de respaldo: actualizando información del usuario');
+        updateUserInfo(window.currentUser.username, window.currentUser.role);
+        clearInterval(userInfoCheckInterval);
+      }
+    }, 1000);
+
+    // Limpiar el intervalo después de 10 segundos para evitar que corra indefinidamente
+    setTimeout(() => {
+      clearInterval(userInfoCheckInterval);
+    }, 10000);
+
+    // Función de respaldo final para asegurar que los permisos se apliquen
+    setTimeout(() => {
+      console.log('🔧 Verificación final de permisos');
+      
+      // Si tenemos datos de usuario y es admin, asegurar que la edición esté habilitada
+      if (window.currentUser && 
+          (window.currentUser.role === 'admin' || 
+           window.currentUser.role === 'Administrativo' || 
+           window.currentUser.role === 'Administrador')) {
+        
+        console.log('🔓 Aplicando permisos de administrador como respaldo final');
+        enableEditingFeatures();
+      } else {
+        console.log('🔧 Usando permisos de administrador por defecto');
+        enableEditingFeatures(); // Por defecto, habilitar para testing
+      }
+    }, 3000);
+
+    // Función para obtener token desde localStorage o cookies
+    function getToken() {
+      // Primero intentar localStorage
+      let token = localStorage.getItem('token');
+      if (token) return token;
+      
+      // Si no está en localStorage, buscar en cookies
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'token' || name === 'authToken' || name === 'jwt') {
+          return value;
+        }
+      }
+      return null;
+    }
+
+    // Verificar permisos del usuario
+    async function checkUserPermissions() {
+      try {
+        const token = getToken();
+        console.log('🔐 Token encontrado:', !!token);
+        console.log('🍪 Cookies disponibles:', document.cookie);
+        
+        if (!token) {
+          console.warn('❌ No hay token de autenticación en localStorage ni cookies');
+          disableEditingFeatures();
+          return;
+        }
+
+        const response = await fetch('/api/auth/verify', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('🌐 Respuesta del servidor:', response.status, response.statusText);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📋 Datos del usuario recibidos:', data);
+          
+          const userRole = data.user.role;
+          const userName = data.user.username;
+          
+          console.log('👤 Usuario:', userName, 'Rol:', userRole);
+          
+          // Actualizar información del usuario en el sidebar
+          updateUserInfo(userName, userRole);
+          
+          // Solo usuarios Administrativos pueden editar
+          if (userRole !== 'Administrativo' && userRole !== 'admin' && userRole !== 'Administrador') {
+            disableEditingFeatures();
+          } else {
+            console.log('✅ Usuario con permisos de administrador detectado:', userRole);
+            enableEditingFeatures();
+          }
+        } else {
+          console.warn('❌ Error de autenticación:', response.status);
+          if (response.status === 401) {
+            console.warn('🔒 Token inválido o expirado');
+            // Redirigir al login si el token es inválido
+            // window.location.href = 'login.html';
+          }
+          disableEditingFeatures();
+        }
+      } catch (error) {
+        console.error('💥 Error verificando permisos:', error);
+        disableEditingFeatures();
+      }
+    }
+
+    // Actualizar información del usuario en el sidebar
+    function updateUserInfo(username, role) {
+      // Guardar datos del usuario para uso posterior
+      window.currentUser = { username, role };
+      
+      console.log('🔄 Intentando actualizar información del usuario:', { username, role });
+      
+      // Función para esperar a que los elementos estén disponibles
+      function waitForElements(maxAttempts = 10, currentAttempt = 1) {
+        const userNameElement = document.getElementById('user-name');
+        const userRoleElement = document.getElementById('user-role');
+        
+        console.log(`🔍 Intento ${currentAttempt}/${maxAttempts} - Elementos encontrados:`, { 
+          userNameElement: !!userNameElement, 
+          userRoleElement: !!userRoleElement,
+          sidebarExists: !!document.querySelector('.sidebar')
+        });
+        
+        if (userNameElement && userRoleElement) {
+          userNameElement.textContent = username || 'Usuario';
+          userRoleElement.textContent = role || 'Rol';
+          console.log('✅ Información del usuario actualizada correctamente');
+          
+          // Marcar que se actualizó exitosamente
+          window.userInfoUpdated = true;
+          return true;
+        } else {
+          if (currentAttempt < maxAttempts) {
+            console.log(`⏳ Elementos no disponibles, reintentando en 200ms... (${currentAttempt}/${maxAttempts})`);
+            setTimeout(() => waitForElements(maxAttempts, currentAttempt + 1), 200);
+          } else {
+            console.warn('❌ No se encontraron los elementos después de todos los intentos');
+            
+            // Debug adicional: mostrar todo el contenido del sidebar
+            const sidebar = document.querySelector('.sidebar');
+            if (sidebar) {
+              console.log('📋 Contenido del sidebar:', sidebar.innerHTML.substring(0, 800));
+              
+              // Intentar con selectores alternativos
+              const altElements = sidebar.querySelectorAll('span, div, p');
+              console.log('🔍 Todos los elementos de texto en sidebar:', 
+                Array.from(altElements).map(el => ({ 
+                  tag: el.tagName, 
+                  id: el.id, 
+                  class: el.className, 
+                  text: el.textContent.trim().substring(0, 50) 
+                }))
+              );
+            } else {
+              console.log('❌ No se encontró el elemento .sidebar');
+            }
+          }
+          return false;
+        }
+      }
+      
+      // Iniciar la espera por los elementos
+      waitForElements();
+    }
+
+    // Habilitar funciones de edición para usuarios administrativos
+    function enableEditingFeatures() {
+      console.log('🔓 Habilitando funciones de edición para administrador');
+      
+      // Esperar un poco para asegurar que los elementos estén disponibles
+      setTimeout(() => {
+        // Restaurar placeholders de "Agregar Foto"
+        const placeholders = document.querySelectorAll('.placeholder-photo');
+        console.log('📋 Placeholders encontrados:', placeholders.length);
+        
+        placeholders.forEach((placeholder, index) => {
+          const employee = index === 0 ? 'first' : 'second';
+          console.log(`🔄 Restaurando placeholder ${index + 1} para ${employee}`);
+          
+          placeholder.style.cursor = 'pointer';
+          placeholder.onclick = () => {
+            console.log(`📸 Clic en placeholder ${employee}`);
+            openPhotoModal(employee);
+          };
+          placeholder.innerHTML = `
+            <i class="fas fa-user-plus"></i>
+            <p>Agregar Foto</p>
+          `;
+          
+          console.log(`✅ Placeholder ${index + 1} actualizado:`, placeholder.innerHTML.substring(0, 100));
+        });
+
+        // Remover clase CSS de modo solo lectura
+        document.body.classList.remove('view-only-mode');
+        console.log('✅ Funciones de edición habilitadas correctamente');
+      }, 100);
+    }
+
+    // Deshabilitar funciones de edición para usuarios no administrativos
+    function disableEditingFeatures() {
+      console.log('🔒 Deshabilitando funciones de edición para usuario no administrador');
+      
+      // Ocultar placeholders de "Agregar Foto"
+      const placeholders = document.querySelectorAll('.placeholder-photo');
+      placeholders.forEach(placeholder => {
+        placeholder.style.cursor = 'default';
+        placeholder.onclick = null;
+        placeholder.innerHTML = `
+          <i class="fas fa-user" style="color: #cbd5e1;"></i>
+          <p style="color: #9ca3af;">Sin foto asignada</p>
+        `;
+      });
+
+      // Agregar clase CSS para ocultar controles de edición
+      document.body.classList.add('view-only-mode');
+    }
+
+    // Sistema de notificaciones personalizadas
+    function setupCustomNotification() {
+      const notification = document.getElementById('customNotification');
+      const cancelBtn = document.getElementById('notificationCancel');
+      
+      // Cerrar al hacer clic en cancelar o fuera del modal
+      cancelBtn.addEventListener('click', closeCustomNotification);
+      notification.addEventListener('click', function(e) {
+        if (e.target === notification) {
+          closeCustomNotification();
+        }
+      });
+    }
+
+    function showCustomConfirm(options) {
+      return new Promise((resolve) => {
+        const notification = document.getElementById('customNotification');
+        const icon = document.getElementById('notificationIcon');
+        const title = document.getElementById('notificationTitle');
+        const message = document.getElementById('notificationMessage');
+        const confirmBtn = document.getElementById('notificationConfirm');
+        
+        // Configurar contenido
+        title.textContent = options.title || 'Confirmar Acción';
+        message.textContent = options.message || '¿Estás seguro de que quieres realizar esta acción?';
+        
+        // Configurar icono según el tipo
+        icon.className = 'notification-icon';
+        if (options.type === 'warning') {
+          icon.classList.add('warning');
+          icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+        } else if (options.type === 'danger') {
+          icon.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        } else if (options.type === 'success') {
+          icon.classList.add('success');
+          icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        }
+        
+        // Configurar botón de confirmación
+        confirmBtn.textContent = options.confirmText || 'Confirmar';
+        
+        // Mostrar modal
+        notification.style.display = 'flex';
+        
+        // Manejar respuesta
+        const handleResponse = (result) => {
+          closeCustomNotification();
+          resolve(result);
+        };
+        
+        // Event listeners (remover anteriores)
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        
+        newConfirmBtn.addEventListener('click', () => handleResponse(true));
+      });
+    }
+
+    function closeCustomNotification() {
+      const notification = document.getElementById('customNotification');
+      notification.style.display = 'none';
+    }
+
+    function showSuccessNotification(message) {
+      return new Promise((resolve) => {
+        const notification = document.getElementById('customNotification');
+        const icon = document.getElementById('notificationIcon');
+        const title = document.getElementById('notificationTitle');
+        const messageEl = document.getElementById('notificationMessage');
+        const confirmBtn = document.getElementById('notificationConfirm');
+        const cancelBtn = document.getElementById('notificationCancel');
+        
+        // Configurar contenido
+        title.textContent = '¡Éxito!';
+        messageEl.textContent = message;
+        
+        // Configurar icono de éxito
+        icon.className = 'notification-icon success';
+        icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+        
+        // Ocultar botón cancelar para notificaciones de éxito
+        cancelBtn.style.display = 'none';
+        confirmBtn.textContent = 'Entendido';
+        
+        // Mostrar modal
+        notification.style.display = 'flex';
+        
+        // Manejar respuesta
+        const handleResponse = () => {
+          cancelBtn.style.display = 'flex'; // Restaurar para futuras notificaciones
+          closeCustomNotification();
+          resolve(true);
+        };
+        
+        // Event listener
+        const newConfirmBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+        newConfirmBtn.addEventListener('click', handleResponse);
+      });
+    }
+
+    function openPhotoModal(employee) {
+      currentEmployee = employee;
+      const modal = document.getElementById('addContentModal');
+      const modalTitle = document.getElementById('modal-title');
+      
+      // Actualizar título del modal
+      if (employee === 'first') {
+        modalTitle.textContent = 'Agregar Foto - Empleado del Mes';
+      } else {
+        modalTitle.textContent = 'Agregar Foto - Empleado del Mes';
+      }
+      
+      // Mostrar modal
+      modal.style.display = 'block';
+      modal.classList.add('show');
+      document.body.classList.add('modal-open');
+      
+      // Crear backdrop
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop fade show';
+      backdrop.id = 'modal-backdrop';
+      document.body.appendChild(backdrop);
+      
+      // Mostrar formulario de foto
+      document.getElementById('photo-form').style.display = 'block';
+    }
+
+    function showAddOptions() {
+      const modal = document.getElementById('addContentModal');
+      modal.style.display = 'block';
+      modal.classList.add('show');
+      document.body.classList.add('modal-open');
+      
+      // Crear backdrop
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop fade show';
+      backdrop.id = 'modal-backdrop';
+      document.body.appendChild(backdrop);
+      
+      // Reset form
+      document.getElementById('photo-form').style.display = 'none';
+      selectedOption = null;
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('addContentModal');
+      modal.style.display = 'none';
+      modal.classList.remove('show');
+      document.body.classList.remove('modal-open');
+      
+      // Remover backdrop
+      const backdrop = document.getElementById('modal-backdrop');
+      if (backdrop) {
+        backdrop.remove();
+      }
+    }
+
+    function selectOption(option) {
+      selectedOption = option;
+      if (option === 'photo') {
+        document.getElementById('photo-form').style.display = 'block';
+      }
+    }
+
+    function setupPhotoUpload() {
+      const photoInput = document.getElementById('photo-input');
+      const uploadArea = document.getElementById('photo-upload-area');
+      const placeholder = uploadArea.querySelector('.upload-placeholder');
+      const preview = document.getElementById('photo-preview');
+      const previewImage = document.getElementById('preview-image');
+
+      // Handle file input change
+      photoInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            previewImage.src = e.target.result;
+            placeholder.style.display = 'none';
+            preview.style.display = 'block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      // Handle drag and drop
+      uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = '#3b82f6';
+        uploadArea.style.backgroundColor = '#f8fafc';
+      });
+
+      uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = '#cbd5e1';
+        uploadArea.style.backgroundColor = '';
+      });
+
+      uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.style.borderColor = '#cbd5e1';
+        uploadArea.style.backgroundColor = '';
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+          photoInput.files = files;
+          photoInput.dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    function removePhoto() {
+      const photoInput = document.getElementById('photo-input');
+      const uploadArea = document.getElementById('photo-upload-area');
+      const placeholder = uploadArea.querySelector('.upload-placeholder');
+      const preview = document.getElementById('photo-preview');
+      const photoTitle = document.getElementById('photo-title');
+      const photoDescription = document.getElementById('photo-description');
+      
+      if (confirm('¿Estás seguro de que quieres eliminar la foto y su información?')) {
+        photoInput.value = '';
+        photoTitle.value = '';
+        photoDescription.value = '';
+        placeholder.style.display = 'block';
+        preview.style.display = 'none';
+      }
+    }
+
+    function savePhoto() {
+      const photoTitle = document.getElementById('photo-title').value.trim();
+      const photoDescription = document.getElementById('photo-description').value.trim();
+      const photoInput = document.getElementById('photo-input');
+      
+      if (!photoInput.files[0]) {
+        alert('No hay ninguna foto seleccionada.');
+        return;
+      }
+      
+      if (!photoTitle) {
+        alert('Por favor, agrega un título para la foto.');
+        document.getElementById('photo-title').focus();
+        return;
+      }
+      
+      // Aquí puedes agregar la lógica para guardar la foto con su título y descripción
+      const photoData = {
+        file: photoInput.files[0],
+        title: photoTitle,
+        description: photoDescription,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log('Foto guardada:', photoData);
+      alert(`Foto guardada correctamente!\n\nTítulo: ${photoTitle}\nDescripción: ${photoDescription || 'Sin descripción'}`);
+    }
+
+    function saveContent() {
+      const photoInput = document.getElementById('photo-input');
+      const photoTitle = document.getElementById('photo-title').value.trim();
+      const photoDescription = document.getElementById('photo-description').value.trim();
+      
+      if (!photoInput.files[0]) {
+        showCustomConfirm({
+          type: 'warning',
+          title: 'Imagen Requerida',
+          message: 'Por favor, selecciona una imagen antes de continuar.',
+          confirmText: 'Entendido'
+        });
+        return;
+      }
+      
+      if (!photoTitle) {
+        showCustomConfirm({
+          type: 'warning',
+          title: 'Nombre Requerido',
+          message: 'Por favor, agrega el nombre del empleado antes de guardar.',
+          confirmText: 'Entendido'
+        });
+        document.getElementById('photo-title').focus();
+        return;
+      }
+      
+      // Agregar foto al recuadro correspondiente
+      addPhotoToEmployee(currentEmployee, photoInput.files[0], photoTitle, photoDescription);
+      
+      // Limpiar formulario
+      photoInput.value = '';
+      document.getElementById('photo-title').value = '';
+      document.getElementById('photo-description').value = '';
+      document.querySelector('#photo-upload-area .upload-placeholder').style.display = 'block';
+      document.getElementById('photo-preview').style.display = 'none';
+      
+      showSuccessNotification('¡Foto guardada correctamente! El empleado del mes ha sido actualizado.');
+      closeModal();
+    }
+
+    function addPhotoToEmployee(employee, file, name, description) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const imageData = e.target.result;
+        
+        // Seleccionar el contenedor correcto
+        const containerId = employee === 'first' ? 'first-photo-container' : 'second-photo-container';
+        const nameId = employee === 'first' ? 'first-name' : 'second-name';
+        const descriptionId = employee === 'first' ? 'first-description' : 'second-description';
+        
+        // Crear imagen temporal para detectar dimensiones
+        const tempImg = new Image();
+        tempImg.onload = function() {
+          const aspectRatio = this.width / this.height;
+          let imageClass = '';
+          
+          if (aspectRatio > 1.2) {
+            imageClass = 'landscape'; // Imagen horizontal
+          } else if (aspectRatio < 0.8) {
+            imageClass = 'portrait'; // Imagen vertical
+          } else {
+            imageClass = 'square'; // Imagen cuadrada o casi cuadrada
+          }
+          
+          // Actualizar la foto con la clase apropiada
+          const container = document.getElementById(containerId);
+          
+          // Verificar si está en modo solo lectura
+          const isViewOnly = document.body.classList.contains('view-only-mode');
+          const controlsHTML = isViewOnly ? '' : `
+            <div class="photo-controls">
+              <button class="photo-control-btn change" onclick="changeEmployeePhoto('${employee}')" title="Cambiar foto">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="photo-control-btn delete" onclick="deleteEmployeePhoto('${employee}')" title="Eliminar foto">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          `;
+          
+          container.innerHTML = `
+            <div class="employee-photo-frame">
+              <img src="${imageData}" alt="${name}" class="${imageClass}">
+              ${controlsHTML}
+            </div>
+          `;
+          
+          // Actualizar nombre y descripción
+          document.getElementById(nameId).textContent = name;
+          document.getElementById(descriptionId).textContent = description || 'Empleado destacado del mes';
+          
+          // Guardar en localStorage
+          const employeeData = {
+            employee: employee,
+            name: name,
+            description: description,
+            imageData: imageData,
+            imageClass: imageClass,
+            date: new Date().toLocaleDateString('es-ES')
+          };
+          
+          saveEmployeeToStorage(employeeData);
+        };
+        
+        tempImg.src = imageData;
+      };
+      
+      reader.readAsDataURL(file);
+    }
+
+    function saveEmployeeToStorage(employeeData) {
+      let savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
+      savedEmployees[employeeData.employee] = employeeData;
+      localStorage.setItem('topEmployees', JSON.stringify(savedEmployees));
+    }
+
+    function loadSavedEmployees() {
+      const savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
+      
+      // Cargar primer lugar
+      if (savedEmployees.first) {
+        const emp = savedEmployees.first;
+        const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
+        const container = document.getElementById('first-photo-container');
+        
+        // Verificar si está en modo solo lectura
+        const isViewOnly = document.body.classList.contains('view-only-mode');
+        const controlsHTML = isViewOnly ? '' : `
+          <div class="photo-controls">
+            <button class="photo-control-btn change" onclick="changeEmployeePhoto('first')" title="Cambiar foto">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="photo-control-btn delete" onclick="deleteEmployeePhoto('first')" title="Eliminar foto">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        container.innerHTML = `
+          <div class="employee-photo-frame">
+            <img src="${emp.imageData}" alt="${emp.name}" class="${imageClass}">
+            ${controlsHTML}
+          </div>
+        `;
+        document.getElementById('first-name').textContent = emp.name;
+        document.getElementById('first-description').textContent = emp.description || 'Empleado destacado del mes';
+      }
+      
+      // Cargar segundo lugar
+      if (savedEmployees.second) {
+        const emp = savedEmployees.second;
+        const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
+        const container = document.getElementById('second-photo-container');
+        
+        // Verificar si está en modo solo lectura
+        const isViewOnly = document.body.classList.contains('view-only-mode');
+        const controlsHTML = isViewOnly ? '' : `
+          <div class="photo-controls">
+            <button class="photo-control-btn change" onclick="changeEmployeePhoto('second')" title="Cambiar foto">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="photo-control-btn delete" onclick="deleteEmployeePhoto('second')" title="Eliminar foto">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        container.innerHTML = `
+          <div class="employee-photo-frame">
+            <img src="${emp.imageData}" alt="${emp.name}" class="${imageClass}">
+            ${controlsHTML}
+          </div>
+        `;
+        document.getElementById('second-name').textContent = emp.name;
+        document.getElementById('second-description').textContent = emp.description || 'Empleado destacado del mes';
+      }
+    }
+
+    function addPhotoToGallery(file, title, description, saveToStorage = true) {
+      const gallery = document.getElementById('photos-gallery');
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const photoId = 'photo-' + Date.now();
+        const currentDate = new Date().toLocaleDateString('es-ES');
+        const imageData = e.target.result;
+        
+        const photoItem = document.createElement('div');
+        photoItem.className = 'photo-item';
+        photoItem.id = photoId;
+        
+        photoItem.innerHTML = `
+          <div class="image-container">
+            <div class="frame-inner">
+              <div class="photo-frame">
+                <img src="${imageData}" alt="${title}">
+              </div>
+              <div class="award-banner">Empleado del Mes</div>
+            </div>
+          </div>
+          <h5>${title}</h5>
+          <p>${description || 'Sin descripción'}</p>
+          <div class="photo-meta">
+            <span>Agregado el ${currentDate}</span>
+            <button class="delete-btn" onclick="deletePhoto('${photoId}')" title="Eliminar foto">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        gallery.appendChild(photoItem);
+        
+        // Guardar en localStorage
+        if (saveToStorage) {
+          const photoData = {
+            id: photoId,
+            title: title,
+            description: description,
+            imageData: imageData,
+            date: currentDate
+          };
+          
+          savePhotoToStorage(photoData);
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    }
+
+    function savePhotoToStorage(photoData) {
+      let savedPhotos = JSON.parse(localStorage.getItem('employeePhotos') || '[]');
+      savedPhotos.push(photoData);
+      localStorage.setItem('employeePhotos', JSON.stringify(savedPhotos));
+    }
+
+    function loadSavedPhotos() {
+      const savedPhotos = JSON.parse(localStorage.getItem('employeePhotos') || '[]');
+      const gallery = document.getElementById('photos-gallery');
+      
+      savedPhotos.forEach(photo => {
+        const photoItem = document.createElement('div');
+        photoItem.className = 'photo-item';
+        photoItem.id = photo.id;
+        
+        photoItem.innerHTML = `
+          <div class="image-container">
+            <div class="frame-inner">
+              <div class="photo-frame">
+                <img src="${photo.imageData}" alt="${photo.title}">
+              </div>
+              <div class="award-banner">Empleado del Mes</div>
+            </div>
+          </div>
+          <h5>${photo.title}</h5>
+          <p>${photo.description || 'Sin descripción'}</p>
+          <div class="photo-meta">
+            <span>Agregado el ${photo.date}</span>
+            <button class="delete-btn" onclick="deletePhoto('${photo.id}')" title="Eliminar foto">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        gallery.appendChild(photoItem);
+      });
+    }
+
+    function deletePhoto(photoId) {
+      if (confirm('¿Estás seguro de que quieres eliminar esta foto?')) {
+        const photoElement = document.getElementById(photoId);
+        if (photoElement) {
+          photoElement.remove();
+          
+          // Eliminar del localStorage
+          let savedPhotos = JSON.parse(localStorage.getItem('employeePhotos') || '[]');
+          savedPhotos = savedPhotos.filter(photo => photo.id !== photoId);
+          localStorage.setItem('employeePhotos', JSON.stringify(savedPhotos));
+        }
+      }
+    }
+
+    // Función para cambiar foto de empleado
+    function changeEmployeePhoto(employee) {
+      // Verificar permisos antes de permitir edición
+      if (document.body.classList.contains('view-only-mode')) {
+        showCustomConfirm({
+          type: 'warning',
+          title: 'Acceso Denegado',
+          message: 'No tienes permisos para editar los empleados del mes. Solo usuarios Administrativos pueden realizar esta acción.',
+          confirmText: 'Entendido'
+        });
+        return;
+      }
+      
+      currentEmployee = employee;
+      openPhotoModal(employee);
+    }
+
+    // Función para eliminar foto de empleado
+    async function deleteEmployeePhoto(employee) {
+      // Verificar permisos antes de permitir eliminación
+      if (document.body.classList.contains('view-only-mode')) {
+        showCustomConfirm({
+          type: 'warning',
+          title: 'Acceso Denegado',
+          message: 'No tienes permisos para eliminar empleados del mes. Solo usuarios Administrativos pueden realizar esta acción.',
+          confirmText: 'Entendido'
+        });
+        return;
+      }
+      
+      const confirmed = await showCustomConfirm({
+        type: 'danger',
+        title: 'Eliminar Empleado del Mes',
+        message: `¿Estás seguro de que quieres eliminar la foto de este Empleado del Mes? Esta acción no se puede deshacer.`,
+        confirmText: 'Sí, Eliminar'
+      });
+      
+      if (confirmed) {
+        const containerId = employee === 'first' ? 'first-photo-container' : 'second-photo-container';
+        const nameId = employee === 'first' ? 'first-name' : 'second-name';
+        const descriptionId = employee === 'first' ? 'first-description' : 'second-description';
+        
+        // Restaurar placeholder
+        const container = document.getElementById(containerId);
+        container.innerHTML = `
+          <div class="placeholder-photo" onclick="openPhotoModal('${employee}')">
+            <i class="fas fa-user-plus"></i>
+            <p>Agregar Foto</p>
+          </div>
+        `;
+        
+        // Restaurar textos por defecto
+        document.getElementById(nameId).textContent = 'Empleado del Mes';
+        document.getElementById(descriptionId).textContent = 'Haz clic en "Agregar Foto" para subir imagen';
+        
+        // Eliminar del localStorage
+        let savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
+        delete savedEmployees[employee];
+        localStorage.setItem('topEmployees', JSON.stringify(savedEmployees));
+        
+        // Mostrar notificación de éxito
+        showSuccessNotification('Foto eliminada correctamente');
+      }
+    }
+  </script>
+</body>
+</html>

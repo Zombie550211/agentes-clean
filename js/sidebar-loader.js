@@ -185,15 +185,17 @@
       }
       // Usar rutas relativas a la raíz del sitio
       const basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '/';
+      // Agregar timestamp para evitar cache
+      const timestamp = Date.now();
       const candidates = [
-        '/components/sidebar.html',
-        'components/sidebar.html',
-        './components/sidebar.html',
-        '../components/sidebar.html',
-        basePath + '/components/sidebar.html',
-        window.location.origin + '/components/sidebar.html',
-        '/dashboard/components/sidebar.html',  // Ruta específica para el servidor local
-        window.location.origin + '/dashboard/components/sidebar.html'  // Ruta completa para el servidor local
+        `/components/sidebar.html?v=${timestamp}`,
+        `components/sidebar.html?v=${timestamp}`,
+        `./components/sidebar.html?v=${timestamp}`,
+        `../components/sidebar.html?v=${timestamp}`,
+        basePath + `/components/sidebar.html?v=${timestamp}`,
+        window.location.origin + `/components/sidebar.html?v=${timestamp}`,
+        `/dashboard/components/sidebar.html?v=${timestamp}`,  // Ruta específica para el servidor local
+        window.location.origin + `/dashboard/components/sidebar.html?v=${timestamp}`  // Ruta completa para el servidor local
       ].filter(Boolean);
       console.log('Buscando sidebar en rutas:', candidates);
       const resp = await fetchFirstOk(candidates);

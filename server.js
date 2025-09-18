@@ -182,6 +182,59 @@ const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res
 const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Crear registro para Team Lineas en colección dedicada "Lineas"
+// Consultar registros de Team Lineas (con filtrado por agente)
+app.get('/api/lineas', protect, async (req, res) => {
+  try {
+    // Asegurar conexión BD
+    if (!db) db = await connectToMongoDB();
+
+    const user = req.user;
+    const username = user?.username || '';
+    const role = (user?.role || '').toLowerCase();
+
+    // Determinar si es usuario privilegiado (puede ver todos los registros)
+    const isPrivileged = ['admin', 'administrador', 'supervisor', 'backoffice', 'b.o', 'bo'].includes(role);
+
+    let filter = {};
+    
+    // Si no es privilegiado, filtrar por agente
+    if (!isPrivileged) {
+      filter = {
+        $or: [
+          { agente: username },
+          { agenteNombre: username },
+          { createdBy: username },
+          { registeredBy: username }
+        ]
+      };
+      console.log(`[GET /api/lineas] Filtro individual para ${username}:`, filter);
+    } else {
+      console.log(`[GET /api/lineas] Usuario privilegiado ${username}, sin filtros`);
+    }
+
+    // Consultar registros
+    const registros = await db.collection('Lineas').find(filter).sort({ creadoEn: -1 }).toArray();
+    
+    console.log(`[GET /api/lineas] Encontrados ${registros.length} registros para ${username}`);
+    
+    return res.status(200).json({ 
+      success: true, 
+      data: registros,
+      count: registros.length,
+      user: username,
+      filtered: !isPrivileged
+    });
+
+  } catch (error) {
+    console.error('Error en GET /api/lineas:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error al consultar registros de Lineas', 
+      error: error.message 
+    });
+  }
+});
+
 app.post('/api/lineas', protect, async (req, res) => {
   try {
     // Asegurar conexión BD
@@ -242,6 +295,10 @@ app.post('/api/lineas', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Validación fallida', errors });
     }
 
+    // Obtener información del usuario que crea el registro
+    const user = req.user;
+    const username = user?.username || '';
+    
     // Construir documento a insertar
     const now = new Date();
     const doc = {
@@ -261,6 +318,11 @@ app.post('/api/lineas', protect, async (req, res) => {
       ID: String(body.id || body.ID || '').trim(),
       mercado: mercado[0].toUpperCase(), // BAMO | ICON
       supervisor: supervisorVal.toUpperCase(), // JONATHAN | DIEGO
+      // Información del agente que crea el registro
+      agente: username,
+      agenteNombre: username,
+      createdBy: username,
+      registeredBy: username,
       creadoEn: now,
       actualizadoEn: now,
       _raw: body
@@ -1224,10 +1286,30 @@ app.get('/api/customers', protect, async (req, res) => {
     const total = await customersCollection.countDocuments(query);
     console.log(`Total de documentos en la colección: ${total}`);
     
-    // Consulta con paginación y ordenados por fecha de creación descendente
+    // Consulta con paginación y orden dinámico (por defecto: creadoEn desc)
+    const rawSortBy = (req.query.sortBy || '').toString().trim();
+    const rawOrder = (req.query.order || 'desc').toString().trim().toLowerCase();
+    const allowedSortFields = {
+      creadoEn: 'creadoEn',
+      actualizadoEn: 'actualizadoEn',
+      dia_venta: 'dia_venta',
+      fecha_contratacion: 'fecha_contratacion',
+      fecha: 'fecha',
+      status: 'status',
+      puntaje: 'puntaje',
+      riesgo: 'riesgo',
+      agenteNombre: 'agenteNombre',
+      agente: 'agente',
+      agenteId: 'agenteId'
+    };
+    const sortField = allowedSortFields[rawSortBy] || 'creadoEn';
+    const sortDir = rawOrder === 'asc' ? 1 : -1;
+    const sortSpec = { [sortField]: sortDir };
+    console.log('[DEBUG] Orden aplicándose:', sortSpec);
+
     const customers = await customersCollection
       .find(query)
-      .sort({ creadoEn: -1 })
+      .sort(sortSpec)
       .skip(skip)
       .limit(limit)
       .toArray();
@@ -1439,15 +1521,7 @@ app.get('/Costumer.html', protect, (req, res, next) => {
   }
 });
 
-// Manejar rutas de la aplicación (SPA)
-app.get('*', (req, res) => {
-  // Si la ruta es una extensión de archivo, devolver 404
-  if (req.path.includes('.')) {
-    return res.status(404).send('Archivo no encontrado');
-  }
-  // Para cualquier otra ruta, servir lead.html (útil para SPA)
-  res.sendFile(path.join(publicPath, 'lead.html'));
-});
+// NOTA: Ruta catch-all movida al final del archivo para no interceptar APIs
 
 // Conexión a MongoDB
 let mongoClient; // Variable para mantener la referencia al cliente
@@ -2148,4 +2222,14 @@ process.on('SIGINT', () => {
     console.log('Servidor apagado');
     process.exit(0);
   });
+});
+
+// Manejar rutas de la aplicación (SPA) - DEBE IR AL FINAL
+app.get('*', (req, res) => {
+  // Si la ruta es una extensión de archivo, devolver 404
+  if (req.path.includes('.')) {
+    return res.status(404).send('Archivo no encontrado');
+  }
+  // Para cualquier otra ruta, servir lead.html (útil para SPA)
+  res.sendFile(path.join(publicPath, 'lead.html'));
 });

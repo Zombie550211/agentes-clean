@@ -1424,7 +1424,7 @@
               if (selById) { const c2 = selById.closest('[data-field], .form-group'); if (c2) c2.remove(); else selById.remove(); }
               const lbl = document.querySelector('label[for="servicios"]');
               if (lbl) { const c3 = lbl.closest('[data-field], .form-group'); if (c3) c3.remove(); else lbl.remove(); }
-              // 4) Bloque alterno: label con texto "¿Por qué llamó el cliente?"
+              // 4) Bloque alterno: label con texto "¿Por qué llamó el cliente?"q
               const norm = (s)=>String(s||'').normalize('NFD').replace(/\p{Diacritic}+/gu,'').trim().toLowerCase();
               document.querySelectorAll('.form-group label').forEach(lab => {
                 try {

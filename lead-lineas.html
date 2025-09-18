@@ -596,50 +596,17 @@
               <select id="supervisor" name="supervisor" class="form-control" required>
                 <option value="">Seleccione supervisor</option>
                 <option value="JONATHAN">JONATHAN</option>
-                <option value="LUIS">LUIS</option>
+                <option value="DIEGO">luis G. </option>
               </select>
             </div>
             
             <div class="form-group">
-              <label for="dia-venta">Día de Venta</label>
-              <input type="date" id="dia-venta" name="dia_venta" class="form-control" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="dia-instalacion">Día de Instalación</label>
-              <input type="date" id="dia-instalacion" name="dia_instalacion" class="form-control" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="mercado">Mercado</label>
+              <label for="mercado">MERCADO</label>
               <select id="mercado" name="mercado" class="form-control" required>
                 <option value="">Seleccione mercado</option>
                 <option value="ICON">ICON</option>
                 <option value="BAMO">BAMO</option>
               </select>
-            </div>
-            
-            <div class="form-group">
-              <label for="supervisor">Supervisor</label>
-              <select id="supervisor" name="supervisor" class="form-control" required>
-                <option value="">Seleccione supervisor</option>
-                <option value="JONATHAN">JONATHAN</option>
-                <option value="LUIS">LUIS</option>
-              </select>
-            </div>
-            
-            <div class="form-group">
-              <label>Status</label>
-              <div class="radio-group">
-                <label class="radio-label">
-                  <input type="radio" name="status" value="PENDING" checked required>
-                  <span>PENDIENTE</span>
-                </label>
-                <label class="radio-label">
-                  <input type="radio" name="status" value="REPRO">
-                  <span>REPRO</span>
-                </label>
-              </div>
             </div>
             
             
@@ -869,33 +836,36 @@
           data[key] = value;
         });
         
-        // Recolectar todos los teléfonos
+        // Recolectar todos los teléfonos y servicios
         const telefonos = [];
+        const servicios = [];
         const cantidadLineas = parseInt(cantidadLineasSelect.value) || 1;
         
         for (let i = 1; i <= cantidadLineas; i++) {
           const telefono = document.getElementById(`telefono-${i}`)?.value;
           const servicio = document.getElementById(`servicio-${i}`)?.value;
           
-          if (telefono && servicio) {
-            telefonos.push({
-              numero: telefono,
-              servicio: servicio,
-              posicion: i
-            });
+          if (telefono) {
+            telefonos.push(telefono.replace(/\D/g, '')); // Solo números
+          }
+          if (servicio) {
+            servicios.push(servicio);
           }
         }
         
-        // Agregar todos los teléfonos al objeto de datos
-        if (telefonos.length > 0) {
-          data.telefonos = telefonos;
-        }
+        // Agregar teléfonos y servicios al objeto de datos
+        data.telefonos = telefonos;
+        data.servicios = servicios.length > 0 ? servicios : ['WIRELESS']; // Default si no hay servicios
         
         // Verificar permisos antes de enviar
         const { isTeamLineas, username } = checkUserPermissions();
         if (!isTeamLineas) {
           throw new Error('No tienes permisos para realizar esta acción.');
         }
+        
+        // Mapear campos para que coincidan con el backend
+        data.id = data.id_cliente; // El servidor espera 'id' no 'id_cliente'
+        delete data.id_cliente;
         
         // Agregar información del usuario
         data.agente = username;

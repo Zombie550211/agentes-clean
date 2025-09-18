@@ -14,6 +14,72 @@
   <link rel="stylesheet" href="css/sidebar-inicio.css">
   <!-- Guard temporal ANTES de cargar scripts: bloquear redirecciones a inicio -->
   <script>
+    // Renderizador con soporte Team Líneas
+    (function(){
+      function isTeamLineas(){
+        try{
+          const user = JSON.parse(localStorage.getItem('user')||sessionStorage.getItem('user')||'{}');
+          const role = (user.role||user?.usuario?.role||'').toString().trim().toLowerCase();
+          const username = (user.username||user?.usuario?.username||'').toString().trim().toLowerCase();
+          
+          // Debug: mostrar valores para diagnosticar
+          console.log('[Team Líneas Debug] role:', role, 'username:', username, 'body.team-lineas:', document.body.classList.contains('team-lineas'));
+          
+          // Detectar Team Líneas por múltiples criterios
+          const isTeam = document.body.classList.contains('team-lineas') || 
+                        role==='teamlineas' || 
+                        username.startsWith('lineas-') ||
+                        username.includes('lineas') ||
+                        role.includes('lineas');
+          
+          console.log('[Team Líneas Debug] Resultado:', isTeam);
+          return isTeam;
+        }catch(e){ 
+          console.warn('[Team Líneas Debug] Error:', e);
+          return false; 
+        }
+      }
+      function maskPin(v){
+        const s = String(v || '');
+        return s ? '•'.repeat(Math.min(4, s.length)) : '';
+      }
+      function serviciosResumen(l){
+        const arr = Array.isArray(l.telefonos)? l.telefonos:[];
+        if(arr.length){ const m=new Map(); arr.forEach(t=>{ const k=(t?.servicio||t?.tipo||'').toString().trim()||'SERVICIO'; m.set(k,(m.get(k)||0)+1);}); return [...m.entries()].map(([k,v])=> v>1?`${k} x${v}`:k).join('; '); }
+        return l.servicios_texto||l.tipo_servicios||l.servicios||l.producto||'';
+      }
+      function normDate(v){ try{ if(!v) return ''; const s=String(v); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; const d=new Date(s); if(isNaN(d)) return s; const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`;}catch{return String(v||'');}}
+      function teamHeader(){ return ['NOMBRE CLIENTE','TELÉFONO PRINCIPAL','NÚMERO DE CUENTA','AUTOPAGO','PIN DE SEGURIDAD','DIRECCIÓN','DÍA DE VENTA','DÍA DE INSTALACIÓN','STATUS','CANTIDAD DE LÍNEAS','TELÉFONOS DE LAS LÍNEAS','ID','SUPERVISOR','MERCADO']; }
+      function agentName(l){ return l.agenteNombre||l.nombreAgente||l.agente||l.agent||l.ownerName||l.vendedor||l.seller||''; }
+      function applyHeader(){ const thead=document.querySelector('.costumer-table thead'); if(!thead) return; const hs=teamHeader(); thead.innerHTML=`<tr>${hs.map(h=>`<th>${h}</th>`).join('')}</tr>`; }
+      function renderRows(list){ const tbody=document.getElementById('costumer-tbody'); if(!tbody) return; tbody.innerHTML=''; (list||[]).forEach(l=>{ const autop=(l.autopay??l.autopago); const autopTxt=typeof autop==='boolean'?(autop?'Sí':'No'):(String(autop||'').toUpperCase()==='SI'?'Sí':(String(autop||'').toUpperCase()==='NO'?'No':String(autop||''))); const cant=(l.cantidad_lineas!=null)?l.cantidad_lineas:(Array.isArray(l.telefonos)?l.telefonos.length:''); const cells=[ l.nombre_cliente||'', l.telefono_principal||'', l.numero_cuenta||'', autopTxt||'', maskPin(l.pin_seguridad)||'', l.direccion||'', normDate(l.dia_venta||l.fecha_contratacion||l.fecha||''), normDate(l.dia_instalacion||''), (l.status||'').toString().toUpperCase(), cant||'', serviciosResumen(l)||'', (l.id_cliente||l._id||l.id||''), l.supervisor||'', l.mercado||'' ]; const tr=document.createElement('tr'); tr.innerHTML=cells.map(v=>`<td>${v==null?'':v}</td>`).join(''); tbody.appendChild(tr); }); }
+      // Guardar referencia al renderizador anterior
+      const originalRenderer = window.renderCostumerTable;
+      
+      // Sobrescribir con nuestro renderizador Team Líneas
+      window.renderCostumerTable = function(leads){ 
+        console.log('[Team Líneas] Interceptando renderCostumerTable, leads:', leads?.length || 0);
+        try{ 
+          if(isTeamLineas()){ 
+            console.log('[Team Líneas] Aplicando vista Team Líneas');
+            applyHeader(); 
+            const arr = Array.isArray(leads)?leads:(Array.isArray(leads?.leads)?leads.leads:[]); 
+            renderRows(arr); 
+            return; 
+          } 
+        }catch(e){ 
+          console.warn('[Team Líneas render] error', e);
+        } 
+        
+        // Si no es Team Líneas, usar renderizador original
+        if(typeof originalRenderer==='function'){ 
+          console.log('[Team Líneas] Usando renderizador original');
+          return originalRenderer(leads);
+        }
+      };
+    })();
+  </script>
+  <script>
     (function(){
       try {
         const blockMs = 12000; // ventana de protección ampliada
@@ -915,6 +981,263 @@
     });
   </script>
   <script src="js/core/script.js"></script>
+  <!-- Override DESPUÉS de script.js para Team Líneas -->
+  <script>
+    // Override para Team Líneas después de cargar script.js
+    (function() {
+      const user = JSON.parse(localStorage.getItem('user')||sessionStorage.getItem('user')||'{}');
+      const role = (user.role||user?.usuario?.role||'').toString().trim().toLowerCase();
+      const username = (user.username||user?.usuario?.username||'').toString().trim().toLowerCase();
+      const isTeamLineas = role==='teamlineas' || username.startsWith('lineas-') || username.includes('lineas');
+      
+      if (isTeamLineas) {
+        console.log('[Team Líneas OVERRIDE] Usuario Team Líneas detectado, sobrescribiendo renderCostumerTable');
+        
+        // Sobrescribir renderCostumerTable DESPUÉS de que script.js lo defina
+        window.renderCostumerTable = function(leads) {
+          console.log('[Team Líneas INTERCEPTOR] Renderizando con interceptor');
+          
+          // Aplicar encabezado Team Líneas
+          const thead = document.querySelector('.costumer-table thead');
+          if (thead) {
+            const headers = ['NOMBRE CLIENTE','TELÉFONO PRINCIPAL','NÚMERO DE CUENTA','AUTOPAGO','PIN DE SEGURIDAD','DIRECCIÓN','DÍA DE VENTA','DÍA DE INSTALACIÓN','STATUS','CANTIDAD DE LÍNEAS','TELÉFONOS DE LAS LÍNEAS','ID','SUPERVISOR','MERCADO'];
+            thead.innerHTML = `<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+          }
+          
+          // Renderizar filas Team Líneas
+          const tbody = document.getElementById('costumer-tbody');
+          if (tbody) {
+            tbody.innerHTML = '';
+            const arr = Array.isArray(leads) ? leads : (Array.isArray(leads?.leads) ? leads.leads : []);
+            
+            arr.forEach(l => {
+              const autop = (l.autopay ?? l.autopago);
+              const autopTxt = typeof autop === 'boolean' ? (autop ? 'Sí' : 'No') : 
+                              (String(autop||'').toUpperCase() === 'SI' ? 'Sí' : 
+                              (String(autop||'').toUpperCase() === 'NO' ? 'No' : String(autop||'')));
+              
+              const cant = (l.cantidad_lineas != null) ? l.cantidad_lineas : 
+                          (Array.isArray(l.telefonos) ? l.telefonos.length : '');
+              
+              // Servicios resumen
+              let servicios = '';
+              const arr = Array.isArray(l.telefonos) ? l.telefonos : [];
+              if (arr.length) {
+                const m = new Map();
+                arr.forEach(t => {
+                  const k = (t?.servicio || t?.tipo || '').toString().trim() || 'SERVICIO';
+                  m.set(k, (m.get(k) || 0) + 1);
+                });
+                servicios = [...m.entries()].map(([k,v]) => v > 1 ? `${k} x${v}` : k).join('; ');
+              } else {
+                servicios = l.servicios_texto || l.tipo_servicios || l.servicios || l.producto || '';
+              }
+              
+              // PIN enmascarado
+              const pin = l.pin_seguridad ? '•'.repeat(Math.min(4, String(l.pin_seguridad).length)) : '';
+              
+              // Fecha normalizada
+              function normDate(v) {
+                try {
+                  if (!v) return '';
+                  const s = String(v);
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+                  const d = new Date(s);
+                  if (isNaN(d)) return s;
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth()+1).padStart(2,'0');
+                  const day = String(d.getDate()).padStart(2,'0');
+                  return `${y}-${m}-${day}`;
+                } catch {
+                  return String(v||'');
+                }
+              }
+              
+              const cells = [
+                l.nombre_cliente || '',
+                l.telefono_principal || '',
+                l.numero_cuenta || '',
+                autopTxt || '',
+                pin || '',
+                l.direccion || '',
+                normDate(l.dia_venta || l.fecha_contratacion || l.fecha || ''),
+                normDate(l.dia_instalacion || ''),
+                (l.status || '').toString().toUpperCase(),
+                cant || '',
+                servicios || '',
+                (l.id_cliente || l._id || l.id || ''),
+                l.supervisor || '',
+                l.mercado || ''
+              ];
+              
+              const tr = document.createElement('tr');
+              tr.innerHTML = cells.map(v => `<td>${v == null ? '' : v}</td>`).join('');
+              tbody.appendChild(tr);
+            });
+          }
+        };
+        
+        // Asignar después de que script.js se cargue
+        setTimeout(() => {
+          console.log('[Team Líneas INTERCEPTOR] Asignando renderizador después de script.js');
+          window.renderCostumerTable = window.teamLineasRenderFunction;
+        }, 100);
+      }
+    })();
+  </script>
+  <script src="js/core/script.js"></script>
+  <!-- Override final para Team Líneas después de cargar script.js -->
+  <script>
+    
+    // Override final para Team Líneas que se ejecuta después de script.js
+    document.addEventListener('DOMContentLoaded', function() {
+      // Esperar a que script.js se cargue completamente
+      setTimeout(() => {
+        console.log('[Team Líneas FINAL] Iniciando override final');
+        
+        const teamLineasRenderer = function(leads) {
+          console.log('[Team Líneas FINAL] Interceptando renderCostumerTable, leads:', leads?.length || 0);
+          
+          // Función de detección Team Líneas
+          function isTeamLineasFinal() {
+            try {
+              const user = JSON.parse(localStorage.getItem('user')||sessionStorage.getItem('user')||'{}');
+              const role = (user.role||user?.usuario?.role||'').toString().trim().toLowerCase();
+              const username = (user.username||user?.usuario?.username||'').toString().trim().toLowerCase();
+              
+              console.log('[Team Líneas FINAL] role:', role, 'username:', username);
+              
+              const isTeam = document.body.classList.contains('team-lineas') || 
+                            role==='teamlineas' || 
+                            username.startsWith('lineas-') ||
+                            username.includes('lineas') ||
+                            role.includes('lineas');
+              
+              console.log('[Team Líneas FINAL] Resultado:', isTeam);
+              return isTeam;
+            } catch(e) { 
+              console.warn('[Team Líneas FINAL] Error:', e);
+              return false; 
+            }
+          }
+          
+          if (isTeamLineasFinal()) {
+            console.log('[Team Líneas FINAL] Aplicando vista Team Líneas');
+            
+            // Aplicar encabezado Team Líneas
+            const thead = document.querySelector('.costumer-table thead');
+            if (thead) {
+              const headers = ['NOMBRE CLIENTE','TELÉFONO PRINCIPAL','NÚMERO DE CUENTA','AUTOPAGO','PIN DE SEGURIDAD','DIRECCIÓN','DÍA DE VENTA','DÍA DE INSTALACIÓN','STATUS','CANTIDAD DE LÍNEAS','TELÉFONOS DE LAS LÍNEAS','ID','SUPERVISOR','MERCADO'];
+              thead.innerHTML = `<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;
+            }
+            
+            // Renderizar filas Team Líneas
+            const tbody = document.getElementById('costumer-tbody');
+            if (tbody) {
+              tbody.innerHTML = '';
+              const arr = Array.isArray(leads) ? leads : (Array.isArray(leads?.leads) ? leads.leads : []);
+              
+              arr.forEach(l => {
+                const autop = (l.autopay ?? l.autopago);
+                const autopTxt = typeof autop === 'boolean' ? (autop ? 'Sí' : 'No') : 
+                                (String(autop||'').toUpperCase() === 'SI' ? 'Sí' : 
+                                (String(autop||'').toUpperCase() === 'NO' ? 'No' : String(autop||'')));
+                
+                const cant = (l.cantidad_lineas != null) ? l.cantidad_lineas : 
+                            (Array.isArray(l.telefonos) ? l.telefonos.length : '');
+                
+                // Servicios resumen
+                let servicios = '';
+                const arr = Array.isArray(l.telefonos) ? l.telefonos : [];
+                if (arr.length) {
+                  const m = new Map();
+                  arr.forEach(t => {
+                    const k = (t?.servicio || t?.tipo || '').toString().trim() || 'SERVICIO';
+                    m.set(k, (m.get(k) || 0) + 1);
+                  });
+                  servicios = [...m.entries()].map(([k,v]) => v > 1 ? `${k} x${v}` : k).join('; ');
+                } else {
+                  servicios = l.servicios_texto || l.tipo_servicios || l.servicios || l.producto || '';
+                }
+                
+                // PIN enmascarado
+                const pin = l.pin_seguridad ? '•'.repeat(Math.min(4, String(l.pin_seguridad).length)) : '';
+                
+                // Fecha normalizada
+                function normDate(v) {
+                  try {
+                    if (!v) return '';
+                    const s = String(v);
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+                    const d = new Date(s);
+                    if (isNaN(d)) return s;
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth()+1).padStart(2,'0');
+                    const day = String(d.getDate()).padStart(2,'0');
+                    return `${y}-${m}-${day}`;
+                  } catch {
+                    return String(v||'');
+                  }
+                }
+                
+                const cells = [
+                  l.nombre_cliente || '',
+                  l.telefono_principal || '',
+                  l.numero_cuenta || '',
+                  autopTxt || '',
+                  pin || '',
+                  l.direccion || '',
+                  normDate(l.dia_venta || l.fecha_contratacion || l.fecha || ''),
+                  normDate(l.dia_instalacion || ''),
+                  (l.status || '').toString().toUpperCase(),
+                  cant || '',
+                  servicios || '',
+                  (l.id_cliente || l._id || l.id || ''),
+                  l.supervisor || '',
+                  l.mercado || ''
+                ];
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = cells.map(v => `<td>${v == null ? '' : v}</td>`).join('');
+                tbody.appendChild(tr);
+              });
+            }
+            
+            return;
+          }
+          
+          // Si no es Team Líneas, no hacer nada (dejar que script.js maneje)
+          console.log('[Team Líneas FINAL] No es Team Líneas, delegando a script.js');
+        };
+        
+        // Asignar renderizador Team Líneas
+        if (window.renderCostumerTable) {
+          console.log('[Team Líneas FINAL] Asignando renderizador Team Líneas');
+          window.renderCostumerTable = teamLineasRenderer;
+        } else {
+          console.log('[Team Líneas FINAL] Definiendo renderizador Team Líneas por primera vez');
+          window.renderCostumerTable = teamLineasRenderer;
+        }
+        
+        // Si ya hay datos cargados, re-renderizar
+        if (window.ultimaListaLeads && window.ultimaListaLeads.length > 0) {
+          console.log('[Team Líneas FINAL] Re-renderizando con datos existentes');
+          teamLineasRenderer(window.ultimaListaLeads);
+        }
+      }, 1000); // Esperar 1000ms para que script.js termine de cargar
+      
+      // Override adicional más fuerte después de más tiempo
+      setTimeout(() => {
+        if (document.body.classList.contains('team-lineas') || 
+            (localStorage.getItem('user')||sessionStorage.getItem('user')||'{}').includes('lineas')) {
+          console.log('[Team Líneas OVERRIDE] Aplicando override final');
+          if (typeof teamLineasRenderer === 'function') {
+            window.renderCostumerTable = teamLineasRenderer;
+          }
+        }
+      }, 2000);
+    });
+  </script>
   <!-- Eliminada la referencia a costumer-comments.js que no existe -->
   <script>
     // Inicializaci¨®n de UI: toggle compacto y refrescar tabla
@@ -1616,17 +1939,28 @@
     async function fetchLeadsAgente() {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        // Nota: /api/customers es p¨²blico; si no hay token, no abortar, solo omitir el header
+        // Nota: /api/customers es público; si no hay token, no abortar, solo omitir el header
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // Construir URL con parámetros cuando el usuario sea agente
-        let url = '/api/customers?page=1&limit=100';
-        let alreadyFilteredByAgent = false;
+        // Detectar si es usuario Team Líneas
+        const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+        const username = (userData.username || userData?.usuario?.username || '').toString().trim().toLowerCase();
+        const isTeamLineasUser = role === 'teamlineas' || username.startsWith('lineas-') || username.includes('lineas');
+
+        // Construir URL según el tipo de usuario
+        let url = isTeamLineasUser ? '/api/lineas' : '/api/customers?page=1&limit=100';
+        let alreadyFilteredByAgent = isTeamLineasUser; // Team Líneas ya filtra automáticamente por agente
+        
+        console.log(`[fetchLeadsAgente] Rol: ${role}, Username: ${username}, Team Líneas: ${isTeamLineasUser}`);
+        console.log(`[fetchLeadsAgente] URL: ${url}`);
+
+        // Obtener parámetros URL
         const urlParams = new URLSearchParams(window.location.search);
         const forceAll = urlParams.get('forceAll') === '1' || urlParams.get('forceAll') === 'true';
-        try {
-          const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-          const role = (userData.role || userData?.usuario?.role || '').toString().trim().toLowerCase();
+
+        // Para usuarios no Team Líneas, aplicar filtro por agente si es necesario
+        if (!isTeamLineasUser) {
           if (role === 'agent' && !forceAll) {
             const idCandidates = [userData._id, userData.id, userData.userId, userData.uid, userData?.usuario?._id, userData?.usuario?.id].map(v => v && String(v).trim()).filter(Boolean);
             const nameCandidates = [userData.username, userData.name, userData.nombre, userData?.usuario?.username, userData?.usuario?.name, userData?.usuario?.nombre].map(v => v && String(v).trim()).filter(Boolean);
@@ -1642,27 +1976,44 @@
               console.log('[fetchLeadsAgente] Rol=agent. Usando agente(nombre) para URL:', nameCandidates[0]);
             }
           } else {
-            console.log('[fetchLeadsAgente] Rol detectado:', role || '(vac¨ªo)');
+            console.log('[fetchLeadsAgente] Rol detectado:', role || '(vacío)');
           }
-        } catch(_) { /* noop */ }
+        }
 
         if (forceAll) console.warn('[fetchLeadsAgente] forceAll=1 activo: NO se aplica filtrado por agente (backend ni frontend)');
         console.log('[fetchLeadsAgente] URL solicitada:', url, 'alreadyFilteredByAgent=', alreadyFilteredByAgent, 'forceAll=', forceAll);
         const response = await fetch(url, { headers });
+        console.log(`[fetchLeadsAgente] Response status: ${response.status}, headers:`, response.headers);
+        
         if (!response.ok) {
           console.warn('[fetchLeadsAgente] Respuesta no OK del backend:', response.status);
+          const errorText = await response.text();
+          console.warn('[fetchLeadsAgente] Error response body:', errorText.substring(0, 200));
         }
+        
         let data = null;
         try {
-          data = await response.json();
+          const responseText = await response.text();
+          console.log('[fetchLeadsAgente] Response text (first 200 chars):', responseText.substring(0, 200));
+          data = JSON.parse(responseText);
         } catch (e) {
           console.warn('[fetchLeadsAgente] No se pudo parsear JSON de respuesta:', e?.message);
+          console.warn('[fetchLeadsAgente] Response was not JSON, probably HTML error page');
         }
         console.log('[fetchLeadsAgente] Datos recibidos (resumen):', {
           tipo: Array.isArray(data) ? 'array' : typeof data,
-          len: Array.isArray(data) ? data.length : (data && Array.isArray(data.leads) ? data.leads.length : 0)
+          len: Array.isArray(data) ? data.length : (data && Array.isArray(data.leads) ? data.leads.length : (data && Array.isArray(data.data) ? data.data.length : 0))
         });
-        let leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
+        
+        // Extraer datos según el endpoint
+        let leadsRaw = [];
+        if (isTeamLineasUser) {
+          // Para /api/lineas, los datos vienen en data.data
+          leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+        } else {
+          // Para /api/customers, los datos vienen directamente o en data.leads
+          leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
+        }
 
         // Paginación: si el backend reporta más páginas, descargarlas y combinarlas
         try {
