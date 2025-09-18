@@ -997,7 +997,8 @@ app.get('/api/customers', protect, async (req, res) => {
         console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro aplicado. IDs agentes:', bothTypesArray.map(x=>x.toString()), ' | Campos supervisor:', supervisorTextFields, ' | Nombres sup:', supNameCandidates, ' | Campos agente:', agentTextFields, ' | Nombres agentes:', agentNameCandidates);
       } else {
         // Solo roles privilegiados ven todo; para cualquier otro rol, filtrar por su propio ID
-        const privileged = ['admin','backoffice','b:o','b.o','b-o','bo'];
+        // Considerar variantes comunes del rol administrador presentes en producción
+        const privileged = ['admin','administrator','administrador','backoffice','b:o','b.o','b-o','bo'];
         if (privileged.includes(role)) {
           console.log('[DEBUG] Rol privilegiado (admin/backoffice): sin filtro por agenteId');
         } else {
