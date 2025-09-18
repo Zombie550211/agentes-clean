@@ -488,8 +488,9 @@
       margin: 20px auto;
       border: 1px solid #eef2f7;
       position: relative;
-      height: calc(100vh - 120px);
+      height: calc(100vh - 120px); /* Tarjeta con alto fijo y scroll interno */
       max-height: 900px;
+      overflow: hidden; /* Evita que los hijos se salgan del borde redondeado */
       transition: all 0.3s ease;
     }
     
@@ -544,9 +545,27 @@
     /* Contenedor de los campos del formulario con scroll */
     .form-fields-container {
       flex: 1;
-      overflow-y: auto;
+      overflow-y: auto; /* El scroll ocurre aquí */
       padding-right: 8px; /* Espacio para la barra de desplazamiento */
       margin-right: -8px; /* Compensar el padding para mantener el ancho */
+      padding-bottom: 72px; /* Espacio suficiente para el botón sticky sin exagerar */
+    }
+    /* Contenedor del botón ahora es sticky dentro del área scrolleable */
+    .form-fields-container .form-button-container {
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 16px 0 8px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      z-index: 5;
+      margin-top: 12px;
+    }
+    /* Asegurar que el último form-group tenga espacio adicional */
+    .form-fields-container .form-group:last-of-type {
+      margin-bottom: 24px;
     }
     
     /* Estilo para la barra de desplazamiento */
@@ -570,15 +589,15 @@
     
     /* Contenedor del botón fijo */
     .form-button-container {
-      position: absolute;
-      bottom: 25px;
-      left: 35px;
-      right: 35px;
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      right: 0;
       background: white;
-      padding: 15px 0 5px;
+      padding: 16px 0 8px;
       border-top: 1px solid #e2e8f0;
       text-align: center;
-      z-index: 10;
+      z-index: 5;
     }
     
     .btn-submit {
@@ -1112,7 +1131,7 @@
   <main class="main-content">
     <div class="lead-content-row">
       <!-- FORMULARIO -->
-      <section class="form-section" id="form-panel" style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); width: 100%; max-width: 520px; margin: 20px auto; border: 1px solid #eef2f7; position: relative; min-height: 80vh; transition: all 0.3s ease;"
+      <section class="form-section" id="form-panel" style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); width: 100%; max-width: 520px; margin: 20px auto; border: 1px solid #eef2f7; position: relative; min-height: 80vh; transition: all 0.3s ease;">
         <h2>Formulario de Registro</h2>
         <form id="crmForm">
           <!-- Contenedor de campos con scroll -->
@@ -1380,12 +1399,11 @@
             </select>
           </div>
           
-          </div> <!-- Cierre del form-fields-container -->
-          
-          <!-- Contenedor fijo para el botón -->
+          <!-- Contenedor del botón dentro del área scrolleable (sticky) -->
           <div class="form-button-container">
             <button type="submit" class="btn-submit">Guardar Lead</button>
           </div>
+          </div> <!-- Cierre del form-fields-container -->
         </form>
       </section>
       <script>
