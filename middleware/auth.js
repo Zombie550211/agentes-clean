@@ -101,7 +101,7 @@ exports.protect = async (req, res, next) => {
           id: userId,
           username: decoded.username || decoded.email || `user_${userId.substring(0, 6)}`,
           email: decoded.email || null,
-          role: (decoded.role || 'agent'), // Por defecto a 'agent' si no se especifica
+          role: (decoded.role || 'Agentes'), // Por defecto a 'Agentes' si no se especifica
           team: decoded.team || null,
           permissions: decoded.permissions || []
         };
@@ -114,7 +114,7 @@ exports.protect = async (req, res, next) => {
         id: userId,
         username: decoded.username || decoded.email || `user_${userId.substring(0, 6)}`,
         email: decoded.email || null,
-        role: (decoded.role || 'agent'),
+        role: (decoded.role || 'Agentes'),
         team: decoded.team || null,
         permissions: decoded.permissions || []
       };
@@ -148,36 +148,35 @@ exports.hasTableAccess = (req, res, next) => {
   const username = (req.user.username || '').toLowerCase();
   const role = (req.user.role || '').toLowerCase();
   
-  // Verificar si el usuario es administrador o de Team Líneas
-  const isAdmin = role === 'admin';
-  const isTeamLineas = role === 'teamlineas' || username.startsWith('lineas-');
+  // Verificar si el usuario tiene permisos para acceder a la tabla
+  const privilegedRoles = ['Administrador', 'Backoffice', 'Supervisor', 'Supervisor Team Lineas'];
+  const hasAccess = privilegedRoles.includes(req.user.role);
   
-  if (isAdmin || isTeamLineas) {
-    console.log(`[AUTH] Acceso concedido a la tabla de clientes para ${req.user.username} (Rol: ${role})`);
+  if (hasAccess) {
+    console.log(`[AUTH] Acceso concedido a la tabla de clientes para ${req.user.username} (Rol: ${req.user.role})`);
     return next();
   }
   
-  console.warn(`[AUTH] Acceso denegado a la tabla de clientes para ${req.user.username} (Rol: ${role})`);
+  console.warn(`[AUTH] Acceso denegado a la tabla de clientes para ${req.user.username} (Rol: ${req.user.role})`);
   return res.status(403).json({
     success: false,
     message: 'Acceso denegado: No tienes permisos para ver la tabla de clientes',
     code: 'ACCESS_DENIED',
-    requiredRoles: ['admin', 'teamlineas'],
-    currentRole: role || 'no definido'
+    requiredRoles: privilegedRoles,
+    currentRole: req.user.role || 'no definido'
   });
 };
 
 // Middleware para autorizar por roles
 exports.authorize = (...roles) => {
-  const allowed = roles.map(r => r.toString().toLowerCase());
   return (req, res, next) => {
-    const roleRaw = (req.user && req.user.role) ? req.user.role : '';
-    const role = roleRaw.toString().toLowerCase();
-    const roleCanonical = role === 'administrador' ? 'admin' : role;
-    if (!allowed.includes(roleCanonical)) {
+    const userRole = (req.user && req.user.role) ? req.user.role : '';
+    if (!roles.includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: `El rol ${roleRaw} no tiene acceso a esta ruta`
+        message: `El rol ${userRole} no tiene acceso a esta ruta`,
+        allowedRoles: roles,
+        currentRole: userRole
       });
     }
     next();

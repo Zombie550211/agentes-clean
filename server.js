@@ -1,20 +1,37 @@
 const express = require('express');
-const cors = require('cors');
 const path = require('path');
+const cors = require('cors');
+const multer = require('multer');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
-const { MongoClient, ObjectId } = require('mongodb');
-const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 require('dotenv').config();
+
 // Carga condicional de Helmet y Rate Limit (si están instalados)
 let helmet = null;
 let rateLimit = null;
-try { helmet = require('helmet'); } catch { console.warn('[INIT] helmet no instalado, se recomienda instalarlo'); }
-try { rateLimit = require('express-rate-limit'); } catch { console.warn('[INIT] express-rate-limit no instalado, se recomienda instalarlo'); }
+try { 
+  helmet = require('helmet'); 
+  console.log('[INIT] Helmet cargado correctamente');
+} catch (e) { 
+  console.warn('[INIT] helmet no instalado, se recomienda instalarlo:', e.message); 
+}
+try { 
+  rateLimit = require('express-rate-limit'); 
+  console.log('[INIT] Rate limit cargado correctamente');
+} catch (e) { 
+  console.warn('[INIT] express-rate-limit no instalado, se recomienda instalarlo:', e.message); 
+}
 // Carga condicional de cookie-parser (para soportar JWT en cookies si se usa)
 let cookieParser = null;
 try { cookieParser = require('cookie-parser'); } catch { console.warn('[INIT] cookie-parser no instalado (opcional si usas JWT en header)'); }
+
+// Importar configuración de base de datos
+const { connectToMongoDB, getDb, closeConnection } = require('./config/db');
+
+// Middleware de autenticación unificado
+const { protect, authorize } = require('./middleware/auth');
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -22,9 +39,6 @@ const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
 const equipoRoutes = require('./routes/equipoRoutes');
 const employeesOfMonthRoutes = require('./routes/employeesOfMonth');
-const { connectToMongoDB, getDb } = require('./config/db');
-// Middleware de autenticación unificado
-const { protect, authorize } = require('./middleware/auth');
 
 // Configuración de JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
@@ -40,9 +54,76 @@ if (process.env.NODE_ENV === 'production' && process.env.DEBUG_LOGS !== '1') {
   console.debug = () => {};
 }
 
+// Inicializar Express app
+const app = express();
+const PORT = 3001; // Cambiar puerto temporalmente
+
+ // Paths base para servir archivos estáticos y vistas
+ const publicPath = path.join(__dirname);
+ const staticPath = publicPath;
+
 // Configuración de rutas de archivos estáticos
-const staticPath = path.join(__dirname, '/');
-const publicPath = path.join(__dirname, '/');
+app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'agentes')));
+
+// Iniciar conexión Mongoose (para modelos basados en Mongoose como MediaFile)
+try {
+  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/crmagente';
+  mongoose.set('strictQuery', false);
+  mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 5
+  })
+  .then(() => console.log('[Mongoose] Conectado a MongoDB'))
+  .catch(err => console.error('[Mongoose] Error de conexión:', err?.message));
+} catch (e) {
+  console.error('[Mongoose] Excepción iniciando conexión:', e?.message);
+}
+
+// Configurar directorio para uploads
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// Configuración de Multer para subida de archivos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    // Generar nombre único: timestamp + nombre original
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, name + '-' + uniqueSuffix + ext);
+  }
+});
+
+// Filtro de archivos permitidos
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+    'video/mp4', 'video/mov', 'video/avi', 'video/quicktime'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Tipo de archivo no permitido'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB límite
+  }
+});
 
 // Helper para opciones de cookie dinámicas según request (soporte localhost:10000 en HTTP)
 function cookieOptionsForReq(req, baseOpts) {
@@ -98,60 +179,31 @@ console.log('[CORS] Lista blanca final:', whitelist);
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Permitir solicitudes sin origen (navegación directa) y orígenes en whitelist
-    if (!origin || whitelist.includes(origin)) {
-      return callback(null, true);
-    }
+    // Permitir solicitudes sin origen (navegación directa)
+    if (!origin) return callback(null, true);
 
-    // Aplicar visibilidad por rol: si NO es admin/backoffice, filtrar por su propio username
+    // Permitir localhost y 127.0.0.1 en cualquier puerto (incluye 3001)
+    const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/i;
+    if (localhostRegex.test(origin)) return callback(null, true);
+
+    // Permitir el mismo host del servidor (mismo origen)
     try {
-      const privileged = new Set(['admin','backoffice','b:o','b.o','b-o','bo']);
-      const isPrivileged = privileged.has(userRole);
-      if (!isPrivileged) {
-        const userName = String(req.user?.username || '').trim();
-        if (userName) {
-          const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          const rx = new RegExp(`^${esc(userName)}$`, 'i');
-          const rxContains = new RegExp(esc(userName), 'i');
-          const selfFilters = [
-            { agente: { $regex: rx } },
-            { agenteNombre: { $regex: rx } },
-            { createdBy: { $regex: rx } },
-            { owner: { $regex: rx } },
-            { usuario: { $regex: rx } },
-            { vendedor: { $regex: rx } },
-            { salesAgent: { $regex: rx } },
-            { atendioPor: { $regex: rx } },
-            { asignadoA: { $regex: rx } },
-            { asignadoPor: { $regex: rx } },
-            { registradoPor: { $regex: rx } },
-            { registeredBy: { $regex: rx } },
-            // Contiene (por si guardaron solo nombre o apellido)
-            { agente: { $regex: rxContains } },
-            { agenteNombre: { $regex: rxContains } },
-            { createdBy: { $regex: rxContains } },
-            { owner: { $regex: rxContains } },
-          ];
-          if (Object.keys(query).length > 0) {
-            query = { $and: [ query, { $or: selfFilters } ] };
-          } else {
-            query = { $or: selfFilters };
-          }
-          console.log('[api/customers] Filtro por usuario aplicado para no-privilegiado:', userName);
-        }
-      }
-    } catch(e) { console.warn('[api/customers] No se pudo aplicar filtro por usuario:', e?.message); }
-    console.warn('[CORS] Origen no permitido:', origin);
-    return callback(new Error('Not allowed by CORS'));
+      const serverHost = `http://localhost:${PORT}`;
+      const serverHostHttps = `https://localhost:${PORT}`;
+      if (origin === serverHost || origin === serverHostHttps) return callback(null, true);
+    } catch {}
+
+    // Permitir orígenes en whitelist explícita
+    if (whitelist.includes(origin)) return callback(null, true);
+
+    console.log(`[CORS] Origen no permitido: ${origin}`);
+    callback(new Error('No permitido por CORS'), false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
   optionsSuccessStatus: 200
 };
-
-const app = express();
-const PORT = process.env.PORT || 3002;
 
 // Inicializar la conexión a la base de datos
 let db;
@@ -194,7 +246,7 @@ app.get('/api/lineas', protect, async (req, res) => {
     const role = (user?.role || '').toLowerCase();
 
     // Determinar si es usuario privilegiado (puede ver todos los registros)
-    const isPrivileged = ['admin', 'administrador', 'supervisor', 'backoffice', 'b.o', 'bo'].includes(role);
+    const isPrivileged = ['Administrador', 'Backoffice', 'Supervisor', 'Supervisor Team Lineas'].includes(role);
 
     let filter = {};
     
@@ -407,6 +459,456 @@ app.get('/api/protected', protect, (req, res) => {
   res.json({ message: 'Ruta protegida', user: req.user });
 });
 
+// Endpoint para verificar autenticación (usado por el frontend)
+app.get('/api/auth/verify', protect, (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Token válido', 
+    user: req.user 
+  });
+});
+
+// Endpoint para obtener teams con supervisores asignados
+app.get('/api/teams', protect, authorize('Administrador', 'admin', 'administrador', 'Administrativo'), (req, res) => {
+  try {
+    console.log('[TEAMS] Solicitando lista de teams...');
+    
+    // Teams con supervisores predefinidos (datos estáticos)
+    const teamsWithSupervisors = [
+      {
+        value: 'TEAM IRANIA',
+        label: 'TEAM IRANIA',
+        supervisor: 'irania.serrano',
+        supervisorName: 'Irania Serrano'
+      },
+      {
+        value: 'TEAM BRYAN PLEITEZ',
+        label: 'TEAM BRYAN PLEITEZ', 
+        supervisor: 'bryan.pleitez',
+        supervisorName: 'Bryan Pleitez'
+      },
+      {
+        value: 'TEAM MARISOL BELTRAN',
+        label: 'TEAM MARISOL BELTRAN',
+        supervisor: 'marisol.beltran', 
+        supervisorName: 'Marisol Beltrán'
+      },
+      {
+        value: 'TEAM ROBERTO VELASQUEZ',
+        label: 'TEAM ROBERTO VELASQUEZ',
+        supervisor: 'roberto.velasquez',
+        supervisorName: 'Roberto Velásquez'
+      },
+      {
+        value: 'TEAM RANDAL MARTINEZ', 
+        label: 'TEAM RANDAL MARTINEZ',
+        supervisor: 'randal.martinez',
+        supervisorName: 'Randal Martínez'
+      },
+      {
+        value: 'TEAM LINEAS',
+        label: 'TEAM LÍNEAS',
+        supervisor: 'jonathan.figueroa',
+        supervisorName: 'Jonathan Figueroa'
+      },
+      {
+        value: 'Backoffice',
+        label: 'Backoffice',
+        supervisor: null,
+        supervisorName: 'Sin supervisor específico'
+      },
+      {
+        value: 'Administración',
+        label: 'Administración', 
+        supervisor: null,
+        supervisorName: 'Sin supervisor específico'
+      }
+    ];
+    
+    console.log('[TEAMS] Devolviendo', teamsWithSupervisors.length, 'teams');
+    
+    res.json({
+      success: true,
+      teams: teamsWithSupervisors
+    });
+    
+  } catch (error) {
+    console.error('[TEAMS] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener teams' 
+    });
+  }
+});
+
+// Endpoint para obtener supervisores por team (simplificado - ya no se usa)
+app.get('/api/supervisors/:team', protect, authorize('Administrador', 'admin', 'administrador', 'Administrativo'), (req, res) => {
+  try {
+    const { team } = req.params;
+    console.log('[SUPERVISORS] Solicitando supervisores para team:', team);
+    
+    // Ya no necesitamos este endpoint porque los supervisores se asignan automáticamente
+    // Pero lo mantenemos por compatibilidad
+    res.json({
+      success: true,
+      supervisors: []
+    });
+    
+  } catch (error) {
+    console.error('[SUPERVISORS] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al obtener supervisores' 
+    });
+  }
+});
+
+// Endpoint para registrar nuevo usuario (solo administradores)
+app.post('/api/auth/register', protect, authorize('Administrador', 'admin', 'administrador', 'Administrativo'), async (req, res) => {
+  try {
+    const { username, password, role, team, supervisor } = req.body;
+    
+    // Validaciones
+    if (!username || !password || !role) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username, password y role son requeridos' 
+      });
+    }
+    
+    if (password.length < 8) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'La contraseña debe tener al menos 8 caracteres' 
+      });
+    }
+    
+    const User = require('./models/User');
+    
+    // Verificar si el usuario ya existe
+    const existingUser = await User.findOne({ username: username });
+    if (existingUser) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'El usuario ya existe' 
+      });
+    }
+    
+    // Hashear la contraseña
+    const bcrypt = require('bcryptjs');
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    
+    // Crear el nuevo usuario
+    const newUser = new User({
+      username: username,
+      password: hashedPassword,
+      role: role,
+      team: team || null,
+      supervisor: supervisor || null,
+      name: username, // Por defecto usar username como name
+      createdBy: req.user.username,
+      createdAt: new Date()
+    });
+    
+    await newUser.save();
+    
+    console.log(`[REGISTER] Nuevo usuario creado: ${username} (${role}) en team: ${team} con supervisor: ${supervisor} por: ${req.user.username}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Usuario creado exitosamente',
+      user: {
+        username: newUser.username,
+        role: newUser.role,
+        team: newUser.team,
+        supervisor: newUser.supervisor
+      }
+    });
+    
+  } catch (error) {
+    console.error('[REGISTER] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error interno del servidor' 
+    });
+  }
+});
+
+// Endpoint para restablecer contraseña (solo administradores)
+app.post('/api/auth/reset-password', protect, authorize('Administrador', 'admin', 'administrador', 'Administrativo'), async (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+    
+    if (!username || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username y nueva contraseña son requeridos' 
+      });
+    }
+    
+    if (newPassword.length < 8) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'La contraseña debe tener al menos 8 caracteres' 
+      });
+    }
+    
+    const User = require('./models/User');
+    
+    // Buscar el usuario
+    const user = await User.findOne({ username: username });
+    if (!user) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Usuario no encontrado' 
+      });
+    }
+    
+    // Hashear la nueva contraseña
+    const bcrypt = require('bcryptjs');
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+    
+    // Actualizar la contraseña
+    await User.findByIdAndUpdate(user._id, { password: hashedPassword });
+    
+    console.log(`[RESET] Contraseña restablecida para usuario: ${username} por: ${req.user.username}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Contraseña restablecida exitosamente' 
+    });
+    
+  } catch (error) {
+    console.error('[RESET] Error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error interno del servidor' 
+    });
+  }
+});
+
+// ===== ENDPOINTS MULTIMEDIA =====
+
+// Endpoint para subir archivos multimedia
+app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se recibió ningún archivo'
+      });
+    }
+
+    const MediaFile = require('./models/MediaFile');
+    
+    // Determinar categoría del archivo
+    let category = 'image';
+    if (req.file.mimetype === 'image/gif') {
+      category = 'gif';
+    } else if (req.file.mimetype.startsWith('video/')) {
+      category = 'video';
+    }
+
+    // Crear URL del archivo
+    const fileUrl = `/uploads/${req.file.filename}`;
+
+    // Guardar información en la base de datos
+    const mediaFile = new MediaFile({
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path,
+      url: fileUrl,
+      uploadedBy: req.user.username,
+      category: category
+    });
+
+    await mediaFile.save();
+
+    console.log(`[UPLOAD] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Archivo subido exitosamente',
+      file: {
+        id: mediaFile._id,
+        name: mediaFile.originalName,
+        url: mediaFile.url,
+        type: mediaFile.mimetype,
+        size: mediaFile.size,
+        category: mediaFile.category,
+        uploadDate: mediaFile.uploadDate
+      }
+    });
+
+  } catch (error) {
+    console.error('[UPLOAD] Error:', error);
+    
+    // Eliminar archivo si hubo error guardando en BD
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error subiendo archivo'
+    });
+  }
+});
+
+// Endpoint para obtener lista de archivos multimedia
+app.get('/api/media', protect, async (req, res) => {
+  try {
+    const MediaFile = require('./models/MediaFile');
+    
+    // Filtros opcionales
+    const { category, limit = 50, offset = 0 } = req.query;
+    
+    let query = {};
+    if (category && category !== 'all') {
+      query.category = category;
+    }
+
+    const files = await MediaFile.find(query)
+      .sort({ uploadDate: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .lean();
+
+    const formattedFiles = files.map(file => ({
+      id: file._id,
+      name: file.originalName,
+      url: file.url,
+      type: file.mimetype,
+      size: file.size,
+      category: file.category,
+      uploadDate: file.uploadDate,
+      uploadedBy: file.uploadedBy
+    }));
+
+    res.json(formattedFiles);
+
+  } catch (error) {
+    console.error('[MEDIA] Error obteniendo archivos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo archivos'
+    });
+  }
+});
+
+// Endpoint para eliminar archivo multimedia
+app.delete('/api/media/:id', protect, async (req, res) => {
+  try {
+    const MediaFile = require('./models/MediaFile');
+    const { id } = req.params;
+
+    const file = await MediaFile.findById(id);
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        message: 'Archivo no encontrado'
+      });
+    }
+
+    // Verificar permisos: solo el que subió el archivo o admin puede eliminarlo
+    const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(req.user.role);
+    if (file.uploadedBy !== req.user.username && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para eliminar este archivo'
+      });
+    }
+
+    // Eliminar archivo físico
+    if (fs.existsSync(file.path)) {
+      fs.unlinkSync(file.path);
+    }
+
+    // Eliminar registro de la base de datos
+    await MediaFile.findByIdAndDelete(id);
+
+    console.log(`[DELETE] Archivo eliminado: ${file.originalName} por ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Archivo eliminado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('[DELETE] Error eliminando archivo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error eliminando archivo'
+    });
+  }
+});
+
+// Endpoint para obtener estadísticas de multimedia
+app.get('/api/media/stats', protect, async (req, res) => {
+  try {
+    const MediaFile = require('./models/MediaFile');
+
+    const stats = await MediaFile.aggregate([
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 },
+          totalSize: { $sum: '$size' }
+        }
+      }
+    ]);
+
+    const totalFiles = await MediaFile.countDocuments();
+    const totalSize = await MediaFile.aggregate([
+      { $group: { _id: null, total: { $sum: '$size' } } }
+    ]);
+
+    res.json({
+      success: true,
+      stats: {
+        total: totalFiles,
+        totalSize: totalSize[0]?.total || 0,
+        byCategory: stats
+      }
+    });
+
+  } catch (error) {
+    console.error('[STATS] Error obteniendo estadísticas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo estadísticas'
+    });
+  }
+});
+
+// Endpoint temporal para debugging - ver información del usuario actual
+app.get('/api/debug/user', protect, async (req, res) => {
+  try {
+    console.log('[DEBUG] Usuario actual:', req.user);
+    
+    // También buscar en la base de datos
+    let dbUser = null;
+    if (req.user && req.user._id) {
+      const User = require('./models/User');
+      dbUser = await User.findById(req.user._id);
+    }
+    
+    res.json({
+      success: true,
+      tokenUser: req.user,
+      dbUser: dbUser,
+      canCreateAccounts: ['Administrador', 'admin', 'administrador', 'Administrativo'].includes(req.user?.role)
+    });
+  } catch (error) {
+    console.error('[DEBUG] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Endpoint para verificar que el servidor está funcionando
 app.get('/api/status', (req, res) => {
   res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
@@ -474,8 +976,8 @@ app.get('/api/users/agents', protect, async (req, res) => {
   try {
     if (!db) await connectToMongoDB();
     const usersColl = db.collection('users');
-    // Filtrar solo roles de agente (variantes comunes)
-    const roleFilter = { role: { $in: ['agent', 'agente', 'Agent', 'AGENT'] } };
+    // Filtrar solo roles de agente
+    const roleFilter = { role: { $in: ['Agentes', 'Lineas-Agentes'] } };
     const users = await usersColl
       .find(roleFilter)
       .project({ username: 1, name: 1, nombre: 1, fullName: 1, role: 1 })
@@ -484,7 +986,7 @@ app.get('/api/users/agents', protect, async (req, res) => {
       id: (u._id && u._id.toString()) || null,
       username: u.username || null,
       name: u.name || u.nombre || u.fullName || u.username || null,
-      role: u.role || 'agent'
+      role: u.role || 'Agentes'
     }));
     return res.json({ success: true, agents: sanitized });
   } catch (e) {
@@ -711,15 +1213,15 @@ app.delete('/api/leads/:id/comentarios/:comentarioId', protect, async (req, res)
 });
 
 // Actualizar el "status" de un lead/cliente
-app.put('/api/leads/:id/status', protect, authorize('admin','backoffice','b:o','b.o','b-o','bo'), async (req, res) => {
+app.put('/api/leads/:id/status', protect, authorize('Administrador','Backoffice'), async (req, res) => {
   try {
     // Verificar conexión a BD
     if (!db) await connectToMongoDB();
 
-    // Roles permitidos: admin, supervisor y variantes de backoffice/B.O
-    const role = (req.user?.role || '').toLowerCase();
+    // Roles permitidos para actualizar status
+    const role = req.user?.role || '';
     console.log('[PUT /api/leads/:id/status] Rol del usuario:', role);
-    const allowedRoles = ['admin', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'];
+    const allowedRoles = ['Administrador', 'Backoffice'];
     if (!allowedRoles.includes(role)) {
       return res.status(403).json({ success: false, message: 'No autorizado para actualizar el estado' });
     }
@@ -887,7 +1389,7 @@ app.get('/api/customers', protect, async (req, res) => {
         'salesAgentId', 'registeredById'
       ];
 
-      if (role === 'agent') {
+      if (role === 'Agentes' || role === 'Lineas-Agentes') {
         // Aplicar SIEMPRE filtro por su propio ID en múltiples variantes de campo
         let oid = null;
         try { if (/^[a-fA-F0-9]{24}$/.test(currentUserId)) oid = new ObjectId(currentUserId); } catch {}
@@ -1061,10 +1563,9 @@ app.get('/api/customers', protect, async (req, res) => {
         console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro aplicado. IDs agentes:', bothTypesArray.map(x=>x.toString()), ' | Campos supervisor:', supervisorTextFields, ' | Nombres sup:', supNameCandidates, ' | Campos agente:', agentTextFields, ' | Nombres agentes:', agentNameCandidates);
       } else {
         // Solo roles privilegiados ven todo; para cualquier otro rol, filtrar por su propio ID
-        // Considerar variantes comunes del rol administrador presentes en producción
-        const privileged = ['admin','administrator','administrador','backoffice','b:o','b.o','b-o','bo'];
+        const privileged = ['Administrador','Backoffice','Supervisor','Supervisor Team Lineas'];
         if (privileged.includes(role)) {
-          console.log('[DEBUG] Rol privilegiado (admin/backoffice): sin filtro por agenteId');
+          console.log('[DEBUG] Rol privilegiado: sin filtro por agenteId');
         } else {
           // Filtro estricto por ID del usuario
           let oid = null;
@@ -1086,7 +1587,7 @@ app.get('/api/customers', protect, async (req, res) => {
     const agenteIdParamRaw = (req.query.agenteId || req.query.agentId || '').toString().trim();
     if (agenteIdParamRaw) {
       console.log('[DEBUG] Parámetro agenteId recibido:', agenteIdParamRaw);
-      if (req.user && req.user.role === 'agent') {
+      if (req.user && (req.user.role === 'Agentes' || req.user.role === 'Lineas-Agentes')) {
         // Un agente siempre se filtra a sí mismo 
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
         // Mantener restricción propia, ignorando el parámetro explícito
@@ -1178,7 +1679,7 @@ app.get('/api/customers', protect, async (req, res) => {
     if (!agenteIdParamRaw && agenteParam) {
       console.log('[DEBUG] Parámetro agente recibido:', agenteParam);
       // Si el usuario autenticado es 'agent', forzamos su propio ID y omitimos el parámetro
-      if (req.user && req.user.role === 'agent') {
+      if (req.user && (req.user.role === 'Agentes' || req.user.role === 'Lineas-Agentes')) {
         console.log('[DEBUG] Rol agent: ignorando parámetro agente y usando su propio ID con filtro tolerante');
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
         // Construir filtro robusto por múltiples campos de ID con soporte string y ObjectId
@@ -2234,4 +2735,41 @@ app.get('*', (req, res) => {
   }
   // Para cualquier otra ruta, servir lead.html (útil para SPA)
   res.sendFile(path.join(publicPath, 'lead.html'));
+});
+
+// Iniciar el servidor
+app.listen(PORT, () => {
+  console.log(`
+=== Configuración del Servidor ===
+Servidor corriendo en el puerto: ${PORT}
+Entorno: ${process.env.NODE_ENV || 'development'}
+
+=== URLs de Acceso ===
+- Local: http://localhost:${PORT}
+- Red local: http://192.168.56.1:${PORT}
+===============================
+  `);
+});
+
+// Manejo de cierre graceful
+process.on('SIGINT', async () => {
+  console.log('\n[SHUTDOWN] Cerrando servidor...');
+  try {
+    await closeConnection();
+    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
+  } catch (error) {
+    console.error('[SHUTDOWN] Error cerrando conexión:', error);
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('\n[SHUTDOWN] Recibida señal SIGTERM...');
+  try {
+    await closeConnection();
+    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
+  } catch (error) {
+    console.error('[SHUTDOWN] Error cerrando conexión:', error);
+  }
+  process.exit(0);
 });

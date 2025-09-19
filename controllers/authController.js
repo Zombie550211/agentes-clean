@@ -54,11 +54,11 @@ exports.register = async (req, res) => {
     }
 
     // Validar que el rol sea válido
-    const validRoles = ['admin', 'agent', 'supervisor', 'backoffice'];
+    const validRoles = ['Administrador', 'Backoffice', 'Supervisor', 'Agentes', 'Supervisor Team Lineas', 'Lineas-Agentes'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Rol no válido. Los roles válidos son: admin, agent, supervisor, backoffice'
+        message: 'Rol no válido. Los roles válidos son: Administrador, Backoffice, Supervisor, Agentes, Supervisor Team Lineas, Lineas-Agentes'
       });
     }
 
@@ -69,10 +69,12 @@ exports.register = async (req, res) => {
     // Función auxiliar para definir permisos por rol
     function getRolePermissions(role) {
       const rolePermissions = {
-        admin: ['read:all', 'write:all', 'delete:all', 'manage:users'],
-        supervisor: ['read:all', 'write:own', 'read:team', 'write:team'],
-        agent: ['read:own', 'write:own'],
-        backoffice: ['read:all', 'write:all']
+        'Administrador': ['read:all', 'write:all', 'delete:all', 'manage:users', 'manage:employees'],
+        'Backoffice': ['read:all', 'write:all', 'export:data'],
+        'Supervisor': ['read:team', 'write:team', 'view:reports'],
+        'Agentes': ['read:own', 'write:own'],
+        'Supervisor Team Lineas': ['read:team:lineas', 'write:team:lineas', 'manage:lineas'],
+        'Lineas-Agentes': ['read:own:lineas', 'write:own:lineas', 'form:lineas']
       };
       return rolePermissions[role] || ['read:own'];
     }
@@ -244,10 +246,12 @@ exports.login = async (req, res) => {
     // Helper function to define role-based permissions
     function getRolePermissions(role) {
       const rolePermissions = {
-        admin: ['read:all', 'write:all', 'delete:all', 'manage:users'],
-        supervisor: ['read:all', 'write:own', 'read:team', 'write:team'],
-        agent: ['read:own', 'write:own'],
-        backoffice: ['read:all', 'write:all']
+        'Administrador': ['read:all', 'write:all', 'delete:all', 'manage:users', 'manage:employees'],
+        'Backoffice': ['read:all', 'write:all', 'export:data'],
+        'Supervisor': ['read:team', 'write:team', 'view:reports'],
+        'Agentes': ['read:own', 'write:own'],
+        'Supervisor Team Lineas': ['read:team:lineas', 'write:team:lineas', 'manage:lineas'],
+        'Lineas-Agentes': ['read:own:lineas', 'write:own:lineas', 'form:lineas']
       };
       return rolePermissions[role] || ['read:own'];
     }

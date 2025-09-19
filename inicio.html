@@ -1123,6 +1123,238 @@
         font-size: 1.5rem;
       }
     }
+
+    /* Dashboard Metrics Styles */
+    .dashboard-metrics {
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 40px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .metric-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+
+    .metric-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    .metric-card .metric-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: white;
+      margin-bottom: 16px;
+    }
+
+    .metric-icon.leads { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .metric-icon.sales { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .metric-icon.conversion { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .metric-icon.revenue { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+
+    .metric-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-number {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 4px;
+    }
+
+    .metric-label {
+      font-size: 0.9rem;
+      color: #718096;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .metric-change {
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 6px;
+      align-self: flex-start;
+    }
+
+    .metric-change.positive {
+      background: rgba(72, 187, 120, 0.1);
+      color: #38a169;
+    }
+
+    .metric-change.negative {
+      background: rgba(245, 101, 101, 0.1);
+      color: #e53e3e;
+    }
+
+    /* Charts Section */
+    .charts-section {
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 40px;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    .chart-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .chart-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1a202c;
+    }
+
+    .chart-controls select {
+      padding: 8px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: white;
+      font-size: 0.9rem;
+      color: #4a5568;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 40px;
+    }
+
+    .quick-actions h3 {
+      margin: 0 0 24px 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #1a202c;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .action-card {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .action-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .action-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .action-info h4 {
+      margin: 0 0 4px 0;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1a202c;
+    }
+
+    .action-info p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #718096;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .metrics-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+      }
+      
+      .actions-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      
+      .action-card {
+        padding: 20px;
+      }
+    }
   </style>
   <script>
     // Verificar autenticación al cargar la página
@@ -1178,6 +1410,19 @@
           welcomeMessage.textContent = `Bienvenido/a, ${user.username || 'Usuario'}`;
         }
 
+        // Actualizar información del usuario en el panel de bienvenida
+        const welcomeUserName = document.getElementById('welcome-user-name');
+        const welcomeUserRole = document.getElementById('welcome-user-role');
+        
+        if (welcomeUserName) {
+          welcomeUserName.textContent = `Bienvenido/a, ${user.username || 'Usuario'}`;
+        }
+        
+        if (welcomeUserRole) {
+          const role = user.role || 'usuario';
+          welcomeUserRole.textContent = `${role.charAt(0).toUpperCase() + role.slice(1)} - ${user.team || 'Sin equipo'}`;
+        }
+
         // Mostrar nombre de usuario en el perfil de usuario
         const userNameElement = document.getElementById('user-name');
         console.log('Elemento user-name encontrado:', userNameElement);
@@ -1218,6 +1463,9 @@
 
         // Obtener estadísticas personales del usuario para el sidebar
         await loadUserStatsForSidebar(user.username);
+        
+        // Cargar datos del dashboard
+        await loadDashboardData(user);
 
         // Función para actualizar información del usuario en el sidebar
         function updateUserInfoInSidebar() {
@@ -1319,6 +1567,216 @@
       }
     }
 
+    // Función para cargar datos del dashboard
+    async function loadDashboardData(user) {
+      try {
+        console.log('🔄 Cargando datos del dashboard...');
+        
+        // Obtener datos de leads/customers
+        const response = await fetch('/api/leads', {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const leads = data.data || [];
+          
+          console.log('📊 Datos cargados:', leads.length, 'registros');
+          
+          // Calcular métricas generales
+          await updateDashboardMetrics(leads, user);
+          
+          // Actualizar estadísticas del usuario
+          await updateUserStats(leads, user);
+          
+          // Crear gráficos
+          await createCharts(leads);
+          
+        } else {
+          console.error('Error cargando datos:', response.status);
+        }
+      } catch (error) {
+        console.error('Error en loadDashboardData:', error);
+      }
+    }
+
+    // Función para actualizar métricas del dashboard
+    async function updateDashboardMetrics(leads, user) {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      // Filtrar leads del mes actual
+      const monthlyLeads = leads.filter(lead => {
+        const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+        return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+      });
+      
+      // Calcular métricas
+      const totalLeads = leads.length;
+      const totalSales = leads.filter(lead => lead.status === 'vendido' || lead.status === 'cerrado').length;
+      const conversionRate = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(1) : 0;
+      const totalRevenue = leads.reduce((sum, lead) => sum + (parseFloat(lead.valor || lead.revenue || 0)), 0);
+      
+      // Actualizar elementos del DOM
+      document.getElementById('total-leads').textContent = totalLeads;
+      document.getElementById('total-sales').textContent = totalSales;
+      document.getElementById('conversion-rate').textContent = conversionRate + '%';
+      document.getElementById('total-revenue').textContent = '$' + totalRevenue.toLocaleString();
+      
+      // Calcular cambios (simulados por ahora)
+      document.getElementById('leads-change').textContent = '+12%';
+      document.getElementById('sales-change').textContent = '+8%';
+      document.getElementById('conversion-change').textContent = '+5%';
+      document.getElementById('revenue-change').textContent = '+15%';
+    }
+
+    // Función para actualizar estadísticas del usuario
+    async function updateUserStats(leads, user) {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      // Filtrar leads del usuario
+      const userLeads = leads.filter(lead => 
+        lead.agenteNombre === user.username || 
+        lead.agente === user.username ||
+        lead.createdBy === user.username ||
+        lead.ownerId === user.username
+      );
+      
+      // Calcular estadísticas del usuario
+      const userMonthlySales = userLeads.filter(lead => {
+        const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+        return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+      }).length;
+      
+      const userTotalPoints = userLeads.reduce((sum, lead) => {
+        return sum + parseFloat(lead.puntaje || lead.points || 0);
+      }, 0);
+      
+      // Actualizar elementos del DOM
+      document.getElementById('user-sales-count').textContent = userMonthlySales;
+      document.getElementById('user-points-total').textContent = userTotalPoints.toFixed(1);
+      document.getElementById('user-team-name').textContent = user.team || 'Sin equipo';
+      
+      // Calcular ranking (simulado)
+      const allAgents = [...new Set(leads.map(lead => lead.agenteNombre || lead.agente).filter(Boolean))];
+      const userRanking = Math.floor(Math.random() * allAgents.length) + 1;
+      document.getElementById('user-ranking').textContent = `#${userRanking}`;
+    }
+
+    // Función para crear gráficos
+    async function createCharts(leads) {
+      // Gráfico de ventas por mes
+      createSalesChart(leads);
+      
+      // Gráfico de distribución por teams
+      createTeamsChart(leads);
+    }
+
+    function createSalesChart(leads) {
+      const ctx = document.getElementById('salesChart').getContext('2d');
+      
+      // Preparar datos por mes (últimos 6 meses)
+      const months = [];
+      const salesData = [];
+      const currentDate = new Date();
+      
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+        const monthName = date.toLocaleDateString('es-ES', { month: 'short' });
+        months.push(monthName);
+        
+        const monthlySales = leads.filter(lead => {
+          const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+          return leadDate.getMonth() === date.getMonth() && leadDate.getFullYear() === date.getFullYear();
+        }).length;
+        
+        salesData.push(monthlySales);
+      }
+      
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: months,
+          datasets: [{
+            label: 'Ventas',
+            data: salesData,
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: 'rgba(0,0,0,0.1)'
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function createTeamsChart(leads) {
+      const ctx = document.getElementById('teamsChart').getContext('2d');
+      
+      // Contar leads por team
+      const teamCounts = {};
+      leads.forEach(lead => {
+        const team = lead.team || 'Sin equipo';
+        teamCounts[team] = (teamCounts[team] || 0) + 1;
+      });
+      
+      const teams = Object.keys(teamCounts);
+      const counts = Object.values(teamCounts);
+      const colors = [
+        '#667eea', '#f093fb', '#4facfe', '#43e97b', 
+        '#fa709a', '#feb47b', '#a8edea', '#d299c2'
+      ];
+      
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: teams,
+          datasets: [{
+            data: counts,
+            backgroundColor: colors.slice(0, teams.length),
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                padding: 20,
+                usePointStyle: true
+              }
+            }
+          }
+        }
+      });
+    }
+
     // Debug: Verificar elementos del sidebar
     console.log('Verificando elementos del sidebar...');
   </script>
@@ -1330,110 +1788,178 @@
     <!-- SIDEBAR (cargado dinámicamente) -->
     <nav class="sidebar sidebar-inicio" data-active="inicio"></nav>
     <main class="main-content">
-
-          <!-- Ranking de Agentes -->
-          <div class="ranking-panel">
-            <div class="ranking-header">
-              <div class="ranking-icon">
-                <i class="fas fa-trophy"></i>
-              </div>
-              <h1 class="ranking-title">Ranking de Agentes</h1>
-              <p class="ranking-subtitle">Clasificación por desempeño mensual</p>
+      
+      <!-- Panel de Bienvenida del Usuario -->
+      <div class="user-welcome-panel">
+        <div class="welcome-header">
+          <div class="welcome-avatar">
+            <i class="fas fa-user-circle"></i>
+          </div>
+          <div class="welcome-info">
+            <h2 id="welcome-user-name">Bienvenido/a</h2>
+            <p id="welcome-user-role">Cargando...</p>
+          </div>
+        </div>
+        <div class="welcome-stats">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-chart-line"></i>
             </div>
-            
-            <div class="ranking-content">
-              <!-- Podio Circular -->
-              <div class="circular-podium">
-                <!-- Segundo Lugar -->
-                <div class="podium-item second-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <div class="medal-icon">
-                      <i class="fas fa-medal"></i>
-                    </div>
-                    <div class="position-badge">2°</div>
-                  </div>
-                  <div class="agent-info">
-                    <h3>Ana García</h3>
-                    <p>Team Irania</p>
-                    <div class="score">22.0</div>
-                  </div>
-                </div>
-
-                <!-- Primer Lugar -->
-                <div class="podium-item first-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <div class="trophy-icon">
-                      <i class="fas fa-trophy"></i>
-                    </div>
-                    <div class="position-badge">1°</div>
-                  </div>
-                  <div class="agent-info">
-                    <h3>Carlos Mendoza</h3>
-                    <p>Team Roberto</p>
-                    <div class="score">28.5</div>
-                  </div>
-                </div>
-
-                <!-- Tercer Lugar -->
-                <div class="podium-item third-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <div class="medal-icon">
-                      <i class="fas fa-award"></i>
-                    </div>
-                    <div class="position-badge">3°</div>
-                  </div>
-                  <div class="agent-info">
-                    <h3>Luis Rodríguez</h3>
-                    <p>Team Pleitez</p>
-                    <div class="score">0.80</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Resto del ranking -->
-              <div class="other-ranks">
-                <h3>Otros Participantes</h3>
-                <div class="rank-list">
-                  <div class="rank-item">
-                    <span class="rank-number">4</span>
-                    <div class="agent-info">
-                      <div class="agent-avatar">
-                        <i class="fas fa-user"></i>
-                      </div>
-                      <div class="agent-details">
-                        <h4>María López</h4>
-                        <p>Team Irania</p>
-                      </div>
-                    </div>
-                    <div class="agent-stats">
-                      <span class="points">834 pts</span>
-                      <span class="sales">65 ventas</span>
-                    </div>
-                  </div>
-
-                  <div class="rank-item">
-                    <span class="rank-number">5</span>
-                    <div class="agent-info">
-                      <div class="agent-avatar">
-                        <i class="fas fa-user"></i>
-                      </div>
-                      <div class="agent-details">
-                        <h4>Pedro Sánchez</h4>
-                        <p>Team Roberto</p>
-                      </div>
-                    </div>
-                    <div class="agent-stats">
-                      <span class="points">756 pts</span>
-                      <span class="sales">58 ventas</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div class="stat-info">
+              <div class="stat-number" id="user-sales-count">0</div>
+              <div class="stat-label">Ventas este mes</div>
             </div>
           </div>
-    </main>
-</body>
-</html>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-star"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-number" id="user-points-total">0</div>
+              <div class="stat-label">Puntos totales</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-number" id="user-team-name">-</div>
+              <div class="stat-label">Equipo</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-trophy"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-number" id="user-ranking">-</div>
+              <div class="stat-label">Posición</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Metrics -->
+      <div class="dashboard-metrics">
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-icon leads">
+              <i class="fas fa-user-plus"></i>
+            </div>
+            <div class="metric-info">
+              <div class="metric-number" id="total-leads">0</div>
+              <div class="metric-label">Total Leads</div>
+              <div class="metric-change positive" id="leads-change">+0%</div>
+            </div>
+          </div>
+          
+          <div class="metric-card">
+            <div class="metric-icon sales">
+              <i class="fas fa-handshake"></i>
+            </div>
+            <div class="metric-info">
+              <div class="metric-number" id="total-sales">0</div>
+              <div class="metric-label">Ventas Cerradas</div>
+              <div class="metric-change positive" id="sales-change">+0%</div>
+            </div>
+          </div>
+          
+          <div class="metric-card">
+            <div class="metric-icon conversion">
+              <i class="fas fa-percentage"></i>
+            </div>
+            <div class="metric-info">
+              <div class="metric-number" id="conversion-rate">0%</div>
+              <div class="metric-label">Tasa Conversión</div>
+              <div class="metric-change positive" id="conversion-change">+0%</div>
+            </div>
+          </div>
+          
+          <div class="metric-card">
+            <div class="metric-icon revenue">
+              <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="metric-info">
+              <div class="metric-number" id="total-revenue">$0</div>
+              <div class="metric-label">Ingresos</div>
+              <div class="metric-change positive" id="revenue-change">+0%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Section -->
+      <div class="charts-section">
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Ventas por Mes</h3>
+              <div class="chart-controls">
+                <select id="sales-period">
+                  <option value="6">Últimos 6 meses</option>
+                  <option value="12">Último año</option>
+                </select>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+          
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3>Distribución por Team</h3>
+            </div>
+            <div class="chart-container">
+              <canvas id="teamsChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3>Acciones Rápidas</h3>
+        <div class="actions-grid">
+          <a href="lead.html" class="action-card">
+            <div class="action-icon">
+              <i class="fas fa-plus-circle"></i>
+            </div>
+            <div class="action-info">
+              <h4>Nuevo Lead</h4>
+              <p>Registrar cliente potencial</p>
+            </div>
+          </a>
+          
+          <a href="Costumer.html" class="action-card">
+            <div class="action-icon">
+              <i class="fas fa-search"></i>
+            </div>
+            <div class="action-info">
+              <h4>Ver Clientes</h4>
+              <p>Gestionar base de datos</p>
+            </div>
+          </a>
+          
+          <a href="Estadisticas.html" class="action-card">
+            <div class="action-icon">
+              <i class="fas fa-chart-bar"></i>
+            </div>
+            <div class="action-info">
+              <h4>Estadísticas</h4>
+              <p>Análisis detallado</p>
+            </div>
+          </a>
+          
+          <a href="empleado-del-mes.html" class="action-card">
+            <div class="action-icon">
+              <i class="fas fa-award"></i>
+            </div>
+            <div class="action-info">
+              <h4>Empleado del Mes</h4>
+              <p>Reconocimientos</p>
+            </div>
+          </a>
+        </div>
+      </div>

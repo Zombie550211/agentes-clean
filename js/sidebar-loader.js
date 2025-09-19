@@ -32,12 +32,23 @@
   // Normaliza distintos alias a un rol canónico
   function normalizeRole(raw){
     try {
-      const r = (raw || '').toString().toLowerCase().trim();
+      const r = (raw || '').toString().trim();
+      // Mapeo de roles antiguos a nuevos roles unificados
       const map = { 
-        'administrador': 'admin', 
-        'admin': 'admin',
-        'teamlineas': 'teamlineas',
-        'lineas': 'teamlineas'
+        'admin': 'Administrador',
+        'administrador': 'Administrador',
+        'Administrativo': 'Administrador',
+        'backoffice': 'Backoffice',
+        'b:o': 'Backoffice',
+        'b.o': 'Backoffice',
+        'b-o': 'Backoffice',
+        'bo': 'Backoffice',
+        'supervisor': 'Supervisor',
+        'agent': 'Agentes',
+        'agente': 'Agentes',
+        'teamlineas': 'Supervisor Team Lineas',
+        'Team Líneas': 'Supervisor Team Lineas',
+        'lineas': 'Lineas-Agentes'
       };
       return map[r] || r;
     } catch { return ''; }
@@ -59,11 +70,13 @@
       // Mapa de claves soportadas
       const map = [
         { key: 'inicio', href: 'inicio.html' },
+        { key: 'ranking', href: 'Ranking y Promociones.html' },
         { key: 'lead', href: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
         { key: 'costumer', href: 'Costumer.html' },
         { key: 'register', href: 'register.html' },
         { key: 'facturacion', href: 'facturacion.html' },
-        { key: 'estadisticas', href: 'Estadisticas.html' }
+        { key: 'estadisticas', href: 'Estadisticas.html' },
+        { key: 'multimedia', href: 'multimedia.html' }
       ];
 
       // 1) Prioridad: atributo data-active si viene de la página
@@ -73,15 +86,17 @@
 
       // 2) Fallback por URL
       if (!target) {
-        const path = (location.pathname || '').toLowerCase();
+        const path = decodeURIComponent(location.pathname || '').toLowerCase();
         const urlTarget = [
           { key: 'inicio', match: 'inicio.html' },
+          { key: 'ranking', match: 'ranking y promociones.html' },
           { key: 'lead', match: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
           { key: 'lead', match: 'lead.html' }, // Para compatibilidad con enlaces existentes
           { key: 'costumer', match: 'costumer.html' },
           { key: 'register', match: 'register.html' },
           { key: 'facturacion', match: 'facturacion.html' },
-          { key: 'estadisticas', match: 'estadisticas.html' }
+          { key: 'estadisticas', match: 'estadisticas.html' },
+          { key: 'multimedia', match: 'multimedia.html' }
         ].find(m => path.endsWith(m.match));
         
         if (urlTarget) {
@@ -115,21 +130,29 @@
 
   function applyAdminVisibility(nav){
     try {
-      const role = normalizeRole(decodeTokenRole());
+      const rawRole = decodeTokenRole();
+      const role = normalizeRole(rawRole);
+      console.log('[SIDEBAR] Rol detectado - Raw:', rawRole, 'Normalizado:', role);
       // 1) Mostrar/ocultar items exclusivamente de admin por ID conocido
       const ids = ['#menu-create-account'];
       ids.forEach(sel => {
         const li = nav.querySelector(sel);
-        if (li) li.style.display = role === 'admin' ? 'block' : 'none';
+        if (li) {
+          // Verificar múltiples variantes de admin
+          const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
+          li.style.display = isAdmin ? 'block' : 'none';
+          console.log('[SIDEBAR] Menu crear cuenta:', isAdmin ? 'VISIBLE' : 'OCULTO', 'para rol:', role);
+        }
       });
       // 2) Ocultar el enlace de Facturación si no es admin (sin modificar el componente)
       const factLink = nav.querySelector('a[href$="facturacion.html"]');
       const factLi = factLink ? (factLink.closest('li') || factLink.parentElement) : null;
       if (factLi) {
-        factLi.style.display = role === 'admin' ? '' : 'none';
+        const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
+        factLi.style.display = isAdmin ? '' : 'none';
       }
       // 3) Ocultar Estadísticas para quienes NO sean admin o BO (variantes)
-      const allowedStats = ['admin','backoffice','b:o','b.o','b-o','bo'];
+      const allowedStats = ['admin', 'Administrador', 'administrador', 'Administrativo', 'backoffice', 'Backoffice', 'b:o', 'b.o', 'b-o', 'bo'];
       const statsLink = nav.querySelector('a[href$="Estadisticas.html"], a[href$="estadisticas.html"]');
       const statsLi = statsLink ? (statsLink.closest('li') || statsLink.parentElement) : null;
       if (statsLi) {

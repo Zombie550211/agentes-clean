@@ -772,6 +772,7 @@
   
   <!-- Scripts -->
   <script src="js/auth-logout.js"></script>
+  <script src="js/user-info-updater.js"></script>
   <script src="js/sidebar-loader.js"></script>
   <script>
     let selectedOption = 'photo';
@@ -804,7 +805,7 @@
         
         // Verificar permisos y habilitar edición si es admin
         const role = window.currentUser.role;
-        if (role === 'admin' || role === 'Administrativo' || role === 'Administrador') {
+        if (role === 'Administrador' || role === 'Supervisor Team Lineas') {
           console.log('🔓 Habilitando edición desde sidebar:loaded para rol:', role);
           enableEditingFeatures();
         }
@@ -843,8 +844,7 @@
               
               updateUserInfo(username, role);
               
-              if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador' && 
-                  role !== 'Team Líneas' && role !== 'agent' && !username?.toLowerCase().includes('lineas')) {
+              if (role !== 'Administrador' && role !== 'Supervisor Team Lineas') {
                 disableEditingFeatures();
               } else {
                 console.log('✅ Usuario con permisos de edición detectado desde token:', role, username);
@@ -871,8 +871,7 @@
           updateUserInfo(username, role);
           
           // También verificar permisos
-          if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador' && 
-              role !== 'Team Líneas' && role !== 'agent' && !username?.toLowerCase().includes('lineas')) {
+          if (role !== 'Administrador' && role !== 'Supervisor Team Lineas') {
             disableEditingFeatures();
           } else {
             console.log('✅ Usuario con permisos de edición detectado desde storage:', role, username);
@@ -916,20 +915,19 @@
     setTimeout(() => {
       console.log('🔧 Verificación final de permisos');
       
-      // Si tenemos datos de usuario y es admin, asegurar que la edición esté habilitada
+      // Si tenemos datos de usuario con permisos, asegurar que la edición esté habilitada
       if (window.currentUser && 
-          (window.currentUser.role === 'admin' || 
-           window.currentUser.role === 'Administrativo' || 
-           window.currentUser.role === 'Administrador')) {
+          (window.currentUser.role === 'Administrador' || 
+           window.currentUser.role === 'Supervisor Team Lineas')) {
         
-        console.log('🔓 Aplicando permisos de administrador como respaldo final');
+        console.log('🔓 Aplicando permisos de edición como respaldo final');
         enableEditingFeatures();
         // Recargar empleados con permisos correctos
         loadSavedEmployees();
       } else {
-        console.log('🔧 Usando permisos de administrador por defecto');
-        enableEditingFeatures(); // Por defecto, habilitar para testing
-        // Recargar empleados con permisos correctos
+        console.log('🔧 Usuario sin permisos de edición o rol no detectado');
+        disableEditingFeatures(); // Por defecto, deshabilitar edición
+        // Recargar empleados en modo solo lectura
         loadSavedEmployees();
       }
       
@@ -972,17 +970,39 @@
     async function checkServerStatus() {
       console.log('🔍 Verificando estado del servidor...');
       try {
-        const response = await fetch('/api/employees-of-month');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
+        
+        const response = await fetch('/api/employees-of-month', {
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        
         if (response.ok) {
-          const data = await response.json();
-          console.log('✅ Servidor conectado. Empleados en servidor:', Object.keys(data).length);
-          return true;
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            console.log('✅ Servidor conectado. Empleados en servidor:', Object.keys(data).length);
+            return true;
+          } else {
+            const textResponse = await response.text();
+            console.warn('⚠️ Servidor devuelve texto:', textResponse.substring(0, 100));
+            return false;
+          }
         } else {
           console.warn('⚠️ Servidor responde pero con error:', response.status);
           return false;
         }
       } catch (error) {
-        console.error('❌ Servidor no disponible:', error);
+        if (error.name === 'AbortError') {
+          console.error('❌ Timeout: Servidor no responde en 5 segundos');
+        } else {
+          console.error('❌ Servidor no disponible:', error.message);
+        }
         return false;
       }
     }
@@ -1025,17 +1045,16 @@
 
     // Verificar permisos del usuario
     async function checkUserPermissions() {
+      const token = getToken();
+      console.log('🔐 Token encontrado:', !!token);
+      console.log('🍪 Cookies disponibles:', document.cookie);
+      
+      if (!token) {
+        console.log('❌ No hay token de autenticación en localStorage ni cookies');
+        return;
+      }
+      
       try {
-        const token = getToken();
-        console.log('🔐 Token encontrado:', !!token);
-        console.log('🍪 Cookies disponibles:', document.cookie);
-        
-        if (!token) {
-          console.warn('❌ No hay token de autenticación en localStorage ni cookies');
-          disableEditingFeatures();
-          return;
-        }
-
         const response = await fetch('/api/auth/verify', {
           method: 'GET',
           headers: {
@@ -1043,43 +1062,49 @@
             'Content-Type': 'application/json'
           }
         });
-
-        console.log('🌐 Respuesta del servidor:', response.status, response.statusText);
-
+        
+        console.log('🌐 Respuesta de autenticación:', response.status, response.statusText);
+        
         if (response.ok) {
-          const data = await response.json();
-          console.log('📋 Datos del usuario recibidos:', data);
-          
-          const userRole = data.user.role;
-          const userName = data.user.username;
-          
-          console.log('👤 Usuario:', userName, 'Rol:', userRole);
-          
-          // Actualizar información del usuario en el sidebar
-          updateUserInfo(userName, userRole);
-          
-          // Solo usuarios con permisos específicos pueden editar
-          if (userRole !== 'Administrativo' && userRole !== 'admin' && userRole !== 'Administrador' && 
-              userRole !== 'Team Líneas' && userRole !== 'agent' && !userName?.toLowerCase().includes('lineas')) {
-            disableEditingFeatures();
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            console.log('📋 Datos del usuario recibidos:', data);
+            
+            const userRole = data.user.role;
+            const userName = data.user.username;
+            
+            console.log('👤 Usuario:', userName, 'Rol:', userRole);
+            
+            // Actualizar información del usuario en el sidebar
+            updateUserInfo(userName, userRole);
+            
+            // Solo usuarios con permisos de edición pueden editar empleados del mes
+            if (userRole !== 'Administrador' && userRole !== 'Supervisor Team Lineas') {
+              console.log('🔒 Usuario sin permisos de edición:', userRole, userName);
+              disableEditingFeatures();
+            } else {
+              console.log('✅ Usuario con permisos de edición:', userRole, userName);
+              enableEditingFeatures();
+              // Recargar empleados con permisos de admin
+              setTimeout(() => loadSavedEmployees(), 500);
+            }
           } else {
-            console.log('✅ Usuario con permisos de edición detectado:', userRole, userName);
-            enableEditingFeatures();
-            // Recargar empleados con permisos de admin
-            setTimeout(() => loadSavedEmployees(), 500);
+            const textResponse = await response.text();
+            console.warn('⚠️ Respuesta no es JSON:', textResponse.substring(0, 100));
           }
         } else {
-          console.warn('❌ Error de autenticación:', response.status);
+          const textResponse = await response.text();
+          console.warn('❌ Error de autenticación:', response.status, textResponse.substring(0, 100));
           if (response.status === 401) {
             console.warn('🔒 Token inválido o expirado');
             // Redirigir al login si el token es inválido
             // window.location.href = 'login.html';
           }
-          disableEditingFeatures();
         }
       } catch (error) {
-        console.error('💥 Error verificando permisos:', error);
-        disableEditingFeatures();
+        console.error('💥 Error en el proceso de autenticación:', error);
+        console.log('🔧 Continuando sin autenticación...');
       }
     }
 
@@ -1690,9 +1715,16 @@
         console.log('🌐 Respuesta del servidor:', response.status, response.statusText);
 
         if (response.ok) {
-          const employees = await response.json();
-          console.log('📋 Empleados cargados desde servidor:', employees);
-          return employees;
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const employees = await response.json();
+            console.log('📋 Empleados cargados desde servidor:', employees);
+            return employees;
+          } else {
+            const textResponse = await response.text();
+            console.warn('⚠️ Servidor devolvió texto en lugar de JSON:', textResponse.substring(0, 200));
+            return {};
+          }
         } else {
           const errorText = await response.text();
           console.warn('❌ Error cargando desde servidor:', response.status, errorText.substring(0, 200));
@@ -1700,6 +1732,7 @@
         }
       } catch (error) {
         console.error('💥 Error cargando empleados desde servidor:', error);
+        console.log('🔧 Usando localStorage como respaldo debido al error');
         return {};
       }
     }
@@ -1773,15 +1806,12 @@
         const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
         const container = document.getElementById('first-photo-container');
         
-        // Verificar permisos de administrador o Team Líneas
+        // Verificar permisos de edición
         const isAdmin = window.currentUser && 
-                       (window.currentUser.role === 'admin' || 
-                        window.currentUser.role === 'Administrativo' || 
-                        window.currentUser.role === 'Administrador' ||
-                        window.currentUser.role === 'Team Líneas' ||
-                        window.currentUser.username?.toLowerCase().includes('lineas'));
+                       (window.currentUser.role === 'Administrador' || 
+                        window.currentUser.role === 'Supervisor Team Lineas');
         
-        console.log('🔍 Cargando empleado 1 - Es admin:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
+        console.log('🔍 Cargando empleado 1 - Tiene permisos:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
         
         const controlsHTML = isAdmin ? `
           <div class="photo-controls">
@@ -1812,15 +1842,12 @@
         const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
         const container = document.getElementById('second-photo-container');
         
-        // Verificar permisos de administrador o Team Líneas
+        // Verificar permisos de edición
         const isAdmin = window.currentUser && 
-                       (window.currentUser.role === 'admin' || 
-                        window.currentUser.role === 'Administrativo' || 
-                        window.currentUser.role === 'Administrador' ||
-                        window.currentUser.role === 'Team Líneas' ||
-                        window.currentUser.username?.toLowerCase().includes('lineas'));
+                       (window.currentUser.role === 'Administrador' || 
+                        window.currentUser.role === 'Supervisor Team Lineas');
         
-        console.log('🔍 Cargando empleado 2 - Es admin:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
+        console.log('🔍 Cargando empleado 2 - Tiene permisos:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
         
         const controlsHTML = isAdmin ? `
           <div class="photo-controls">

@@ -1,38 +1,77 @@
 // Roles y permisos del sistema
 const ROLES = {
-  ADMIN: 'admin',
-  SUPERVISOR: 'supervisor',
-  AGENT: 'agent'
+  ADMINISTRADOR: 'Administrador',
+  BACKOFFICE: 'Backoffice',
+  SUPERVISOR: 'Supervisor',
+  AGENTES: 'Agentes',
+  SUPERVISOR_TEAM_LINEAS: 'Supervisor Team Lineas',
+  LINEAS_AGENTES: 'Lineas-Agentes'
 };
 
 // Permisos para cada rol
 const PERMISSIONS = {
-  [ROLES.ADMIN]: {
+  [ROLES.ADMINISTRADOR]: {
     canViewAllLeads: true,
     canEditAllLeads: true,
     canDeleteLeads: true,
     canManageUsers: true,
     canViewReports: true,
     canManageSettings: true,
-    canExportData: true
+    canExportData: true,
+    canManageEmployees: true
   },
-  [ROLES.SUPERVISOR]: {
+  [ROLES.BACKOFFICE]: {
     canViewAllLeads: true,
     canEditAllLeads: true,
     canDeleteLeads: false,
     canManageUsers: false,
     canViewReports: true,
     canManageSettings: false,
-    canExportData: true
+    canExportData: true,
+    canManageEmployees: false
   },
-  [ROLES.AGENT]: {
+  [ROLES.SUPERVISOR]: {
+    canViewAllLeads: false,
+    canEditAllLeads: false,
+    canDeleteLeads: false,
+    canManageUsers: false,
+    canViewReports: true,
+    canManageSettings: false,
+    canExportData: true,
+    canViewTeam: true
+  },
+  [ROLES.AGENTES]: {
     canViewAllLeads: false,
     canEditAllLeads: false,
     canDeleteLeads: false,
     canManageUsers: false,
     canViewReports: false,
     canManageSettings: false,
-    canExportData: false
+    canExportData: false,
+    canViewOwn: true
+  },
+  [ROLES.SUPERVISOR_TEAM_LINEAS]: {
+    canViewAllLeads: false,
+    canEditAllLeads: false,
+    canDeleteLeads: false,
+    canManageUsers: false,
+    canViewReports: true,
+    canManageSettings: false,
+    canExportData: true,
+    canViewTeam: true,
+    canManageEmployees: true,
+    canManageLineas: true
+  },
+  [ROLES.LINEAS_AGENTES]: {
+    canViewAllLeads: false,
+    canEditAllLeads: false,
+    canDeleteLeads: false,
+    canManageUsers: false,
+    canViewReports: false,
+    canManageSettings: false,
+    canExportData: false,
+    canViewOwn: true,
+    canUseLineasForm: true
   }
 };
 
