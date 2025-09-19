@@ -159,6 +159,14 @@
         statsLi.style.display = allowedStats.includes(role) ? '' : 'none';
       }
 
+      // 3.1) Ocultar Multimedia para todos excepto Administrador
+      const multimediaLink = nav.querySelector('a[href$="multimedia.html"]');
+      const multimediaLi = multimediaLink ? (multimediaLink.closest('li') || multimediaLink.parentElement) : null;
+      if (multimediaLi) {
+        const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
+        multimediaLi.style.display = isAdmin ? '' : 'none';
+      }
+
       // 4) Habilitar SIEMPRE Costumer para todos los roles (incluyendo Team Líneas)
       const costumerLink = nav.querySelector('a[href$="Costumer.html"], a[href$="costumer.html"]');
       const costumerLi = costumerLink ? (costumerLink.closest('li') || costumerLink.parentElement) : null;
