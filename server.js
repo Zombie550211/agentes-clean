@@ -56,7 +56,7 @@ if (process.env.NODE_ENV === 'production' && process.env.DEBUG_LOGS !== '1') {
 
 // Inicializar Express app
 const app = express();
-const PORT = 3001; // Cambiar puerto temporalmente
+const PORT = process.env.PORT || 3001; // Usa PORT de entorno si está definido
 
  // Paths base para servir archivos estáticos y vistas
  const publicPath = path.join(__dirname);
