@@ -935,6 +935,9 @@
       
       // Probar endpoint del servidor
       testServerEndpoint();
+      
+      // Verificar estado del servidor
+      checkServerStatus();
     }, 3000);
 
     // Función para probar el endpoint del servidor
@@ -951,15 +954,36 @@
         console.log('🧪 Respuesta de prueba:', response.status, response.statusText);
         
         if (response.status === 401) {
-          console.log('🔒 Endpoint requiere autenticación (correcto)');
+          console.log('🔒 Endpoint requiere autenticación (incorrecto - debería ser público)');
         } else if (response.ok) {
           console.log('✅ Endpoint funcionando correctamente');
+          const data = await response.json();
+          console.log('📋 Datos de prueba del servidor:', data);
         } else {
           const text = await response.text();
           console.log('❌ Error en endpoint:', text.substring(0, 200));
         }
       } catch (error) {
         console.error('💥 Error probando endpoint:', error);
+      }
+    }
+
+    // Función para verificar el estado del servidor
+    async function checkServerStatus() {
+      console.log('🔍 Verificando estado del servidor...');
+      try {
+        const response = await fetch('/api/employees-of-month');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Servidor conectado. Empleados en servidor:', Object.keys(data).length);
+          return true;
+        } else {
+          console.warn('⚠️ Servidor responde pero con error:', response.status);
+          return false;
+        }
+      } catch (error) {
+        console.error('❌ Servidor no disponible:', error);
+        return false;
       }
     }
 
@@ -1474,91 +1498,151 @@
 
     function addPhotoToEmployee(employee, file, name, description) {
       console.log('🎯 addPhotoToEmployee llamada con empleado:', employee);
+      console.log('📏 Tamaño original del archivo:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      
       const reader = new FileReader();
       
       reader.onload = function(e) {
-        const imageData = e.target.result;
+        const originalImageData = e.target.result;
         
-        // Seleccionar el contenedor correcto
-        const containerId = employee === 'first' ? 'first-photo-container' : 'second-photo-container';
-        const nameId = employee === 'first' ? 'first-name' : 'second-name';
-        const descriptionId = employee === 'first' ? 'first-description' : 'second-description';
-        
-        console.log('📋 Contenedores seleccionados:', {
-          employee: employee,
-          containerId: containerId,
-          nameId: nameId,
-          descriptionId: descriptionId
+        // Comprimir imagen antes de procesar
+        compressImage(originalImageData, 0.7, 800, 600).then(compressedImageData => {
+          console.log('🗜️ Imagen comprimida exitosamente');
+          processEmployeeImage(employee, compressedImageData, name, description);
+        }).catch(error => {
+          console.warn('⚠️ Error comprimiendo imagen, usando original:', error);
+          processEmployeeImage(employee, originalImageData, name, description);
         });
-        
-        // Crear imagen temporal para detectar dimensiones
-        const tempImg = new Image();
-        tempImg.onload = function() {
-          const aspectRatio = this.width / this.height;
-          let imageClass = '';
-          
-          if (aspectRatio > 1.2) {
-            imageClass = 'landscape'; // Imagen horizontal
-          } else if (aspectRatio < 0.8) {
-            imageClass = 'portrait'; // Imagen vertical
-          } else {
-            imageClass = 'square'; // Imagen cuadrada o casi cuadrada
-          }
-          
-          // Actualizar la foto con la clase apropiada
-          const container = document.getElementById(containerId);
-          console.log('📦 Contenedor encontrado:', container ? 'SÍ' : 'NO', 'ID:', containerId);
-          
-          if (!container) {
-            console.error('❌ No se encontró el contenedor:', containerId);
-            return;
-          }
-          
-          // Verificar si está en modo solo lectura
-          const isViewOnly = document.body.classList.contains('view-only-mode');
-          const controlsHTML = isViewOnly ? '' : `
-            <div class="photo-controls">
-              <button class="photo-control-btn change" onclick="changeEmployeePhoto('${employee}')" title="Cambiar foto">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="photo-control-btn delete" onclick="deleteEmployeePhoto('${employee}')" title="Eliminar foto">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          `;
-          
-          container.innerHTML = `
-            <div class="employee-photo-frame">
-              <img src="${imageData}" alt="${name}" class="${imageClass}">
-              ${controlsHTML}
-            </div>
-          `;
-          
-          console.log('✅ Contenedor actualizado exitosamente para:', employee);
-          
-          // Actualizar nombre y descripción
-          document.getElementById(nameId).textContent = name;
-          document.getElementById(descriptionId).textContent = description || 'Empleado destacado del mes';
-          
-          console.log('✅ Nombre y descripción actualizados para:', employee);
-          
-          // Guardar en localStorage
-          const employeeData = {
-            employee: employee,
-            name: name,
-            description: description,
-            imageData: imageData,
-            imageClass: imageClass,
-            date: new Date().toLocaleDateString('es-ES')
-          };
-          
-          saveEmployeeToStorage(employeeData);
-        };
-        
-        tempImg.src = imageData;
       };
       
       reader.readAsDataURL(file);
+    }
+
+    // Función para comprimir imágenes
+    function compressImage(imageData, quality = 0.7, maxWidth = 800, maxHeight = 600) {
+      return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = function() {
+          // Calcular nuevas dimensiones manteniendo proporción
+          let { width, height } = img;
+          
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width *= ratio;
+            height *= ratio;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Dibujar imagen redimensionada
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convertir a base64 comprimido
+          const compressedData = canvas.toDataURL('image/jpeg', quality);
+          
+          console.log('📊 Compresión completada:');
+          console.log('  - Dimensiones originales:', img.width, 'x', img.height);
+          console.log('  - Dimensiones nuevas:', width, 'x', height);
+          console.log('  - Tamaño original:', (imageData.length / 1024 / 1024).toFixed(2), 'MB');
+          console.log('  - Tamaño comprimido:', (compressedData.length / 1024 / 1024).toFixed(2), 'MB');
+          
+          resolve(compressedData);
+        };
+        
+        img.onerror = reject;
+        img.src = imageData;
+      });
+    }
+
+    // Procesar imagen del empleado (separado para reutilización)
+    function processEmployeeImage(employee, imageData, name, description) {
+      // Seleccionar el contenedor correcto
+      const containerId = employee === 'first' ? 'first-photo-container' : 'second-photo-container';
+      const nameId = employee === 'first' ? 'first-name' : 'second-name';
+      const descriptionId = employee === 'first' ? 'first-description' : 'second-description';
+      
+      console.log('📋 Contenedores seleccionados:', {
+        employee: employee,
+        containerId: containerId,
+        nameId: nameId,
+        descriptionId: descriptionId
+      });
+      
+      // Crear imagen temporal para detectar dimensiones
+      const tempImg = new Image();
+      tempImg.onload = function() {
+        const aspectRatio = this.width / this.height;
+        let imageClass = '';
+        
+        if (aspectRatio > 1.2) {
+          imageClass = 'landscape'; // Imagen horizontal
+        } else if (aspectRatio < 0.8) {
+          imageClass = 'portrait'; // Imagen vertical
+        } else {
+          imageClass = 'square'; // Imagen cuadrada o casi cuadrada
+        }
+        
+        // Actualizar la foto con la clase apropiada
+        const container = document.getElementById(containerId);
+        console.log('📦 Contenedor encontrado:', container ? 'SÍ' : 'NO', 'ID:', containerId);
+        
+        if (!container) {
+          console.error('❌ No se encontró el contenedor:', containerId);
+          return;
+        }
+        
+        // Verificar si está en modo solo lectura
+        const isViewOnly = document.body.classList.contains('view-only-mode');
+        const controlsHTML = isViewOnly ? '' : `
+          <div class="photo-controls">
+            <button class="photo-control-btn change" onclick="changeEmployeePhoto('${employee}')" title="Cambiar foto">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button class="photo-control-btn delete" onclick="deleteEmployeePhoto('${employee}')" title="Eliminar foto">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        `;
+        
+        container.innerHTML = `
+          <div class="employee-photo-frame">
+            <img src="${imageData}" alt="${name}" class="${imageClass}">
+            ${controlsHTML}
+          </div>
+        `;
+        
+        console.log('✅ Contenedor actualizado exitosamente para:', employee);
+        
+        // Actualizar nombre y descripción
+        document.getElementById(nameId).textContent = name;
+        document.getElementById(descriptionId).textContent = description || 'Empleado destacado del mes';
+        
+        console.log('✅ Nombre y descripción actualizados para:', employee);
+        
+        // Guardar en localStorage
+        const employeeData = {
+          employee: employee,
+          name: name,
+          description: description,
+          imageData: imageData,
+          imageClass: imageClass,
+          date: new Date().toLocaleDateString('es-ES')
+        };
+        
+        saveEmployeeToStorage(employeeData);
+        
+        // Forzar recarga desde servidor después de un breve delay
+        setTimeout(() => {
+          console.log('🔄 Forzando recarga desde servidor...');
+          loadSavedEmployees();
+        }, 1000);
+      };
+      
+      tempImg.src = imageData;
     }
 
     // Guardar empleado en el servidor (compartido entre todos los usuarios)
@@ -1645,14 +1729,21 @@
       }
     }
 
-    function saveEmployeeToStorage(employeeData) {
+    async function saveEmployeeToStorage(employeeData) {
       // Guardar en localStorage como respaldo
       let savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
       savedEmployees[employeeData.employee] = employeeData;
       localStorage.setItem('topEmployees', JSON.stringify(savedEmployees));
+      console.log('💾 Guardado en localStorage:', employeeData.employee);
       
       // Guardar en servidor para sincronización
-      saveEmployeeToServer(employeeData);
+      const serverSaved = await saveEmployeeToServer(employeeData);
+      if (serverSaved) {
+        console.log('🌐 Guardado exitoso en servidor, forzando recarga...');
+        setTimeout(() => loadSavedEmployees(), 500);
+      } else {
+        console.warn('⚠️ Error guardando en servidor, usando solo localStorage');
+      }
     }
 
     async function loadSavedEmployees() {
@@ -1668,7 +1759,13 @@
       }
       
       console.log('📋 Empleados cargados:', savedEmployees);
+      console.log('🔍 Claves encontradas:', Object.keys(savedEmployees));
       console.log('👤 Usuario actual:', window.currentUser);
+      
+      // Verificar si hay empleados para mostrar
+      if (Object.keys(savedEmployees).length === 0) {
+        console.log('⚠️ No hay empleados guardados - mostrando placeholders');
+      }
       
       // Cargar primer lugar
       if (savedEmployees.first) {
