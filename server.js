@@ -21,6 +21,7 @@ const authRoutes = require('./routes/auth');
 const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
 const equipoRoutes = require('./routes/equipoRoutes');
+const employeesOfMonthRoutes = require('./routes/employeesOfMonth');
 const { connectToMongoDB, getDb } = require('./config/db');
 // Middleware de autenticación unificado
 const { protect, authorize } = require('./middleware/auth');
@@ -381,6 +382,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 // Montar rutas de API públicas
 app.use('/api', apiRoutes);
 app.use('/api/ranking', rankingRoutes);
+app.use('/api/employees-of-month', employeesOfMonthRoutes);
 app.use('/api/equipos', equipoRoutes);
 
 // Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)

@@ -634,7 +634,7 @@
     <!-- Top Employees Section -->
     <div class="top-employees-section">
       <div class="section-title">
-        <h2><i class="fas fa-star"></i> Top 2 Empleados del Mes</h2>
+        <h2><i class="fas fa-star"></i> Top 1 Empleados del Mes</h2>
         <p>Destacando la excelencia y dedicación de nuestro equipo</p>
       </div>
       
@@ -843,11 +843,14 @@
               
               updateUserInfo(username, role);
               
-              if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador') {
+              if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador' && 
+                  role !== 'Team Líneas' && role !== 'agent' && !username?.toLowerCase().includes('lineas')) {
                 disableEditingFeatures();
               } else {
-                console.log('✅ Usuario con permisos de administrador detectado desde token:', role);
+                console.log('✅ Usuario con permisos de edición detectado desde token:', role, username);
                 enableEditingFeatures();
+                // Recargar empleados con permisos de admin
+                setTimeout(() => loadSavedEmployees(), 500);
               }
               return;
             } catch (e) {
@@ -868,11 +871,14 @@
           updateUserInfo(username, role);
           
           // También verificar permisos
-          if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador') {
+          if (role !== 'Administrativo' && role !== 'admin' && role !== 'Administrador' && 
+              role !== 'Team Líneas' && role !== 'agent' && !username?.toLowerCase().includes('lineas')) {
             disableEditingFeatures();
           } else {
-            console.log('✅ Usuario con permisos de administrador detectado desde storage:', role);
+            console.log('✅ Usuario con permisos de edición detectado desde storage:', role, username);
             enableEditingFeatures();
+            // Recargar empleados con permisos de admin
+            setTimeout(() => loadSavedEmployees(), 500);
           }
         } else {
           console.warn('❌ No hay datos de usuario en localStorage, sessionStorage ni token decodificable');
@@ -918,26 +924,78 @@
         
         console.log('🔓 Aplicando permisos de administrador como respaldo final');
         enableEditingFeatures();
+        // Recargar empleados con permisos correctos
+        loadSavedEmployees();
       } else {
         console.log('🔧 Usando permisos de administrador por defecto');
         enableEditingFeatures(); // Por defecto, habilitar para testing
+        // Recargar empleados con permisos correctos
+        loadSavedEmployees();
       }
+      
+      // Probar endpoint del servidor
+      testServerEndpoint();
     }, 3000);
+
+    // Función para probar el endpoint del servidor
+    async function testServerEndpoint() {
+      console.log('🧪 Probando endpoint del servidor...');
+      try {
+        const response = await fetch('/api/employees-of-month', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('🧪 Respuesta de prueba:', response.status, response.statusText);
+        
+        if (response.status === 401) {
+          console.log('🔒 Endpoint requiere autenticación (correcto)');
+        } else if (response.ok) {
+          console.log('✅ Endpoint funcionando correctamente');
+        } else {
+          const text = await response.text();
+          console.log('❌ Error en endpoint:', text.substring(0, 200));
+        }
+      } catch (error) {
+        console.error('💥 Error probando endpoint:', error);
+      }
+    }
 
     // Función para obtener token desde localStorage o cookies
     function getToken() {
       // Primero intentar localStorage
       let token = localStorage.getItem('token');
-      if (token) return token;
+      if (token) {
+        console.log('🔑 Token encontrado en localStorage');
+        return token;
+      }
       
       // Si no está en localStorage, buscar en cookies
       const cookies = document.cookie.split(';');
+      console.log('🍪 Cookies disponibles:', document.cookie);
+      
       for (let cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         if (name === 'token' || name === 'authToken' || name === 'jwt') {
+          console.log('🔑 Token encontrado en cookies:', name);
           return value;
         }
       }
+      
+      // Intentar obtener token del sistema de autenticación actual
+      // Buscar en el DOM si hay algún elemento que contenga el token
+      const authElements = document.querySelectorAll('[data-token], [data-auth-token]');
+      for (let element of authElements) {
+        const token = element.dataset.token || element.dataset.authToken;
+        if (token) {
+          console.log('🔑 Token encontrado en DOM');
+          return token;
+        }
+      }
+      
+      console.warn('❌ No se encontró token en ningún lugar');
       return null;
     }
 
@@ -976,12 +1034,15 @@
           // Actualizar información del usuario en el sidebar
           updateUserInfo(userName, userRole);
           
-          // Solo usuarios Administrativos pueden editar
-          if (userRole !== 'Administrativo' && userRole !== 'admin' && userRole !== 'Administrador') {
+          // Solo usuarios con permisos específicos pueden editar
+          if (userRole !== 'Administrativo' && userRole !== 'admin' && userRole !== 'Administrador' && 
+              userRole !== 'Team Líneas' && userRole !== 'agent' && !userName?.toLowerCase().includes('lineas')) {
             disableEditingFeatures();
           } else {
-            console.log('✅ Usuario con permisos de administrador detectado:', userRole);
+            console.log('✅ Usuario con permisos de edición detectado:', userRole, userName);
             enableEditingFeatures();
+            // Recargar empleados con permisos de admin
+            setTimeout(() => loadSavedEmployees(), 500);
           }
         } else {
           console.warn('❌ Error de autenticación:', response.status);
@@ -1212,15 +1273,18 @@
     }
 
     function openPhotoModal(employee) {
+      console.log('📸 Abriendo modal para empleado:', employee);
       currentEmployee = employee;
+      console.log('📝 Variable currentEmployee establecida a:', currentEmployee);
+      
       const modal = document.getElementById('addContentModal');
       const modalTitle = document.getElementById('modal-title');
       
       // Actualizar título del modal
       if (employee === 'first') {
-        modalTitle.textContent = 'Agregar Foto - Empleado del Mes';
+        modalTitle.textContent = 'Agregar Foto - Empleado del Mes (Primer Lugar)';
       } else {
-        modalTitle.textContent = 'Agregar Foto - Empleado del Mes';
+        modalTitle.textContent = 'Agregar Foto - Empleado del Mes (Segundo Lugar)';
       }
       
       // Mostrar modal
@@ -1394,6 +1458,7 @@
       }
       
       // Agregar foto al recuadro correspondiente
+      console.log('📷 Procesando foto para empleado:', currentEmployee);
       addPhotoToEmployee(currentEmployee, photoInput.files[0], photoTitle, photoDescription);
       
       // Limpiar formulario
@@ -1408,6 +1473,7 @@
     }
 
     function addPhotoToEmployee(employee, file, name, description) {
+      console.log('🎯 addPhotoToEmployee llamada con empleado:', employee);
       const reader = new FileReader();
       
       reader.onload = function(e) {
@@ -1417,6 +1483,13 @@
         const containerId = employee === 'first' ? 'first-photo-container' : 'second-photo-container';
         const nameId = employee === 'first' ? 'first-name' : 'second-name';
         const descriptionId = employee === 'first' ? 'first-description' : 'second-description';
+        
+        console.log('📋 Contenedores seleccionados:', {
+          employee: employee,
+          containerId: containerId,
+          nameId: nameId,
+          descriptionId: descriptionId
+        });
         
         // Crear imagen temporal para detectar dimensiones
         const tempImg = new Image();
@@ -1434,6 +1507,12 @@
           
           // Actualizar la foto con la clase apropiada
           const container = document.getElementById(containerId);
+          console.log('📦 Contenedor encontrado:', container ? 'SÍ' : 'NO', 'ID:', containerId);
+          
+          if (!container) {
+            console.error('❌ No se encontró el contenedor:', containerId);
+            return;
+          }
           
           // Verificar si está en modo solo lectura
           const isViewOnly = document.body.classList.contains('view-only-mode');
@@ -1455,9 +1534,13 @@
             </div>
           `;
           
+          console.log('✅ Contenedor actualizado exitosamente para:', employee);
+          
           // Actualizar nombre y descripción
           document.getElementById(nameId).textContent = name;
           document.getElementById(descriptionId).textContent = description || 'Empleado destacado del mes';
+          
+          console.log('✅ Nombre y descripción actualizados para:', employee);
           
           // Guardar en localStorage
           const employeeData = {
@@ -1478,14 +1561,114 @@
       reader.readAsDataURL(file);
     }
 
+    // Guardar empleado en el servidor (compartido entre todos los usuarios)
+    async function saveEmployeeToServer(employeeData) {
+      try {
+        console.log('💾 Guardando en servidor:', employeeData.employee);
+        
+        const response = await fetch('/api/employees-of-month', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(employeeData)
+        });
+
+        console.log('🌐 Respuesta guardado:', response.status, response.statusText);
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ Empleado guardado en servidor:', employeeData.employee, result);
+          return true;
+        } else {
+          const errorText = await response.text();
+          console.warn('❌ Error guardando en servidor:', response.status, errorText.substring(0, 200));
+          return false;
+        }
+      } catch (error) {
+        console.error('💥 Error guardando empleado en servidor:', error);
+        return false;
+      }
+    }
+
+    // Cargar empleados desde el servidor (compartido entre todos los usuarios)
+    async function loadEmployeesFromServer() {
+      try {
+        console.log('🌐 Cargando empleados desde servidor (sin autenticación)...');
+        
+        const response = await fetch('/api/employees-of-month', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('🌐 Respuesta del servidor:', response.status, response.statusText);
+
+        if (response.ok) {
+          const employees = await response.json();
+          console.log('📋 Empleados cargados desde servidor:', employees);
+          return employees;
+        } else {
+          const errorText = await response.text();
+          console.warn('❌ Error cargando desde servidor:', response.status, errorText.substring(0, 200));
+          return {};
+        }
+      } catch (error) {
+        console.error('💥 Error cargando empleados desde servidor:', error);
+        return {};
+      }
+    }
+
+    // Eliminar empleado del servidor
+    async function deleteEmployeeFromServer(employee) {
+      try {
+        console.log('🗑️ Eliminando del servidor:', employee);
+        
+        const response = await fetch(`/api/employees-of-month/${employee}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          console.log('✅ Empleado eliminado del servidor:', employee);
+          return true;
+        } else {
+          console.warn('❌ Error eliminando del servidor:', response.status);
+          return false;
+        }
+      } catch (error) {
+        console.error('💥 Error eliminando empleado del servidor:', error);
+        return false;
+      }
+    }
+
     function saveEmployeeToStorage(employeeData) {
+      // Guardar en localStorage como respaldo
       let savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
       savedEmployees[employeeData.employee] = employeeData;
       localStorage.setItem('topEmployees', JSON.stringify(savedEmployees));
+      
+      // Guardar en servidor para sincronización
+      saveEmployeeToServer(employeeData);
     }
 
-    function loadSavedEmployees() {
-      const savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
+    async function loadSavedEmployees() {
+      console.log('🌐 Cargando empleados desde servidor...');
+      
+      // Intentar cargar desde servidor primero
+      let savedEmployees = await loadEmployeesFromServer();
+      
+      // Si no hay datos en servidor, usar localStorage como respaldo
+      if (!savedEmployees || Object.keys(savedEmployees).length === 0) {
+        console.log('📱 Usando localStorage como respaldo');
+        savedEmployees = JSON.parse(localStorage.getItem('topEmployees') || '{}');
+      }
+      
+      console.log('📋 Empleados cargados:', savedEmployees);
+      console.log('👤 Usuario actual:', window.currentUser);
       
       // Cargar primer lugar
       if (savedEmployees.first) {
@@ -1493,9 +1676,17 @@
         const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
         const container = document.getElementById('first-photo-container');
         
-        // Verificar si está en modo solo lectura
-        const isViewOnly = document.body.classList.contains('view-only-mode');
-        const controlsHTML = isViewOnly ? '' : `
+        // Verificar permisos de administrador o Team Líneas
+        const isAdmin = window.currentUser && 
+                       (window.currentUser.role === 'admin' || 
+                        window.currentUser.role === 'Administrativo' || 
+                        window.currentUser.role === 'Administrador' ||
+                        window.currentUser.role === 'Team Líneas' ||
+                        window.currentUser.username?.toLowerCase().includes('lineas'));
+        
+        console.log('🔍 Cargando empleado 1 - Es admin:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
+        
+        const controlsHTML = isAdmin ? `
           <div class="photo-controls">
             <button class="photo-control-btn change" onclick="changeEmployeePhoto('first')" title="Cambiar foto">
               <i class="fas fa-edit"></i>
@@ -1504,7 +1695,7 @@
               <i class="fas fa-trash"></i>
             </button>
           </div>
-        `;
+        ` : '';
         
         container.innerHTML = `
           <div class="employee-photo-frame">
@@ -1514,6 +1705,8 @@
         `;
         document.getElementById('first-name').textContent = emp.name;
         document.getElementById('first-description').textContent = emp.description || 'Empleado destacado del mes';
+        
+        console.log('✅ Empleado 1 cargado con controles:', !!isAdmin);
       }
       
       // Cargar segundo lugar
@@ -1522,9 +1715,17 @@
         const imageClass = emp.imageClass || 'square'; // Fallback para datos antiguos
         const container = document.getElementById('second-photo-container');
         
-        // Verificar si está en modo solo lectura
-        const isViewOnly = document.body.classList.contains('view-only-mode');
-        const controlsHTML = isViewOnly ? '' : `
+        // Verificar permisos de administrador o Team Líneas
+        const isAdmin = window.currentUser && 
+                       (window.currentUser.role === 'admin' || 
+                        window.currentUser.role === 'Administrativo' || 
+                        window.currentUser.role === 'Administrador' ||
+                        window.currentUser.role === 'Team Líneas' ||
+                        window.currentUser.username?.toLowerCase().includes('lineas'));
+        
+        console.log('🔍 Cargando empleado 2 - Es admin:', isAdmin, 'Rol:', window.currentUser?.role, 'Username:', window.currentUser?.username);
+        
+        const controlsHTML = isAdmin ? `
           <div class="photo-controls">
             <button class="photo-control-btn change" onclick="changeEmployeePhoto('second')" title="Cambiar foto">
               <i class="fas fa-edit"></i>
@@ -1533,7 +1734,7 @@
               <i class="fas fa-trash"></i>
             </button>
           </div>
-        `;
+        ` : '';
         
         container.innerHTML = `
           <div class="employee-photo-frame">
@@ -1543,6 +1744,8 @@
         `;
         document.getElementById('second-name').textContent = emp.name;
         document.getElementById('second-description').textContent = emp.description || 'Empleado destacado del mes';
+        
+        console.log('✅ Empleado 2 cargado con controles:', !!isAdmin);
       }
     }
 
@@ -1709,10 +1912,17 @@
         delete savedEmployees[employee];
         localStorage.setItem('topEmployees', JSON.stringify(savedEmployees));
         
+        // Eliminar del servidor
+        await deleteEmployeeFromServer(employee);
+        
         // Mostrar notificación de éxito
         showSuccessNotification('Foto eliminada correctamente');
       }
     }
   </script>
+</body>
+</html>
+
+
 </body>
 </html>
