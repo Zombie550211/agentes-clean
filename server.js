@@ -56,11 +56,23 @@ if (process.env.NODE_ENV === 'production' && process.env.DEBUG_LOGS !== '1') {
 
 // Inicializar Express app
 const app = express();
-const PORT = process.env.PORT || 10000; // Puerto único por defecto (10000)
+// En Render SIEMPRE se debe escuchar en process.env.PORT. En local usamos 10000 por defecto.
+const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
+const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
 
  // Paths base para servir archivos estáticos y vistas
  const publicPath = path.join(__dirname);
  const staticPath = publicPath;
+
+// Guard de acceso: multimedia.html solo para Administrador
+app.use('/multimedia.html', protect, (req, res, next) => {
+  const role = (req.user?.role || '').toString();
+  const allowed = ['Administrador', 'admin', 'administrador'];
+  if (!allowed.includes(role)) {
+    return res.status(403).send('Acceso denegado');
+  }
+  return res.sendFile(path.join(__dirname, 'multimedia.html'));
+});
 
 // Configuración de rutas de archivos estáticos
 app.use(express.static(path.join(__dirname)));
