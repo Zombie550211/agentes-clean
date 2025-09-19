@@ -2684,23 +2684,25 @@ app.post('/api/leads', protect, async (req, res) => {
   }
 });
 
-// Iniciar el servidor
-const server = app.listen(PORT, '0.0.0.0', async () => {
-  await connectToMongoDB();
-  const lines = [
-    '',
-    '=== Configuración del Servidor ===',
-    `Servidor corriendo en el puerto: ${PORT}`,
-    `Entorno: ${process.env.NODE_ENV || 'development'}`,
-    '',
-    '=== URLs de Acceso ===',
-    `- Local: http://localhost:${PORT}`,
-    `- Red local: http://${getLocalIp()}:${PORT}`,
-    '======================================',
-    ''
-  ];
-  process.stdout.write(lines.join('\n'));
-});
+// Iniciar el servidor con fallback de puerto
+let activeServer = null;
+function startServer(port, retries = 10) {
+  const p = Number(port) || 10000;
+  const server = app.listen(p, '0.0.0.0', async () => {
+    await connectToMongoDB();
+    console.log(`\n=== Configuración del Servidor ===\nServidor corriendo en el puerto: ${p}\nEntorno: ${process.env.NODE_ENV || 'development'}\n- Local: http://localhost:${p}\n- Red local: http://${getLocalIp()}:${p}\n======================================\n`);
+  });
+  activeServer = server;
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE' && retries > 0) {
+      console.warn(`[PORT] ${p} en uso. Reintentando en ${p + 1}...`);
+      setTimeout(() => startServer(p + 1, retries - 1), 200);
+    } else {
+      console.error('[SERVER] Error al iniciar:', err);
+      process.exit(1);
+    }
+  });
+}
 
 // Función para obtener la IP local
 function getLocalIp() {
@@ -2718,13 +2720,12 @@ function getLocalIp() {
   return 'localhost';
 }
 
-// Manejo de cierre del servidor
+// Arrancar y manejo de cierre
+startServer(PORT);
 process.on('SIGINT', () => {
   console.log('\nApagando el servidor...');
-  server.close(() => {
-    console.log('Servidor apagado');
-    process.exit(0);
-  });
+  if (activeServer) activeServer.close(() => { console.log('Servidor apagado'); process.exit(0); });
+  else process.exit(0);
 });
 
 // Manejar rutas de la aplicación (SPA) - DEBE IR AL FINAL
@@ -2737,19 +2738,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(publicPath, 'lead.html'));
 });
 
-// Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`
-=== Configuración del Servidor ===
-Servidor corriendo en el puerto: ${PORT}
-Entorno: ${process.env.NODE_ENV || 'development'}
-
-=== URLs de Acceso ===
-- Local: http://localhost:${PORT}
-- Red local: http://192.168.56.1:${PORT}
-===============================
-  `);
-});
+// (el listener anterior fue consolidado con startServer)
 
 // Manejo de cierre graceful
 process.on('SIGINT', async () => {
