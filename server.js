@@ -3014,6 +3014,9 @@ app.get('*', (req, res) => {
 
 // (el listener anterior fue consolidado con startServer)
 
+// Arrancar servidor
+startServer(PORT);
+
 // Manejo de cierre graceful
 process.on('SIGINT', async () => {
   console.log('\n[SHUTDOWN] Cerrando servidor...');
