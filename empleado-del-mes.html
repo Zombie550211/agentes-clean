@@ -1015,11 +1015,11 @@
         console.log('🔑 Token encontrado en localStorage');
         return token;
       }
-      
+
       // Si no está en localStorage, buscar en cookies
       const cookies = document.cookie.split(';');
       console.log('🍪 Cookies disponibles:', document.cookie);
-      
+
       for (let cookie of cookies) {
         const [name, value] = cookie.trim().split('=');
         if (name === 'token' || name === 'authToken' || name === 'jwt') {
@@ -1027,7 +1027,7 @@
           return value;
         }
       }
-      
+
       // Intentar obtener token del sistema de autenticación actual
       // Buscar en el DOM si hay algún elemento que contenga el token
       const authElements = document.querySelectorAll('[data-token], [data-auth-token]');
@@ -1038,8 +1038,9 @@
           return token;
         }
       }
-      
-      console.warn('❌ No se encontró token en ningún lugar');
+
+      // No mostrar error si no hay token - es normal cuando no hay usuario logueado
+      console.log('📖 Sin token - modo solo lectura activado');
       return null;
     }
 
@@ -1048,12 +1049,17 @@
       const token = getToken();
       console.log('🔐 Token encontrado:', !!token);
       console.log('🍪 Cookies disponibles:', document.cookie);
-      
+
+      // Si no hay token, usar modo solo lectura (normal)
       if (!token) {
-        console.log('❌ No hay token de autenticación en localStorage ni cookies');
+        console.log('📖 Modo solo lectura - No hay token de autenticación (esto es normal)');
+        // Asegurar que se inicie en modo solo lectura
+        setTimeout(() => {
+          document.body.classList.add('view-only-mode');
+        }, 100);
         return;
       }
-      
+
       try {
         const response = await fetch('/api/auth/verify', {
           method: 'GET',
@@ -1062,23 +1068,23 @@
             'Content-Type': 'application/json'
           }
         });
-        
+
         console.log('🌐 Respuesta de autenticación:', response.status, response.statusText);
-        
+
         if (response.ok) {
           const contentType = response.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
             console.log('📋 Datos del usuario recibidos:', data);
-            
+
             const userRole = data.user.role;
             const userName = data.user.username;
-            
+
             console.log('👤 Usuario:', userName, 'Rol:', userRole);
-            
+
             // Actualizar información del usuario en el sidebar
             updateUserInfo(userName, userRole);
-            
+
             // Solo usuarios con permisos de edición pueden editar empleados del mes
             if (userRole !== 'Administrador' && userRole !== 'Supervisor Team Lineas') {
               console.log('🔒 Usuario sin permisos de edición:', userRole, userName);
@@ -1092,19 +1098,26 @@
           } else {
             const textResponse = await response.text();
             console.warn('⚠️ Respuesta no es JSON:', textResponse.substring(0, 100));
+            // Si no es JSON, asumir modo solo lectura
+            document.body.classList.add('view-only-mode');
           }
         } else {
           const textResponse = await response.text();
           console.warn('❌ Error de autenticación:', response.status, textResponse.substring(0, 100));
           if (response.status === 401) {
             console.warn('🔒 Token inválido o expirado');
-            // Redirigir al login si el token es inválido
-            // window.location.href = 'login.html';
+            // Token inválido, usar modo solo lectura
+            document.body.classList.add('view-only-mode');
+          } else {
+            // Otro error, usar modo solo lectura
+            document.body.classList.add('view-only-mode');
           }
         }
       } catch (error) {
         console.error('💥 Error en el proceso de autenticación:', error);
-        console.log('🔧 Continuando sin autenticación...');
+        console.log('🔧 Continuando en modo solo lectura...');
+        // Error de conexión, usar modo solo lectura
+        document.body.classList.add('view-only-mode');
       }
     }
 
@@ -2043,10 +2056,36 @@
         showSuccessNotification('Foto eliminada correctamente');
       }
     }
+
+    // Inicialización cuando el DOM está listo
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 Iniciando Empleado del Mes...');
+
+      // Verificar permisos del usuario
+      checkUserPermissions();
+
+      // Cargar empleados guardados
+      loadSavedEmployees();
+
+      console.log('✅ Inicialización completada');
+    });
+
+    // Función global para cambiar foto de empleado
+    window.changeEmployeePhoto = function(employee) {
+      if (document.body.classList.contains('view-only-mode')) {
+        showCustomConfirm({
+          type: 'warning',
+          title: 'Acceso Denegado',
+          message: 'No tienes permisos para cambiar fotos de empleados del mes. Solo usuarios Administrativos pueden realizar esta acción.',
+          confirmText: 'Entendido'
+        });
+        return;
+      }
+      openPhotoModal(employee);
+    };
+
+    // Función global para eliminar foto de empleado
+    window.deleteEmployeePhoto = deleteEmployeePhoto;
   </script>
-</body>
-</html>
-
-
 </body>
 </html>
