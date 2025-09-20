@@ -3114,4 +3114,5 @@ process.on('SIGINT', async () => {
     console.error('[SHUTDOWN] Error cerrando conexión:', error);
   }
   process.exit(0);
-});
+});m o d u l e . e x p o r t s   =   a p p ;  
+ 
