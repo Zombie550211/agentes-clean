@@ -61,9 +61,35 @@ const app = express();
 const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
 const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
 
- // Paths base para servir archivos estáticos y vistas
- const publicPath = path.join(__dirname);
- const staticPath = publicPath;
+// Paths base para servir archivos estáticos y vistas
+const publicPath = path.join(__dirname);
+const staticPath = publicPath;
+
+// Variable para almacenar la referencia del servidor activo
+let activeServer = null;
+
+// Función para iniciar el servidor
+function startServer(port) {
+  const server = app.listen(port, () => {
+    console.log(`[SERVER] Servidor iniciado en puerto ${port}`);
+    console.log(`[SERVER] Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[SERVER] URL: http://localhost:${port}`);
+  });
+
+  // Manejo de errores del servidor
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`[SERVER] Error: El puerto ${port} ya está en uso`);
+      console.error('[SERVER] Intenta detener otros procesos que usen este puerto');
+      process.exit(1);
+    } else {
+      console.error('[SERVER] Error del servidor:', error);
+    }
+  });
+
+  activeServer = server;
+  return server;
+}
 
 // Guard de acceso: multimedia.html solo para Administrador
 app.use('/multimedia.html', protect, (req, res, next) => {
@@ -3099,20 +3125,5 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Manejo de señales de interrupción (Ctrl+C)
-process.on('SIGINT', async () => {
-  console.log('\n[SHUTDOWN] Recibida señal SIGINT (Ctrl+C)...');
-  try {
-    if (activeServer) {
-      activeServer.close(() => {
-        console.log('[SHUTDOWN] Servidor cerrado');
-      });
-    }
-    await closeConnection();
-    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
-  } catch (error) {
-    console.error('[SHUTDOWN] Error cerrando conexión:', error);
-  }
-  process.exit(0);
-});});
+// Exportar la aplicación
 module.exports = app;
