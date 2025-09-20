@@ -39,6 +39,7 @@
   "homepage": "https://github.com/Zombie550211/crmagente#readme",
   "description": "",
   "devDependencies": {
-    "@types/node": "^24.0.13"
+    "@types/node": "^24.5.2",
+    "typescript": "^5.9.2"
   }
 }

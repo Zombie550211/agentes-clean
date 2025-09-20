@@ -1044,6 +1044,58 @@
       return null;
     }
 
+    // Nueva función para verificar permisos desde el servidor
+    async function checkUserPermissionsFromServer() {
+      try {
+        console.log('🌐 Verificando permisos desde servidor...');
+
+        const response = await fetch('/api/auth/verify-server', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('🌐 Respuesta de verificación del servidor:', response.status, response.statusText);
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📋 Datos de verificación del servidor:', data);
+
+          if (data.authenticated && data.user) {
+            const userRole = data.user.role;
+            const userName = data.user.username;
+
+            console.log('👤 Usuario verificado desde servidor:', userName, 'Rol:', userRole);
+
+            // Actualizar información del usuario en el sidebar
+            updateUserInfo(userName, userRole);
+
+            // Solo usuarios con permisos de edición pueden editar empleados del mes
+            if (userRole !== 'Administrador' && userRole !== 'Supervisor Team Lineas') {
+              console.log('🔒 Usuario sin permisos de edición:', userRole, userName);
+              disableEditingFeatures();
+            } else {
+              console.log('✅ Usuario con permisos de edición:', userRole, userName);
+              enableEditingFeatures();
+              // Recargar empleados con permisos de admin
+              setTimeout(() => loadSavedEmployees(), 500);
+            }
+            return;
+          }
+        }
+
+        // Si no hay autenticación, usar modo solo lectura
+        console.log('📖 No hay autenticación - modo solo lectura');
+        document.body.classList.add('view-only-mode');
+
+      } catch (error) {
+        console.error('💥 Error verificando permisos desde servidor:', error);
+        console.log('🔧 Usando modo solo lectura debido al error');
+        document.body.classList.add('view-only-mode');
+      }
+    }
+
     // Verificar permisos del usuario
     async function checkUserPermissions() {
       const token = getToken();
@@ -2061,8 +2113,8 @@
     document.addEventListener('DOMContentLoaded', function() {
       console.log('🚀 Iniciando Empleado del Mes...');
 
-      // Verificar permisos del usuario
-      checkUserPermissions();
+      // Verificar permisos del usuario desde el servidor
+      checkUserPermissionsFromServer();
 
       // Cargar empleados guardados
       loadSavedEmployees();

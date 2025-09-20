@@ -21,13 +21,19 @@
     "noFallthroughCasesInSwitch": false,
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
-    "module": "commonjs"
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./"
   },
   "include": [
-    "**/*.js"
+    "**/*.js",
+    "**/*.ts",
+    "server.js"
   ],
   "exclude": [
     "node_modules",
-    "**/node_modules/*"
+    "**/node_modules/*",
+    "**/*.d.ts",
+    "dist"
   ]
 }

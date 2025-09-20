@@ -472,12 +472,59 @@ app.get('/api/protected', protect, (req, res) => {
   res.json({ message: 'Ruta protegida', user: req.user });
 });
 
-// Endpoint para verificar autenticación (usado por el frontend)
-app.get('/api/auth/verify', protect, (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Token válido', 
-    user: req.user 
+// Endpoint para verificar autenticación desde el servidor (sin protección)
+app.get('/api/auth/verify-server', (req, res) => {
+  // Verificar si hay token en cookies
+  const token = req.cookies?.token;
+
+  if (!token) {
+    return res.json({
+      success: false,
+      message: 'No se encontró token',
+      authenticated: false,
+      role: null,
+      username: null
+    });
+  }
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    res.json({
+      success: true,
+      message: 'Token válido',
+      authenticated: true,
+      user: {
+        id: decoded.id,
+        username: decoded.username,
+        role: decoded.role,
+        permissions: decoded.permissions
+      }
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      message: 'Token inválido',
+      authenticated: false,
+      role: null,
+      username: null,
+      error: error.message
+    });
+  } // Fin del try/catch para /api/auth/verify-server
+app.get('/api/auth/debug-storage', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Este endpoint es solo para debugging',
+    note: 'Para verificar si hay token, usa /api/auth/verify-server',
+    instructions: 'Asegúrate de estar logueado correctamente en login.html',
+    troubleshooting: [
+      '1. Ve a login.html e inicia sesión con un usuario admin',
+      '2. El token se guardará automáticamente en cookies',
+      '3. Regresa a empleado-del-mes.html',
+      '4. Los permisos se verificarán automáticamente'
+    ]
   });
 });
 
@@ -2814,11 +2861,12 @@ app.post('/api/leads', protect, async (req, res) => {
   }
 });
 
-// Iniciar el servidor con fallback de puerto
 let activeServer = null;
 function startServer(port, retries = 10) {
   const p = Number(port) || 10000;
   const server = app.listen(p, '0.0.0.0', () => {
+    // Archivo server.js - Configuración del servidor Express
+    // Este archivo contiene todos los endpoints de la API del CRM
     console.log(`\n=== Configuración del Servidor ===\nServidor corriendo en el puerto: ${p}\nEntorno: ${process.env.NODE_ENV || 'development'}\n- Local: http://localhost:${p}\n- Red local: http://${getLocalIp()}:${p}\n======================================\n`);
   });
   activeServer = server;
@@ -3034,8 +3082,26 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
+// Manejo de señales de terminación
 process.on('SIGTERM', async () => {
   console.log('\n[SHUTDOWN] Recibida señal SIGTERM...');
+  try {
+    if (activeServer) {
+      activeServer.close(() => {
+        console.log('[SHUTDOWN] Servidor cerrado');
+      });
+    }
+    await closeConnection();
+    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
+  } catch (error) {
+    console.error('[SHUTDOWN] Error cerrando conexión:', error);
+  }
+  process.exit(0);
+});
+
+// Manejo de señales de interrupción (Ctrl+C)
+process.on('SIGINT', async () => {
+  console.log('\n[SHUTDOWN] Recibida señal SIGINT (Ctrl+C)...');
   try {
     if (activeServer) {
       activeServer.close(() => {
