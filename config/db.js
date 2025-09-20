@@ -2,7 +2,7 @@ const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config();
 
 // Configuración de conexión
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/crmagente';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Zombie550211:fDJneHzSCsiU5mdy@cluster0.ywxaotz.mongodb.net/crmagente?retryWrites=true&w=majority&appName=Cluster0';
 const MONGODB_DB = process.env.MONGODB_DB; // Opcional; si no se define, usa el de la URI
 
 // Opciones de conexión mejoradas
@@ -54,7 +54,7 @@ async function connectToMongoDB() {
       // Verificar la conexión
       await db.command({ ping: 1 });
       
-      console.log(`[MongoDB] Conectado exitosamente a: ${db.databaseName}`);
+      console.log(`[MongoDB] Conectado exitosamente a: ${db.databaseName} (MongoDB Atlas)`);
       
       // Configurar manejadores de eventos
       client.on('serverClosed', () => {

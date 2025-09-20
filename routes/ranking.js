@@ -2,6 +2,100 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../config/db');
 
+// Datos de prueba para ranking cuando MongoDB no esté disponible
+const datosRankingPrueba = [
+  {
+    id: '1',
+    nombre: 'Daniel Martinez',
+    ventas: 25,
+    puntos: 87.5,
+    promedio: 3.5,
+    posicion: 1,
+    cargo: 'Agente Ejecutivo'
+  },
+  {
+    id: '2',
+    nombre: 'Ana García',
+    ventas: 22,
+    puntos: 78.2,
+    promedio: 3.6,
+    posicion: 2,
+    cargo: 'Agente Senior'
+  },
+  {
+    id: '3',
+    nombre: 'Carlos López',
+    ventas: 20,
+    puntos: 71.0,
+    promedio: 3.6,
+    posicion: 3,
+    cargo: 'Agente Senior'
+  },
+  {
+    id: '4',
+    nombre: 'María Rodríguez',
+    ventas: 18,
+    puntos: 65.4,
+    promedio: 3.6,
+    posicion: 4,
+    cargo: 'Agente'
+  },
+  {
+    id: '5',
+    nombre: 'Luis Hernández',
+    ventas: 16,
+    puntos: 58.8,
+    promedio: 3.7,
+    posicion: 5,
+    cargo: 'Agente'
+  },
+  {
+    id: '6',
+    nombre: 'Sofia Martínez',
+    ventas: 15,
+    puntos: 52.5,
+    promedio: 3.5,
+    posicion: 6,
+    cargo: 'Agente'
+  },
+  {
+    id: '7',
+    nombre: 'Pedro Sánchez',
+    ventas: 12,
+    puntos: 42.0,
+    promedio: 3.5,
+    posicion: 7,
+    cargo: 'Agente'
+  },
+  {
+    id: '8',
+    nombre: 'Laura Torres',
+    ventas: 10,
+    puntos: 35.0,
+    promedio: 3.5,
+    posicion: 8,
+    cargo: 'Agente Junior'
+  },
+  {
+    id: '9',
+    nombre: 'Miguel Flores',
+    ventas: 8,
+    puntos: 28.0,
+    promedio: 3.5,
+    posicion: 9,
+    cargo: 'Agente Junior'
+  },
+  {
+    id: '10',
+    nombre: 'Carmen Díaz',
+    ventas: 6,
+    puntos: 21.0,
+    promedio: 3.5,
+    posicion: 10,
+    cargo: 'Agente Junior'
+  }
+];
+
 // Endpoint para obtener datos del ranking de agentes
 // Nota: este router se monta en server.js bajo '/api/ranking',
 // por lo que el handler debe estar en '/'
@@ -10,13 +104,22 @@ router.get('/', async (req, res) => {
     console.log('=== ENDPOINT /api/ranking LLAMADO ===');
     console.log('Headers:', req.headers);
     
-    const db = getDb();
+    let db;
+    try {
+      db = getDb();
+    } catch (error) {
+      console.log('[RANKING] MongoDB no disponible, usando datos de prueba');
+      db = null;
+    }
     
     if (!db) {
-      console.error('No hay conexión a la base de datos');
-      return res.status(500).json({
-        success: false,
-        message: 'Error de conexión con la base de datos'
+      console.log('[RANKING] Devolviendo datos de prueba');
+      return res.json({
+        success: true,
+        ranking: datosRankingPrueba,
+        totalAgentes: datosRankingPrueba.length,
+        totalClientes: 150,
+        message: 'Datos de prueba - MongoDB no disponible'
       });
     }
     

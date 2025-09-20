@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User');
+// Usar MongoDB en lugar de UserMemory
+const { connectToMongoDB, getDb } = require('../config/db');
 require('dotenv').config();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
@@ -188,13 +189,30 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres' });
     }
 
-    const result = await User.updatePasswordByUsername(username, newPassword);
-    if (!result.updated) {
-      if (result.reason === 'not_found') {
-        return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
-      }
-      return res.status(500).json({ success: false, message: 'No se pudo actualizar la contraseña' });
+    // Conectar a MongoDB
+    let db;
+    try {
+      db = await connectToMongoDB();
+    } catch (dbError) {
+      console.error('[AUTH] Error conectando a MongoDB en resetPassword:', dbError);
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
     }
+
+    // Buscar el usuario en MongoDB
+    const user = await db.collection('users').findOne({ username });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
+    // Hashear la nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Actualizar la contraseña
+    await db.collection('users').updateOne(
+      { _id: user._id },
+      { $set: { password: hashedPassword, updatedAt: new Date() } }
+    );
 
     return res.json({ success: true, message: 'Contraseña restablecida correctamente' });
   } catch (error) {
@@ -219,8 +237,19 @@ exports.login = async (req, res) => {
     }
 
     console.log(`[AUTH] Buscando usuario: ${username}`);
-    // Buscar usuario por nombre de usuario
-    const user = await User.findByUsername(username);
+    // Buscar usuario en MongoDB
+    let db;
+    try {
+      db = await connectToMongoDB();
+    } catch (dbError) {
+      console.error('[AUTH] Error conectando a MongoDB:', dbError);
+      return res.status(500).json({
+        success: false,
+        message: 'Error de conexión a la base de datos'
+      });
+    }
+
+    const user = await db.collection('users').findOne({ username });
     if (!user) {
       console.warn('[AUTH] Usuario no encontrado', { username });
       // Usar un mensaje genérico por seguridad
@@ -259,8 +288,8 @@ exports.login = async (req, res) => {
     console.log(`[AUTH] Generando token JWT para: ${username}`);
     // Generate JWT token with extended information
     const token = jwt.sign(
-      { 
-        id: user._id, 
+      {
+        id: user._id,
         userId: user._id, // For backward compatibility
         username: user.username,
         email: user.email,
@@ -269,7 +298,7 @@ exports.login = async (req, res) => {
         permissions: getRolePermissions(user.role)
       },
       JWT_SECRET,
-      { 
+      {
         expiresIn: '24h',
         issuer: 'dashboard-api',
         audience: 'dashboard-client'
@@ -280,7 +309,7 @@ exports.login = async (req, res) => {
     // Configurar cookie
     const cookieOptions = cookieOptionsForReq(req);
     console.log('[AUTH] Configuración de cookies:', cookieOptions);
-    
+
     try {
       res.cookie('token', token, cookieOptions);
       console.log('[AUTH] Cookie configurada exitosamente');
@@ -302,7 +331,7 @@ exports.login = async (req, res) => {
         permissions: getRolePermissions(user.role)
       }
     });
-    
+
   } catch (error) {
     console.error('[AUTH] Error en el inicio de sesión:', error);
     return res.status(500).json({

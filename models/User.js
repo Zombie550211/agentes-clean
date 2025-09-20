@@ -5,11 +5,8 @@ const { connectToMongoDB, getDb } = require('../config/db');
 // Función auxiliar para obtener la instancia de la base de datos
 async function getDatabase() {
   try {
-    const db = getDb();
-    if (!db) {
-      return await connectToMongoDB();
-    }
-    return db;
+    // Siempre intentar conectar primero
+    return await connectToMongoDB();
   } catch (error) {
     console.error('Error al obtener la instancia de la base de datos:', error);
     throw error;

@@ -6,6 +6,7 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const { ObjectId } = require('mongodb');
 require('dotenv').config();
 
 // Carga condicional de Helmet y Rate Limit (si están instalados)
@@ -79,16 +80,16 @@ app.use(express.static(path.join(__dirname)));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'agentes')));
 
-// Iniciar conexión Mongoose (para modelos basados en Mongoose como MediaFile)
+// Iniciar conexión Mongoose
 try {
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/crmagente';
+  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Zombie550211:fDJneHzSCsiU5mdy@cluster0.ywxaotz.mongodb.net/crmagente?retryWrites=true&w=majority&appName=Cluster0';
   mongoose.set('strictQuery', false);
   mongoose.connect(MONGODB_URI, {
     serverSelectionTimeoutMS: 10000,
     socketTimeoutMS: 45000,
     maxPoolSize: 5
   })
-  .then(() => console.log('[Mongoose] Conectado a MongoDB'))
+  .then(() => console.log('[Mongoose] Conectado a MongoDB Atlas'))
   .catch(err => console.error('[Mongoose] Error de conexión:', err?.message));
 } catch (e) {
   console.error('[Mongoose] Excepción iniciando conexión:', e?.message);
@@ -222,9 +223,9 @@ let db;
 (async () => {
   try {
     db = await connectToMongoDB();
-    console.log('Conexión a la base de datos establecida correctamente');
+    console.log('Conexión a MongoDB Atlas establecida correctamente');
   } catch (error) {
-    console.error('Error al conectar a la base de datos en el arranque:', error?.message);
+    console.error('Error al conectar a MongoDB Atlas en el arranque:', error?.message);
     console.warn('Continuando sin conexión inicial. Los endpoints intentarán reconectar bajo demanda...');
   }
 })();
@@ -595,24 +596,25 @@ app.post('/api/auth/register', protect, authorize('Administrador', 'admin', 'adm
       });
     }
     
-    const User = require('./models/User');
-    
+    // Crear el nuevo usuario
+    if (!db) db = await connectToMongoDB();
+
     // Verificar si el usuario ya existe
-    const existingUser = await User.findOne({ username: username });
+    const existingUser = await db.collection('users').findOne({ username: username });
     if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'El usuario ya existe' 
+      return res.status(400).json({
+        success: false,
+        message: 'El usuario ya existe'
       });
     }
-    
+
     // Hashear la contraseña
     const bcrypt = require('bcryptjs');
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
-    
+
     // Crear el nuevo usuario
-    const newUser = new User({
+    const newUser = {
       username: username,
       password: hashedPassword,
       role: role,
@@ -620,10 +622,13 @@ app.post('/api/auth/register', protect, authorize('Administrador', 'admin', 'adm
       supervisor: supervisor || null,
       name: username, // Por defecto usar username como name
       createdBy: req.user.username,
-      createdAt: new Date()
-    });
-    
-    await newUser.save();
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await db.collection('users').insertOne(newUser);
+    // No devolver la contraseña
+    delete newUser.password;
     
     console.log(`[REGISTER] Nuevo usuario creado: ${username} (${role}) en team: ${team} con supervisor: ${supervisor} por: ${req.user.username}`);
     
@@ -666,24 +671,31 @@ app.post('/api/auth/reset-password', protect, authorize('Administrador', 'admin'
       });
     }
     
-    const User = require('./models/User');
-    
-    // Buscar el usuario
-    const user = await User.findOne({ username: username });
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Usuario no encontrado' 
-      });
+    // Conectar a MongoDB
+    let db;
+    try {
+      db = await connectToMongoDB();
+    } catch (dbError) {
+      console.error('[AUTH] Error conectando a MongoDB en resetPassword:', dbError);
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
     }
-    
+
+    // Buscar el usuario en MongoDB
+    const user = await db.collection('users').findOne({ username });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+
     // Hashear la nueva contraseña
     const bcrypt = require('bcryptjs');
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-    
+
     // Actualizar la contraseña
-    await User.findByIdAndUpdate(user._id, { password: hashedPassword });
+    await db.collection('users').updateOne(
+      { _id: user._id },
+      { $set: { password: hashedPassword, updatedAt: new Date() } }
+    );
     
     console.log(`[RESET] Contraseña restablecida para usuario: ${username} por: ${req.user.username}`);
     
@@ -771,26 +783,58 @@ app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
   }
 });
 
-// Endpoint para obtener lista de archivos multimedia
+// Endpoint para obtener lista de archivos multimedia (con verificación de existencia)
 app.get('/api/media', protect, async (req, res) => {
   try {
-    const MediaFile = require('./models/MediaFile');
-    
+    console.log('[MEDIA] Solicitud a /api/media recibida');
+
+    // Usar MongoDB nativo en lugar de Mongoose
+    if (!db) await connectToMongoDB();
+    const collection = db.collection('mediafiles');
+
     // Filtros opcionales
     const { category, limit = 50, offset = 0 } = req.query;
-    
+
     let query = {};
     if (category && category !== 'all') {
       query.category = category;
     }
 
-    const files = await MediaFile.find(query)
+    console.log('[MEDIA] Ejecutando consulta a mediafiles...');
+    const files = await collection
+      .find(query)
       .sort({ uploadDate: -1 })
       .limit(parseInt(limit))
       .skip(parseInt(offset))
-      .lean();
+      .toArray();
 
-    const formattedFiles = files.map(file => ({
+    console.log(`[MEDIA] Encontrados ${files.length} archivos en BD`);
+
+    // Verificar existencia de archivos y filtrar los que no existen
+    const uploadsDir = path.join(__dirname, 'uploads');
+    const validFiles = [];
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(uploadsDir, path.basename(file.url));
+
+        // Si el archivo existe físicamente, incluirlo
+        if (fs.existsSync(filePath)) {
+          validFiles.push(file);
+          console.log(`[MEDIA] ✓ Archivo válido: ${file.originalName}`);
+        } else {
+          // Si no existe, eliminar la referencia de la base de datos
+          console.log(`[MEDIA] 🗑️ Eliminando referencia a archivo inexistente: ${file.url}`);
+          await collection.deleteOne({ _id: file._id });
+        }
+      } catch (error) {
+        console.error(`[MEDIA] Error verificando archivo ${file.url}:`, error);
+      }
+    }
+
+    console.log(`[MEDIA] Devolviendo ${validFiles.length} archivos válidos`);
+
+    const formattedFiles = validFiles.map(file => ({
       id: file._id,
       name: file.originalName,
       url: file.url,
@@ -815,10 +859,11 @@ app.get('/api/media', protect, async (req, res) => {
 // Endpoint para eliminar archivo multimedia
 app.delete('/api/media/:id', protect, async (req, res) => {
   try {
-    const MediaFile = require('./models/MediaFile');
+    if (!db) await connectToMongoDB();
+    const collection = db.collection('mediafiles');
     const { id } = req.params;
 
-    const file = await MediaFile.findById(id);
+    const file = await collection.findOne({ _id: new ObjectId(id) });
     if (!file) {
       return res.status(404).json({
         success: false,
@@ -841,7 +886,7 @@ app.delete('/api/media/:id', protect, async (req, res) => {
     }
 
     // Eliminar registro de la base de datos
-    await MediaFile.findByIdAndDelete(id);
+    await collection.deleteOne({ _id: new ObjectId(id) });
 
     console.log(`[DELETE] Archivo eliminado: ${file.originalName} por ${req.user.username}`);
 
@@ -862,9 +907,11 @@ app.delete('/api/media/:id', protect, async (req, res) => {
 // Endpoint para obtener estadísticas de multimedia
 app.get('/api/media/stats', protect, async (req, res) => {
   try {
-    const MediaFile = require('./models/MediaFile');
+    if (!db) await connectToMongoDB();
+    const collection = db.collection('mediafiles');
 
-    const stats = await MediaFile.aggregate([
+    // Usar aggregate con MongoDB nativo
+    const stats = await collection.aggregate([
       {
         $group: {
           _id: '$category',
@@ -872,18 +919,18 @@ app.get('/api/media/stats', protect, async (req, res) => {
           totalSize: { $sum: '$size' }
         }
       }
-    ]);
+    ]).toArray();
 
-    const totalFiles = await MediaFile.countDocuments();
-    const totalSize = await MediaFile.aggregate([
+    const totalFiles = await collection.countDocuments();
+    const totalSizeResult = await collection.aggregate([
       { $group: { _id: null, total: { $sum: '$size' } } }
-    ]);
+    ]).toArray();
 
     res.json({
       success: true,
       stats: {
         total: totalFiles,
-        totalSize: totalSize[0]?.total || 0,
+        totalSize: totalSizeResult[0]?.total || 0,
         byCategory: stats
       }
     });
@@ -905,8 +952,13 @@ app.get('/api/debug/user', protect, async (req, res) => {
     // También buscar en la base de datos
     let dbUser = null;
     if (req.user && req.user._id) {
-      const User = require('./models/User');
-      dbUser = await User.findById(req.user._id);
+      // Usar MongoDB en lugar de UserMemory
+      try {
+        if (!db) db = await connectToMongoDB();
+        dbUser = await db.collection('users').findOne({ _id: new ObjectId(req.user._id) });
+      } catch (error) {
+        console.error('[DEBUG] Error buscando usuario en MongoDB:', error);
+      }
     }
     
     res.json({
@@ -921,9 +973,75 @@ app.get('/api/debug/user', protect, async (req, res) => {
   }
 });
 
-// Endpoint para verificar que el servidor está funcionando
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', message: 'Servidor funcionando correctamente' });
+// Endpoint para ver usuarios disponibles (solo desarrollo)
+app.get('/api/debug/users', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    // Usar MongoDB en lugar de UserMemory
+    if (!db) db = await connectToMongoDB();
+    const users = await db.collection('users')
+      .find({}, { username: 1, role: 1, _id: 1 })
+      .toArray();
+
+    const sanitizedUsers = users.map(u => ({
+      _id: u._id,
+      username: u.username,
+      role: u.role,
+      team: u.team,
+      createdAt: u.createdAt
+    }));
+
+    res.json({
+      success: true,
+      message: 'Usuarios disponibles en MongoDB',
+      users: sanitizedUsers,
+      note: 'Credenciales de prueba: usuario="Kelvin Rodriguez" contraseña="Kelvin2025" o "Daniel Martinez" contraseña="password"'
+    });
+  } catch (error) {
+    try {
+      if (!db) await connectToMongoDB();
+      const collection = db.collection('mediafiles');
+
+      // Obtener todos los archivos multimedia de la BD
+      const mediaFiles = await collection.find({}).toArray();
+      const uploadsDir = path.join(__dirname, 'uploads');
+
+      let cleaned = 0;
+      let errors = 0;
+
+      console.log(`[CLEAN-MEDIA] Revisando ${mediaFiles.length} archivos multimedia...`);
+
+      for (const file of mediaFiles) {
+        try {
+          const filePath = path.join(uploadsDir, path.basename(file.url));
+
+          // Verificar si el archivo existe físicamente
+          if (!fs.existsSync(filePath)) {
+            console.log(`[CLEAN-MEDIA] Eliminando referencia a archivo inexistente: ${file.url}`);
+            await collection.deleteOne({ _id: file._id });
+            cleaned++;
+          }
+        } catch (error) {
+          console.error(`[CLEAN-MEDIA] Error procesando archivo ${file.url}:`, error);
+          errors++;
+        }
+      }
+
+      res.json({
+        success: true,
+        message: 'Limpieza de archivos multimedia completada',
+        cleaned,
+        errors,
+        total: mediaFiles.length
+      });
+    } catch (error) {
+      console.error('[CLEAN-MEDIA] Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 });
 
 // Endpoint para crear un usuario administrador inicial (solo desarrollo + secreto por .env)
@@ -2700,8 +2818,7 @@ app.post('/api/leads', protect, async (req, res) => {
 let activeServer = null;
 function startServer(port, retries = 10) {
   const p = Number(port) || 10000;
-  const server = app.listen(p, '0.0.0.0', async () => {
-    await connectToMongoDB();
+  const server = app.listen(p, '0.0.0.0', () => {
     console.log(`\n=== Configuración del Servidor ===\nServidor corriendo en el puerto: ${p}\nEntorno: ${process.env.NODE_ENV || 'development'}\n- Local: http://localhost:${p}\n- Red local: http://${getLocalIp()}:${p}\n======================================\n`);
   });
   activeServer = server;
@@ -2732,13 +2849,8 @@ function getLocalIp() {
   return 'localhost';
 }
 
-// Arrancar y manejo de cierre
+// Arrancar servidor
 startServer(PORT);
-process.on('SIGINT', () => {
-  console.log('\nApagando el servidor...');
-  if (activeServer) activeServer.close(() => { console.log('Servidor apagado'); process.exit(0); });
-  else process.exit(0);
-});
 
 // Manejar rutas de la aplicación (SPA) - DEBE IR AL FINAL
 app.get('*', (req, res) => {
@@ -2756,6 +2868,11 @@ app.get('*', (req, res) => {
 process.on('SIGINT', async () => {
   console.log('\n[SHUTDOWN] Cerrando servidor...');
   try {
+    if (activeServer) {
+      activeServer.close(() => {
+        console.log('[SHUTDOWN] Servidor cerrado');
+      });
+    }
     await closeConnection();
     console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
   } catch (error) {
@@ -2767,6 +2884,11 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
   console.log('\n[SHUTDOWN] Recibida señal SIGTERM...');
   try {
+    if (activeServer) {
+      activeServer.close(() => {
+        console.log('[SHUTDOWN] Servidor cerrado');
+      });
+    }
     await closeConnection();
     console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
   } catch (error) {

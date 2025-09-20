@@ -1643,34 +1643,41 @@
     async function updateUserStats(leads, user) {
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
-      
+
       // Filtrar leads del usuario
-      const userLeads = leads.filter(lead => 
-        lead.agenteNombre === user.username || 
+      const userLeads = leads.filter(lead =>
+        lead.agenteNombre === user.username ||
         lead.agente === user.username ||
         lead.createdBy === user.username ||
         lead.ownerId === user.username
       );
-      
+
       // Calcular estadísticas del usuario
       const userMonthlySales = userLeads.filter(lead => {
         const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
         return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
       }).length;
-      
+
       const userTotalPoints = userLeads.reduce((sum, lead) => {
         return sum + parseFloat(lead.puntaje || lead.points || 0);
       }, 0);
-      
-      // Actualizar elementos del DOM
-      document.getElementById('user-sales-count').textContent = userMonthlySales;
-      document.getElementById('user-points-total').textContent = userTotalPoints.toFixed(1);
-      document.getElementById('user-team-name').textContent = user.team || 'Sin equipo';
-      
+
+      // Usar la función segura para actualizar elementos del DOM
+      setText('user-sales-count', userMonthlySales);
+      setText('user-points-total', userTotalPoints.toFixed(1));
+      setText('user-team-name', user.team || 'Sin equipo');
+
       // Calcular ranking (simulado)
       const allAgents = [...new Set(leads.map(lead => lead.agenteNombre || lead.agente).filter(Boolean))];
       const userRanking = Math.floor(Math.random() * allAgents.length) + 1;
-      document.getElementById('user-ranking').textContent = `#${userRanking}`;
+      setText('user-ranking', `#${userRanking}`);
+
+      console.log('[USER-STATS] Actualizadas estadísticas:', {
+        sales: userMonthlySales,
+        points: userTotalPoints,
+        team: user.team,
+        ranking: userRanking
+      });
     }
 
     // Función para crear gráficos
@@ -1796,12 +1803,12 @@
   <script src="js/ranking.js"></script>
   <style>
     /* Espaciado entre hero y ranking */
-    .promo-hero{width:100%;max-width:1100px;margin:24px auto 20px auto;display:flex;flex-direction:column;align-items:center;gap:10px}
+    .promo-hero{width:100%;max-width:1100px;margin:24px auto 20px auto;display:flex;flex-direction:column;align-items:center;gap:10px;visibility:visible;opacity:1}
     .ranking-panel { margin-top: 16px !important; }
     /* Promo hero */
     /* (override actualizado más arriba) */
     .promo-media{width:100%;border-radius:20px;overflow:hidden;background:#0f172a0d;box-shadow:0 10px 30px rgba(2,132,199,.12);border:1px solid rgba(15,23,42,.08);position:relative;min-height:180px;max-height:420px;transition:height .2s ease}
-    .promo-media .promo-placeholder{min-height:200px;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:500}
+    .promo-media .promo-placeholder{min-height:200px;display:flex;align-items:center;justify-content:center;color:#64748b;font-weight:500;font-size:1.2rem;padding:20px;text-align:center;background:linear-gradient(135deg,#f8fafc,#e2e8f0);border:2px dashed #cbd5e1;border-radius:20px}
     .promo-media img,.promo-media video{width:100%;height:100%;display:block;object-fit:cover}
     .promo-media.contain img,.promo-media.contain video{object-fit:contain;background:#0f172a0d}
     .promo-actions{display:flex;gap:12px;align-items:center;justify-content:flex-end;width:100%;max-width:1100px}
@@ -1819,8 +1826,7 @@
           <!-- Hero Promocional (imagen / video / gif) -->
           <section class="promo-hero">
             <div class="promo-media" id="promo-media">
-              <!-- Se cargará automáticamente el último archivo subido -->
-              <div class="promo-placeholder">Cargando promoción...</div>
+              <div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>
             </div>
             <div class="promo-actions" id="promo-actions" style="display:none;">
               <form id="promo-upload-form">
@@ -1938,112 +1944,328 @@
           </div>
     </main>
     <script>
-      (function(){
-        async function getUser(){
-          try {
-            const res = await fetch('/api/auth/verify', { credentials: 'include' });
-            if (!res.ok) return null;
-            const data = await res.json();
-            return data?.user || null;
-          } catch { return null; }
+    // Verificar que el script se esté ejecutando
+    console.log('🎯 Ranking y Promociones - Script cargado correctamente');
+
+    (function(){
+      console.log('🚀 Inicializando funciones de multimedia...');
+
+      async function getUser(){
+        try {
+          const res = await fetch('/api/auth/verify', { credentials: 'include' });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return data?.user || null;
+        } catch (error) {
+          console.error('Error obteniendo usuario:', error);
+          return null;
+        }
+      }
+
+      function canUpload(role){
+        const r = (role||'').toString().toLowerCase();
+        return ['admin','administrador','administrativo','supervisor','backoffice','supervisor team lineas'].includes(r);
+      }
+
+      function renderPromo(container, file){
+        container.innerHTML = '';
+        if (!file || !file.url){
+          container.innerHTML = '<div class="promo-placeholder">Sin promoción. Sube una imagen o video.</div>';
+          return;
+        }
+        const isVideo = (file.type||'').startsWith('video/');
+        const applyFit = (mediaEl, naturalW, naturalH) => {
+          const box = container;
+          const boxW = box.clientWidth || 1100;
+          const ratio = naturalW && naturalH ? (naturalW / naturalH) : (16/9);
+          let targetH = Math.min(420, Math.max(200, Math.round(boxW / ratio)));
+          box.style.height = targetH + 'px';
+          const shouldContain = ratio < 1.6;
+          box.classList.toggle('contain', shouldContain);
+        };
+
+        if (isVideo){
+          const v = document.createElement('video');
+          v.src = file.url; v.autoplay = true; v.muted = true; v.loop = true; v.playsInline = true; v.controls = true;
+          v.addEventListener('loadedmetadata', () => applyFit(v, v.videoWidth, v.videoHeight));
+          v.addEventListener('error', (e) => {
+            console.error('[PROMO] Error cargando video:', file.url, e);
+            container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>';
+          });
+          container.appendChild(v);
+        } else {
+          const img = document.createElement('img');
+          img.src = file.url; img.alt = file.name || 'Promoción';
+          img.addEventListener('load', () => applyFit(img, img.naturalWidth, img.naturalHeight));
+          img.addEventListener('error', (e) => {
+            console.error('[PROMO] Error cargando imagen:', file.url, e);
+            container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>';
+          });
+          container.appendChild(img);
+        }
+      }
+
+      async function loadLatestMedia(){
+        const mediaBox = document.getElementById('promo-media');
+        console.log('[PROMO] Iniciando carga de multimedia...');
+        console.log('[PROMO] Elemento promo-media encontrado:', !!mediaBox);
+
+        if (!mediaBox) {
+          console.error('[PROMO] No se encontró el elemento promo-media');
+          return;
         }
 
-        function canUpload(role){
-          const r = (role||'').toString().toLowerCase();
-          return ['admin','administrador','administrativo','supervisor','backoffice','supervisor team lineas'].includes(r);
-        }
+        try {
+          console.log('[PROMO] Solicitando archivos multimedia...');
+          const res = await fetch('/api/media?limit=1', { credentials: 'include' });
 
-        function renderPromo(container, file){
-          container.innerHTML = '';
-          if (!file || !file.url){
-            container.innerHTML = '<div class="promo-placeholder">Sin promoción. Sube una imagen o video.</div>';
+          console.log('[PROMO] Respuesta del servidor:', res.status, res.statusText);
+
+          if (!res.ok) {
+            console.log('[PROMO] No se pudo cargar archivos multimedia, mostrando placeholder');
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
             return;
           }
-          const isVideo = (file.type||'').startsWith('video/');
-          const applyFit = (mediaEl, naturalW, naturalH) => {
-            const box = container;
-            const boxW = box.clientWidth || 1100;
-            const ratio = naturalW && naturalH ? (naturalW / naturalH) : (16/9);
-            // Altura objetivo entre 200 y 420 según ancho y ratio
-            let targetH = Math.min(420, Math.max(200, Math.round(boxW / ratio)));
-            box.style.height = targetH + 'px';
-            const shouldContain = ratio < 1.6; // medios muy altos o cuadrados
-            box.classList.toggle('contain', shouldContain);
-          };
 
-          if (isVideo){
-            const v = document.createElement('video');
-            v.src = file.url; v.autoplay = true; v.muted = true; v.loop = true; v.playsInline = true; v.controls = true;
-            v.addEventListener('loadedmetadata', () => applyFit(v, v.videoWidth, v.videoHeight));
-            container.appendChild(v);
-          } else {
-            const img = document.createElement('img');
-            img.src = file.url; img.alt = file.name || 'Promoción';
-            img.addEventListener('load', () => applyFit(img, img.naturalWidth, img.naturalHeight));
-            container.appendChild(img);
+          const list = await res.json();
+          console.log('[PROMO] Archivos recibidos:', list);
+
+          const last = Array.isArray(list) && list.length ? list[0] : null;
+          console.log('[PROMO] Último archivo:', last);
+
+          if (!last || !last.url) {
+            console.log('[PROMO] No hay archivos multimedia disponibles');
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
+            return;
           }
-        }
 
-        async function loadLatestMedia(){
-          const mediaBox = document.getElementById('promo-media');
-          if (!mediaBox) return;
+          // Verificar si el archivo existe antes de intentar cargarlo
           try {
-            const res = await fetch('/api/media?limit=1', { credentials: 'include' });
-            if (!res.ok) throw new Error('media list failed');
-            const list = await res.json();
-            const last = Array.isArray(list) && list.length ? list[0] : null;
-            renderPromo(mediaBox, last);
+            console.log('[PROMO] Verificando existencia del archivo:', last.url);
+            const fileResponse = await fetch(last.url, { method: 'HEAD' });
+            console.log('[PROMO] Respuesta HEAD:', fileResponse.status, fileResponse.statusText);
+
+            if (!fileResponse.ok) {
+              console.log('[PROMO] Archivo multimedia no existe físicamente:', last.url);
+              mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
+              return;
+            }
+          } catch (e) {
+            console.log('[PROMO] No se pudo verificar el archivo:', last.url, e);
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
+            return;
+          }
+
+          console.log('[PROMO] Renderizando archivo multimedia:', last);
+          renderPromo(mediaBox, last);
+        } catch(e){
+          console.error('[PROMO] Error cargando multimedia:', e);
+          mediaBox.innerHTML = '<div class="promo-placeholder">❌ Error al cargar promoción<br><small>No fue posible cargar la promoción</small></div>';
+        }
+      }
+
+      function wireUpload(){
+        const input = document.getElementById('promo-file');
+        if (!input) return;
+        input.addEventListener('change', async function(){
+          if (!input.files || !input.files[0]) return;
+          const fd = new FormData(); fd.append('file', input.files[0]);
+          try {
+            const res = await fetch('/api/upload', { method: 'POST', body: fd, credentials: 'include' });
+            if (!res.ok) throw new Error('upload failed');
+            await loadLatestMedia();
           } catch(e){
-            mediaBox.innerHTML = '<div class="promo-placeholder">No fue posible cargar la promoción.</div>';
-          }
-        }
+            alert('No se pudo subir el archivo.');
+          } finally { input.value = ''; }
+        });
+      }
 
-        function wireUpload(){
-          const input = document.getElementById('promo-file');
-          if (!input) return;
-          input.addEventListener('change', async function(){
-            if (!input.files || !input.files[0]) return;
-            const fd = new FormData(); fd.append('file', input.files[0]);
-            try {
-              const res = await fetch('/api/upload', { method: 'POST', body: fd, credentials: 'include' });
-              if (!res.ok) throw new Error('upload failed');
-              await loadLatestMedia();
-            } catch(e){
-              alert('No se pudo subir el archivo.');
-            } finally { input.value = ''; }
-          });
+      (async function init(){
+        console.log('[PROMO] 🚀 Iniciando carga de página...');
+        const user = await getUser();
+        console.log('[PROMO] Usuario detectado:', user?.username, 'rol:', user?.role);
+        const actions = document.getElementById('promo-actions');
+        if (user && canUpload(user.role)){
+          if (actions) { actions.style.display = 'flex'; console.log('[PROMO] Acciones visibles para rol autorizado'); }
+          wireUpload();
+        } else {
+          if (actions) { actions.style.display = 'none'; console.log('[PROMO] Acciones ocultas por rol no autorizado'); }
         }
-
-        (async function init(){
-          const user = await getUser();
-          const actions = document.getElementById('promo-actions');
-          console.log('[PROMO] Usuario detectado:', user?.username, 'rol:', user?.role);
-          if (user && canUpload(user.role)){
-            if (actions) { actions.style.display = 'flex'; console.log('[PROMO] Acciones visibles para rol autorizado'); }
-            wireUpload();
-          } else {
-            if (actions) { actions.style.display = 'none'; console.log('[PROMO] Acciones ocultas por rol no autorizado'); }
-          }
-          await loadLatestMedia();
-          // Recalcular en resize para mantener proporciones
-          let _resizeT;
-          window.addEventListener('resize', () => {
-            clearTimeout(_resizeT);
-            _resizeT = setTimeout(() => {
-              const media = document.querySelector('#promo-media img, #promo-media video');
-              const box = document.getElementById('promo-media');
-              if (media && box) {
-                const naturalW = media.videoWidth || media.naturalWidth || box.clientWidth;
-                const naturalH = media.videoHeight || media.naturalHeight || 300;
-                const ratio = naturalW / Math.max(1, naturalH);
-                let targetH = Math.min(420, Math.max(200, Math.round(box.clientWidth / ratio)));
-                box.style.height = targetH + 'px';
-                box.classList.toggle('contain', ratio < 1.6);
-              }
-            }, 120);
-          });
-        })();
+        console.log('[PROMO] Llamando a loadLatestMedia...');
+        await loadLatestMedia();
+        console.log('[PROMO] ✅ Carga inicial completada');
+        // Recalcular en resize para mantener proporciones
+        let _resizeT;
+        window.addEventListener('resize', () => {
+          clearTimeout(_resizeT);
+          _resizeT = setTimeout(() => {
+            const media = document.querySelector('#promo-media img, #promo-media video');
+            const box = document.getElementById('promo-media');
+            if (media && box) {
+              const naturalW = media.videoWidth || media.naturalWidth || box.clientWidth;
+              const naturalH = media.videoHeight || media.naturalHeight || 300;
+              const ratio = naturalW / Math.max(1, naturalH);
+              let targetH = Math.min(420, Math.max(200, Math.round(box.clientWidth / ratio)));
+              box.style.height = targetH + 'px';
+              box.classList.toggle('contain', ratio < 1.6);
+            }
+          }, 120);
+        });
       })();
-    </script>
+
+      // 🔧 DEBUG TOOLS - Herramientas de debug para multimedia
+      console.log('🛠️ Herramientas de debug de multimedia cargadas');
+      console.log('📋 Comandos disponibles:');
+      console.log('  - debugLoadMedia() - Cargar multimedia manualmente');
+      console.log('  - debugTestAPI() - Probar endpoint /api/media');
+      console.log('  - debugCheckFiles() - Verificar archivos en servidor');
+      console.log('  - debugClearCache() - Limpiar cache del navegador');
+
+      // Función de debug para cargar multimedia manualmente
+      window.debugLoadMedia = async function(){
+        console.log('🔧 [DEBUG] Cargando multimedia manualmente...');
+        const mediaBox = document.getElementById('promo-media');
+        if (!mediaBox) {
+          console.error('❌ [DEBUG] No se encontró el elemento promo-media');
+          return;
+        }
+
+        try {
+          console.log('📡 [DEBUG] Solicitando archivos multimedia...');
+          const res = await fetch('/api/media?limit=1', { credentials: 'include' });
+          console.log('📡 [DEBUG] Respuesta del servidor:', res.status, res.statusText);
+
+          if (!res.ok) {
+            console.error('❌ [DEBUG] Error en la respuesta del servidor');
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Error del servidor</small></div>';
+            return;
+          }
+
+          const list = await res.json();
+          console.log('📦 [DEBUG] Archivos recibidos:', list);
+
+          if (!Array.isArray(list) || !list.length) {
+            console.log('📭 [DEBUG] No hay archivos multimedia disponibles');
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>No hay archivos</small></div>';
+            return;
+          }
+
+          const last = list[0];
+          console.log('🎯 [DEBUG] Último archivo:', last);
+
+          if (!last || !last.url) {
+            console.log('⚠️ [DEBUG] Archivo sin URL válida');
+            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Archivo inválido</small></div>';
+            return;
+          }
+
+          console.log('✅ [DEBUG] Archivo válido encontrado, renderizando...');
+          renderPromo(mediaBox, last);
+        } catch(e){
+          console.error('💥 [DEBUG] Error en debugLoadMedia:', e);
+          mediaBox.innerHTML = '<div class="promo-placeholder">❌ Error al cargar promoción<br><small>' + e.message + '</small></div>';
+        }
+      };
+
+      // Función de debug para probar el endpoint API
+      window.debugTestAPI = async function(){
+        console.log('🔧 [DEBUG] Probando endpoint /api/media...');
+        try {
+          const res = await fetch('/api/media?limit=5', { credentials: 'include' });
+          console.log('📡 [DEBUG] Status:', res.status);
+
+          if (res.ok) {
+            const data = await res.json();
+            console.log('✅ [DEBUG] Endpoint funcionando correctamente');
+            console.log('📦 [DEBUG] Datos recibidos:', data);
+            return data;
+          } else {
+            console.error('❌ [DEBUG] Error en el endpoint');
+            const errorText = await res.text();
+            console.log('💥 [DEBUG] Error response:', errorText);
+          }
+        } catch(e){
+          console.error('💥 [DEBUG] Error probando API:', e);
+        }
+      };
+
+      // Función de debug para verificar archivos del servidor
+      window.debugCheckFiles = async function(){
+        console.log('🔧 [DEBUG] Verificando archivos multimedia en el servidor...');
+        try {
+          const res = await fetch('/api/debug/media-check', { credentials: 'include' });
+          console.log('📡 [DEBUG] Status:', res.status);
+
+          if (res.ok) {
+            const data = await res.json();
+            console.log('✅ [DEBUG] Verificación completada');
+            console.log('📦 [DEBUG] Resultados:', data);
+            return data;
+          } else {
+            console.error('❌ [DEBUG] Error en la verificación');
+            const errorText = await res.text();
+            console.log('💥 [DEBUG] Error response:', errorText);
+          }
+        } catch(e){
+          console.error('💥 [DEBUG] Error verificando archivos:', e);
+        }
+      };
+
+      // Función para limpiar cache del navegador
+      window.debugClearCache = function(){
+        console.log('🔧 [DEBUG] Limpiando cache del navegador...');
+        localStorage.clear();
+        sessionStorage.clear();
+        console.log('✅ [DEBUG] Cache limpiado');
+      };
+
+      // Función para mostrar información de debug en la página
+      window.debugShowInfo = function(){
+        const info = {
+          userAgent: navigator.userAgent,
+          url: window.location.href,
+          timestamp: new Date().toISOString(),
+          mediaElement: !!document.getElementById('promo-media'),
+          hasCredentials: !!document.cookie.includes('token')
+        };
+        console.log('🔧 [DEBUG] Información del navegador:', info);
+        return info;
+      };
+
+      // Botón de debug visual (opcional)
+      const debugButton = document.createElement('button');
+      debugButton.innerHTML = '🛠️ Debug';
+      debugButton.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        opacity: 0.7;
+        transition: opacity 0.3s;
+      `;
+      debugButton.onmouseover = () => debugButton.style.opacity = '1';
+      debugButton.onmouseout = () => debugButton.style.opacity = '0.7';
+
+      debugButton.onclick = function(){
+        console.log('🛠️ [DEBUG] Herramientas de debug activadas');
+        console.log('📋 Funciones disponibles: debugLoadMedia(), debugTestAPI(), debugCheckFiles(), debugClearCache()');
+        debugTestAPI();
+      };
+
+      // Solo agregar el botón si estamos en modo desarrollo o si hay errores
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        document.body.appendChild(debugButton);
+      }
+
+    })();
+  </script>
   </body>
 </html>

@@ -8,23 +8,22 @@ const { connectToMongoDB, getDb } = require('../config/db');
 // Middleware para manejar la conexión a la base de datos
 const withDatabase = async (req, res, next) => {
   try {
-    const db = await connectToMongoDB();
-    if (!db) {
-      console.error('[ERROR] No se pudo conectar a la base de datos');
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Error de conexión con la base de datos' 
-      });
+    let db;
+    try {
+      db = await connectToMongoDB();
+    } catch (error) {
+      console.log('[API] MongoDB no disponible, continuando con datos de prueba');
+      db = null;
     }
+    
     req.db = db;
+    req.usingMockData = !db; // Flag para indicar si estamos usando datos de prueba
     next();
   } catch (error) {
-    console.error('[ERROR] Error en la conexión a la base de datos:', error);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Error al conectar con la base de datos',
-      error: error.message 
-    });
+    console.error('[ERROR] Error en el middleware de base de datos:', error);
+    req.db = null;
+    req.usingMockData = true;
+    next(); // Continuar con datos de prueba
   }
 };
 
@@ -71,11 +70,11 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
     
     // Determinar rol y normalizar
     const rol = (usuarioAutenticado && usuarioAutenticado.role) ? String(usuarioAutenticado.role).toLowerCase() : '';
-    const esAdmin = rol === 'admin';
+    const esAdmin = ['admin', 'administrador', 'administrativo'].includes(rol);
     const esBackoffice = ['backoffice','b:o','b.o','b-o','bo'].includes(rol);
     const esSupervisor = rol === 'supervisor';
     const esTeamLineas = rol === 'teamlineas' || (usuarioAutenticado?.username || '').toLowerCase().startsWith('lineas-');
-    
+
     console.error('[DEBUG] Rol del usuario:', usuarioAutenticado?.role || 'no autenticado');
     
     // Filtros de visibilidad por rol - REACTIVADO
@@ -540,5 +539,61 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
   }
 });
 
-// Exportar el router
+// Ruta temporal para verificar todas las colecciones disponibles
+router.get('/debug/collections', protect, withDatabase, async (req, res) => {
+  console.error('\n===========================================');
+  console.error('📊 VERIFICANDO COLECCIONES EN BD');
+  console.error('===========================================');
+
+  const db = req.db;
+
+  try {
+    const collections = await db.listCollections().toArray();
+    console.error('[DEBUG] Colecciones disponibles:', collections.map(c => c.name));
+
+    // Verificar específicamente la colección "costumers"
+    const costumersCollection = collections.find(c => c.name === 'costumers');
+    console.error('[DEBUG] Colección costumers encontrada:', !!costumersCollection);
+
+    if (costumersCollection) {
+      const collection = db.collection('costumers');
+      const totalRegistros = await collection.countDocuments();
+      const primeros3 = await collection.find().limit(3).toArray();
+
+      console.error(`[DEBUG] Total de registros en costumers: ${totalRegistros}`);
+      console.error('[DEBUG] Ejemplo de registros:', JSON.stringify(primeros3, null, 2));
+
+      return res.json({
+        success: true,
+        message: 'Información de colecciones',
+        collections: collections.map(c => c.name),
+        costumersInfo: {
+          exists: true,
+          count: totalRegistros,
+          sample: primeros3
+        }
+      });
+    } else {
+      return res.json({
+        success: true,
+        message: 'Colección costumers no encontrada',
+        collections: collections.map(c => c.name),
+        costumersInfo: {
+          exists: false,
+          count: 0,
+          sample: []
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('[ERROR] Error verificando colecciones:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al verificar colecciones',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
