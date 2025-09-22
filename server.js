@@ -81,6 +81,13 @@ const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 
  const publicPath = path.join(__dirname);
  const staticPath = publicPath;
 
+// Montar rutas de API (DEBEN IR ANTES DE LOS ARCHIVOS ESTÁTICOS)
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/ranking', rankingRoutes);
+app.use('/api/employees-of-month', employeesOfMonthRoutes);
+app.use('/api/equipos', equipoRoutes);
+app.use('/api', apiRoutes); // Esta ruta más general debe ir después de las más específicas
+
 // Guard de acceso: multimedia.html solo para Administrador
 app.use('/multimedia.html', protect, (req, res, next) => {
   const role = (req.user?.role || '').toString();
@@ -91,7 +98,7 @@ app.use('/multimedia.html', protect, (req, res, next) => {
   return res.sendFile(path.join(__dirname, 'multimedia.html'));
 });
 
-// Configuración de rutas de archivos estáticos
+// Configuración de rutas de archivos estáticos (AHORA VAN DESPUÉS DE LA API)
 app.use(express.static(path.join(__dirname)));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'agentes')));
@@ -447,13 +454,6 @@ app.use('/api/leads', (req, res, next) => {
   next();
 });
 
-// Usar rutas de autenticación (aplicar limiter suave al grupo si disponible)
-app.use('/api/auth', authLimiter, authRoutes);
-// Montar rutas de API públicas
-app.use('/api', apiRoutes);
-app.use('/api/ranking', rankingRoutes);
-app.use('/api/employees-of-month', employeesOfMonthRoutes);
-app.use('/api/equipos', equipoRoutes);
 
 // Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)
 // Wrapper mínimo por compatibilidad con referencias existentes

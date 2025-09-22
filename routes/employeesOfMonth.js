@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const EmployeeOfMonth = require('../models/EmployeeOfMonth'); 
+const { protect, authorize } = require('../middleware/auth');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { protect, authorize } = require('../middleware/auth');
 const { getDb } = require('../config/db');
 
-// Configuración de Multer para subida en memoria
+// Configuración de Multer para subida en memoria (para Cloudinary)
 const storage = multer.memoryStorage();
-const upload = multer({ storage });
+const upload = multer({ storage: storage });
 
 const COLLECTION = 'employees_of_month';
 
