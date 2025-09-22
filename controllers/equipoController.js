@@ -25,12 +25,10 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
 
     // Rango de fechas: hoy por defecto, o por querystring (YYYY-MM-DD)
     const { fechaInicio, fechaFin } = req.query || {};
-    // Obtener la fecha actual en la zona horaria de El Salvador (UTC-6)
-    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
-    const yyyy = hoy.getFullYear();
-    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-    const dd = String(hoy.getDate()).padStart(2, '0');
-    const hoyStr = `${yyyy}-${mm}-${dd}`;
+    // Obtener la fecha actual en la zona horaria de El Salvador (UTC-6) para evitar el corte a las 6 PM.
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador' });
+    const hoyStr = formatter.format(now);
 
     const startStr = (fechaInicio && String(fechaInicio).trim()) || hoyStr;
     const endStr = (fechaFin && String(fechaFin).trim()) || hoyStr;
