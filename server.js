@@ -77,6 +77,82 @@ const app = express();
 const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
 const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
 
+// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + orígenes conocidos
+const parseAllowedOrigins = (raw) => (raw || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+// Lista blanca de orígenes permitidos
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
+const defaultAllowed = [
+  'http://localhost:10000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:10000',
+  'https://agentes-49dr.onrender.com',
+  'https://agentes-frontend.onrender.com'
+];
+
+// Si estamos en producción, añadir el dominio de Render a la lista blanca
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  const renderDomains = [
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.RENDER_INSTANCE && `https://${process.env.RENDER_INSTANCE}.onrender.com`,
+    'https://agentes-49dr.onrender.com'
+  ].filter(Boolean);
+  
+  allowedOrigins.push(...renderDomains);
+  console.log('[CORS] Orígenes permitidos en producción:', allowedOrigins);
+}
+
+const whitelist = [...new Set([...allowedOrigins, ...defaultAllowed])]; // Eliminar duplicados
+console.log('[CORS] Lista blanca final:', whitelist);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Permitir solicitudes sin origen (navegación directa)
+    if (!origin) return callback(null, true);
+
+    // Permitir localhost y 127.0.0.1 en cualquier puerto (incluye 3001)
+    const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/i;
+    if (localhostRegex.test(origin)) return callback(null, true);
+
+    // Permitir el mismo host del servidor (mismo origen)
+    try {
+      const serverHost = `http://localhost:${PORT}`;
+      const serverHostHttps = `https://localhost:${PORT}`;
+      if (origin === serverHost || origin === serverHostHttps) return callback(null, true);
+    } catch {}
+
+    // Permitir orígenes en whitelist explícita
+    if (whitelist.includes(origin)) return callback(null, true);
+
+    console.log(`[CORS] Origen no permitido: ${origin}`);
+    callback(new Error('No permitido por CORS'), false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// Configuración de middlewares ESENCIALES (deben ir primero)
+app.use(cors(corsOptions));
+app.use(express.json()); // Middleware para parsear JSON
+app.use(express.urlencoded({ extended: true })); // Middleware para parsear cuerpos de formularios
+if (cookieParser) {
+  app.use(cookieParser());
+}
+
+// Middlewares de seguridad
+if (helmet) {
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
+}
+
  // Paths base para servir archivos estáticos y vistas
  const publicPath = path.join(__dirname);
  const staticPath = publicPath;
@@ -85,7 +161,7 @@ const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 
 const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
 const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
 
-// Montar rutas de API (DEBEN IR ANTES DE LOS ARCHIVOS ESTÁTICOS)
+// Montar rutas de API (DEBEN IR DESPUÉS de los middlewares de parseo)
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/ranking', rankingRoutes);
 app.use('/api/employees-of-month', employeesOfMonthRoutes);
@@ -173,66 +249,6 @@ function cookieOptionsForReq(req, baseOpts) {
   return defaultOpts;
 }
 
-// CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + orígenes conocidos
-const parseAllowedOrigins = (raw) => (raw || '')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
-
-// Lista blanca de orígenes permitidos
-const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
-const defaultAllowed = [
-  'http://localhost:10000',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:10000',
-  'https://agentes-49dr.onrender.com',
-  'https://agentes-frontend.onrender.com'
-];
-
-// Si estamos en producción, añadir el dominio de Render a la lista blanca
-const isProduction = process.env.NODE_ENV === 'production';
-if (isProduction) {
-  const renderDomains = [
-    process.env.RENDER_EXTERNAL_URL,
-    process.env.RENDER_INSTANCE && `https://${process.env.RENDER_INSTANCE}.onrender.com`,
-    'https://agentes-49dr.onrender.com'
-  ].filter(Boolean);
-  
-  allowedOrigins.push(...renderDomains);
-  console.log('[CORS] Orígenes permitidos en producción:', allowedOrigins);
-}
-
-const whitelist = [...new Set([...allowedOrigins, ...defaultAllowed])]; // Eliminar duplicados
-console.log('[CORS] Lista blanca final:', whitelist);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Permitir solicitudes sin origen (navegación directa)
-    if (!origin) return callback(null, true);
-
-    // Permitir localhost y 127.0.0.1 en cualquier puerto (incluye 3001)
-    const localhostRegex = /^https?:\/\/(localhost|127\.0\.0\.1)(:\\d+)?$/i;
-    if (localhostRegex.test(origin)) return callback(null, true);
-
-    // Permitir el mismo host del servidor (mismo origen)
-    try {
-      const serverHost = `http://localhost:${PORT}`;
-      const serverHostHttps = `https://localhost:${PORT}`;
-      if (origin === serverHost || origin === serverHostHttps) return callback(null, true);
-    } catch {}
-
-    // Permitir orígenes en whitelist explícita
-    if (whitelist.includes(origin)) return callback(null, true);
-
-    console.log(`[CORS] Origen no permitido: ${origin}`);
-    callback(new Error('No permitido por CORS'), false);
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
 
 // Inicializar la conexión a la base de datos
 let db;
@@ -246,19 +262,6 @@ let db;
   }
 })();
 
-// Configuración de middlewares
-app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-if (cookieParser) {
-  app.use(cookieParser());
-}
-// Helmet (si disponible)
-if (helmet) {
-  app.use(helmet({
-    contentSecurityPolicy: false
-  }));
-}
 
 // Crear registro para Team Lineas en colección dedicada "Lineas"
 // Consultar registros de Team Lineas (con filtrado por agente)

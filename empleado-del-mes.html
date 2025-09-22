@@ -689,28 +689,22 @@
   <script>
     let currentEmployee = null; // 'first' or 'second'
 
-    document.addEventListener('DOMContentLoaded', function() {
-      checkUserPermissions().then(() => {
-        loadSavedEmployees();
-      });
+    document.addEventListener('DOMContentLoaded', async function() {
+      // Forzar la espera hasta que los permisos y el token estén listos
+      await checkUserPermissions(); 
+      
+      // Solo después, continuar con el resto de la inicialización
+      loadSavedEmployees();
       setupPhotoUpload();
       setupCustomNotification();
     });
 
-    function getToken() {
-      // Prioritize cookie, as it's the most reliable source from the server
-      const cookies = document.cookie.split(';').map(c => c.trim());
-      const cookie = cookies.find(c => c.startsWith('token='));
-      if (cookie) {
-        return cookie.split('=')[1];
-      }
-      // Fallback to localStorage if no cookie is found
-      return localStorage.getItem('token');
-    }
 
     async function checkUserPermissions() {
-      const token = getToken();
-      if (!token) {
+      // La cookie httpOnly se envía automáticamente, solo necesitamos verificar la sesión.
+      // No es necesario obtener el token manualmente en el frontend.
+      const tokenExists = document.cookie.includes('token='); // Verificación simple
+      if (!document.cookie.includes('token=')) {
         disableEditingFeatures();
         return;
       }
@@ -747,6 +741,7 @@
     }
 
     function openPhotoModal(employee) {
+
       currentEmployee = employee;
       document.getElementById('modal-title').innerText = `Editar Foto - ${employee === 'first' ? 'Primer' : 'Segundo'} Lugar`;
       resetModal();
@@ -792,6 +787,7 @@
         return;
       }
 
+
       try {
         // Step 1: Upload image to Cloudinary
         const formData = new FormData();
@@ -800,7 +796,7 @@
         const uploadResponse = await fetch('/api/employees-of-month/upload-image', {
           method: 'POST',
           body: formData,
-          credentials: 'include' // El navegador enviará la cookie automáticamente
+          credentials: 'include' // Esto es suficiente para que el navegador envíe la cookie httpOnly
         });
 
         if (!uploadResponse.ok) {
@@ -825,7 +821,7 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify(employeeData),
-          credentials: 'include' // El navegador enviará la cookie automáticamente
+          credentials: 'include' // Esto es suficiente para que el navegador envíe la cookie httpOnly
         });
 
         if (saveResponse.ok) {

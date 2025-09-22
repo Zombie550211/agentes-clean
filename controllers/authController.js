@@ -334,16 +334,21 @@ exports.login = async (req, res) => {
     );
 
     console.log(`[AUTH] Token generado para: ${username}`);
-    // Configurar cookie
-    const cookieOptions = cookieOptionsForReq(req);
-    console.log('[AUTH] Configuración de cookies:', cookieOptions);
+    // Configurar cookie con path raíz para máxima compatibilidad
+    const isProduction = process.env.NODE_ENV === 'production';
+    const cookieOptions = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1 día
+      path: '/' // <-- LA CLAVE ES ESTA LÍNEA
+    };
 
     try {
       res.cookie('token', token, cookieOptions);
-      console.log('[AUTH] Cookie configurada exitosamente');
+      console.log('[AUTH] Cookie configurada exitosamente con path=/', cookieOptions);
     } catch (cookieError) {
       console.error('[AUTH] Error al configurar la cookie:', cookieError);
-      // Continuar aunque falle la cookie, ya que también tenemos el token en la respuesta
     }
 
     console.log(`[AUTH] Inicio de sesión exitoso para: ${username}`);
