@@ -1944,157 +1944,145 @@
           </div>
     </main>
     <script>
-    // Verificar que el script se esté ejecutando
-    console.log('🎯 Ranking y Promociones - Script cargado correctamente');
+      document.addEventListener('DOMContentLoaded', async () => {
+        console.log('🎯 Ranking y Promociones - Script cargado correctamente');
 
-    (function(){
-      console.log('🚀 Inicializando funciones de multimedia...');
-
-      async function getUser(){
-        try {
-          const res = await fetch('/api/auth/verify', { credentials: 'include' });
-          if (!res.ok) return null;
-          const data = await res.json();
-          return data?.user || null;
-        } catch (error) {
-          console.error('Error obteniendo usuario:', error);
-          return null;
-        }
-      }
-
-      function canUpload(role){
-        const r = (role||'').toString().toLowerCase();
-        return ['admin','administrador','administrativo','supervisor','backoffice','supervisor team lineas'].includes(r);
-      }
-
-      function renderPromo(container, file){
-        container.innerHTML = '';
-        if (!file || !file.url){
-          container.innerHTML = '<div class="promo-placeholder">Sin promoción. Sube una imagen o video.</div>';
-          return;
-        }
-        const isVideo = (file.type||'').startsWith('video/');
-        const applyFit = (mediaEl, naturalW, naturalH) => {
-          const box = container;
-          const boxW = box.clientWidth || 1100;
-          const ratio = naturalW && naturalH ? (naturalW / naturalH) : (16/9);
-          let targetH = Math.min(420, Math.max(200, Math.round(boxW / ratio)));
-          box.style.height = targetH + 'px';
-          const shouldContain = ratio < 1.6;
-          box.classList.toggle('contain', shouldContain);
-        };
-
-        if (isVideo){
-          const v = document.createElement('video');
-          v.src = file.url; v.autoplay = true; v.muted = true; v.loop = true; v.playsInline = true; v.controls = true;
-          v.addEventListener('loadedmetadata', () => applyFit(v, v.videoWidth, v.videoHeight));
-          v.addEventListener('error', (e) => {
-            console.error('[PROMO] Error cargando video:', file.url, e);
-            container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>';
-          });
-          container.appendChild(v);
-        } else {
-          const img = document.createElement('img');
-          img.src = file.url; img.alt = file.name || 'Promoción';
-          img.addEventListener('load', () => applyFit(img, img.naturalWidth, img.naturalHeight));
-          img.addEventListener('error', (e) => {
-            console.error('[PROMO] Error cargando imagen:', file.url, e);
-            container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>';
-          });
-          container.appendChild(img);
-        }
-      }
-
-      async function loadLatestMedia(){
-        const mediaBox = document.getElementById('promo-media');
-        console.log('[PROMO] Iniciando carga de multimedia...');
-        console.log('[PROMO] Elemento promo-media encontrado:', !!mediaBox);
-
-        if (!mediaBox) {
-          console.error('[PROMO] No se encontró el elemento promo-media');
-          return;
-        }
-
-        try {
-          console.log('[PROMO] Solicitando archivos multimedia...');
-          const res = await fetch('/api/media?limit=1', { credentials: 'include' });
-
-          console.log('[PROMO] Respuesta del servidor:', res.status, res.statusText);
-
-          if (!res.ok) {
-            console.log('[PROMO] No se pudo cargar archivos multimedia, mostrando placeholder');
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
-            return;
-          }
-
-          const list = await res.json();
-          console.log('[PROMO] Archivos recibidos:', list);
-
-          const last = Array.isArray(list) && list.length ? list[0] : null;
-          console.log('[PROMO] Último archivo:', last);
-
-          if (!last || !last.url) {
-            console.log('[PROMO] No hay archivos multimedia disponibles');
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
-            return;
-          }
-
-          // Verificar si el archivo existe antes de intentar cargarlo
+        // --- Funciones de utilidad y lógica de la página ---
+        async function getUser(){
           try {
-            console.log('[PROMO] Verificando existencia del archivo:', last.url);
-            const fileResponse = await fetch(last.url, { method: 'HEAD' });
-            console.log('[PROMO] Respuesta HEAD:', fileResponse.status, fileResponse.statusText);
-
-            if (!fileResponse.ok) {
-              console.log('[PROMO] Archivo multimedia no existe físicamente:', last.url);
-              mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
-              return;
-            }
-          } catch (e) {
-            console.log('[PROMO] No se pudo verificar el archivo:', last.url, e);
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Sube una imagen o video para mostrar aquí</small></div>';
-            return;
+            const res = await fetch('/api/auth/verify', { credentials: 'include' });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return data.user;
+          } catch(error){
+            console.error('Error obteniendo usuario:', error);
+            return null;
           }
-
-          console.log('[PROMO] Renderizando archivo multimedia:', last);
-          renderPromo(mediaBox, last);
-        } catch(e){
-          console.error('[PROMO] Error cargando multimedia:', e);
-          mediaBox.innerHTML = '<div class="promo-placeholder">❌ Error al cargar promoción<br><small>No fue posible cargar la promoción</small></div>';
         }
-      }
 
-      function wireUpload(){
-        const input = document.getElementById('promo-file');
-        if (!input) return;
-        input.addEventListener('change', async function(){
-          if (!input.files || !input.files[0]) return;
-          const fd = new FormData(); fd.append('file', input.files[0]);
+        function canUpload(role){
+          const r = (role||'').toString().toLowerCase();
+          return ['admin','administrador','administrativo','supervisor','backoffice','supervisor team lineas'].includes(r);
+        }
+
+        async function handleUpload(e){
+          const input = e.target;
+          const file = input.files[0];
+          if (!file) return;
+
+          const formData = new FormData();
+          formData.append('file', file);
+
           try {
-            const res = await fetch('/api/upload', { method: 'POST', body: fd, credentials: 'include' });
+            const res = await fetch('/api/upload', {
+              method: 'POST',
+              credentials: 'include',
+              body: formData
+            });
             if (!res.ok) throw new Error('upload failed');
             await loadLatestMedia();
-          } catch(e){
-            alert('No se pudo subir el archivo.');
-          } finally { input.value = ''; }
-        });
-      }
-
-      (async function init(){
-        console.log('[PROMO] 🚀 Iniciando carga de página...');
-        const user = await getUser();
-        console.log('[PROMO] Usuario detectado:', user?.username, 'rol:', user?.role);
-        const actions = document.getElementById('promo-actions');
-        if (user && canUpload(user.role)){
-          if (actions) { actions.style.display = 'flex'; console.log('[PROMO] Acciones visibles para rol autorizado'); }
-          wireUpload();
-        } else {
-          if (actions) { actions.style.display = 'none'; console.log('[PROMO] Acciones ocultas por rol no autorizado'); }
+          } catch(err){
+            alert('No se pudo subir el archivo: ' + err.message);
+          } finally { 
+            input.value = ''; 
+          }
         }
-        console.log('[PROMO] Llamando a loadLatestMedia...');
+
+        async function fixMediaDates() {
+          if (!confirm('¿Estás seguro de que quieres corregir las fechas de los archivos multimedia?')) {
+            return;
+          }
+          try {
+            const res = await fetch('/api/media/fix-dates', {
+              method: 'POST',
+              credentials: 'include'
+            });
+            const result = await res.json();
+            alert(result.message || 'Proceso completado.');
+            if (result.success) {
+              loadLatestMedia();
+            }
+          } catch (error) {
+            console.error('Error al ejecutar la corrección:', error);
+            alert('Falló la corrección: ' + error.message);
+          }
+        }
+
+        function renderPromo(container, file){
+          container.innerHTML = '';
+          if (!file || !file.url){
+            container.innerHTML = '<div class="promo-placeholder">Sin promoción. Sube una imagen o video.</div>';
+            return;
+          }
+          const isVideo = (file.type||'').startsWith('video/');
+          const applyFit = (mediaEl, naturalW, naturalH) => {
+            const box = container;
+            const boxW = box.clientWidth || 1100;
+            const ratio = naturalW && naturalH ? (naturalW / naturalH) : (16/9);
+            let targetH = Math.min(420, Math.max(200, Math.round(boxW / ratio)));
+            box.style.height = targetH + 'px';
+            box.classList.toggle('contain', ratio < 1.6);
+          };
+
+          if (isVideo){
+            const v = document.createElement('video');
+            v.src = file.url; v.autoplay = true; v.muted = true; v.loop = true; v.playsInline = true; v.controls = true;
+            v.addEventListener('loadedmetadata', () => applyFit(v, v.videoWidth, v.videoHeight));
+            v.addEventListener('error', () => { container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>'; });
+            container.appendChild(v);
+          } else {
+            const img = document.createElement('img');
+            img.src = file.url; img.alt = file.name || 'Promoción';
+            img.addEventListener('load', () => applyFit(img, img.naturalWidth, img.naturalHeight));
+            img.addEventListener('error', () => { container.innerHTML = '<div class="promo-placeholder">Archivo multimedia no disponible</div>'; });
+            container.appendChild(img);
+          }
+        }
+
+        async function loadLatestMedia(){
+          const mediaBox = document.getElementById('promo-media');
+          if (!mediaBox) return;
+          
+          try {
+            const res = await fetch('/api/media?limit=1', { credentials: 'include' });
+            if (!res.ok) throw new Error('Server response not OK');
+
+            const list = await res.json();
+            const last = Array.isArray(list) && list.length ? list[0] : null;
+
+            if (!last || !last.url) {
+              mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible</div>';
+              return;
+            }
+            
+            const fileResponse = await fetch(last.url, { method: 'HEAD' });
+            if (!fileResponse.ok) {
+              mediaBox.innerHTML = '<div class="promo-placeholder">📭 Archivo no encontrado</div>';
+              return;
+            }
+
+            renderPromo(mediaBox, last);
+          } catch(e){
+            console.error('[PROMO] Error cargando multimedia:', e);
+            mediaBox.innerHTML = '<div class="promo-placeholder">❌ Error al cargar promoción</div>';
+          }
+        }
+
+        // --- Inicialización y Event Listeners ---
+        const user = await getUser();
+        const promoActions = document.getElementById('promo-actions');
+        const promoFileInput = document.getElementById('promo-file');
+
+        if(promoActions && user && canUpload(user.role)){
+          promoActions.style.display = 'flex';
+        }
+
+        if(promoFileInput) promoFileInput.addEventListener('change', handleUpload);
+
         await loadLatestMedia();
         console.log('[PROMO] ✅ Carga inicial completada');
-        // Recalcular en resize para mantener proporciones
+
+        // --- Lógica de Resize ---
         let _resizeT;
         window.addEventListener('resize', () => {
           clearTimeout(_resizeT);
@@ -2102,170 +2090,19 @@
             const media = document.querySelector('#promo-media img, #promo-media video');
             const box = document.getElementById('promo-media');
             if (media && box) {
-              const naturalW = media.videoWidth || media.naturalWidth || box.clientWidth;
-              const naturalH = media.videoHeight || media.naturalHeight || 300;
-              const ratio = naturalW / Math.max(1, naturalH);
-              let targetH = Math.min(420, Math.max(200, Math.round(box.clientWidth / ratio)));
+              const isVideo = media.tagName === 'VIDEO';
+              const naturalW = isVideo ? media.videoWidth : media.naturalWidth;
+              const naturalH = isVideo ? media.videoHeight : media.naturalHeight;
+              const boxW = box.clientWidth || 1100;
+              const ratio = naturalW && naturalH ? (naturalW / naturalH) : (16/9);
+              let targetH = Math.min(420, Math.max(200, Math.round(boxW / ratio)));
               box.style.height = targetH + 'px';
               box.classList.toggle('contain', ratio < 1.6);
             }
-          }, 120);
+          }, 200);
         });
-      })();
 
-      // 🔧 DEBUG TOOLS - Herramientas de debug para multimedia
-      console.log('🛠️ Herramientas de debug de multimedia cargadas');
-      console.log('📋 Comandos disponibles:');
-      console.log('  - debugLoadMedia() - Cargar multimedia manualmente');
-      console.log('  - debugTestAPI() - Probar endpoint /api/media');
-      console.log('  - debugCheckFiles() - Verificar archivos en servidor');
-      console.log('  - debugClearCache() - Limpiar cache del navegador');
-
-      // Función de debug para cargar multimedia manualmente
-      window.debugLoadMedia = async function(){
-        console.log('🔧 [DEBUG] Cargando multimedia manualmente...');
-        const mediaBox = document.getElementById('promo-media');
-        if (!mediaBox) {
-          console.error('❌ [DEBUG] No se encontró el elemento promo-media');
-          return;
-        }
-
-        try {
-          console.log('📡 [DEBUG] Solicitando archivos multimedia...');
-          const res = await fetch('/api/media?limit=1', { credentials: 'include' });
-          console.log('📡 [DEBUG] Respuesta del servidor:', res.status, res.statusText);
-
-          if (!res.ok) {
-            console.error('❌ [DEBUG] Error en la respuesta del servidor');
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Error del servidor</small></div>';
-            return;
-          }
-
-          const list = await res.json();
-          console.log('📦 [DEBUG] Archivos recibidos:', list);
-
-          if (!Array.isArray(list) || !list.length) {
-            console.log('📭 [DEBUG] No hay archivos multimedia disponibles');
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>No hay archivos</small></div>';
-            return;
-          }
-
-          const last = list[0];
-          console.log('🎯 [DEBUG] Último archivo:', last);
-
-          if (!last || !last.url) {
-            console.log('⚠️ [DEBUG] Archivo sin URL válida');
-            mediaBox.innerHTML = '<div class="promo-placeholder">📭 Sin promoción disponible<br><small>Archivo inválido</small></div>';
-            return;
-          }
-
-          console.log('✅ [DEBUG] Archivo válido encontrado, renderizando...');
-          renderPromo(mediaBox, last);
-        } catch(e){
-          console.error('💥 [DEBUG] Error en debugLoadMedia:', e);
-          mediaBox.innerHTML = '<div class="promo-placeholder">❌ Error al cargar promoción<br><small>' + e.message + '</small></div>';
-        }
-      };
-
-      // Función de debug para probar el endpoint API
-      window.debugTestAPI = async function(){
-        console.log('🔧 [DEBUG] Probando endpoint /api/media...');
-        try {
-          const res = await fetch('/api/media?limit=5', { credentials: 'include' });
-          console.log('📡 [DEBUG] Status:', res.status);
-
-          if (res.ok) {
-            const data = await res.json();
-            console.log('✅ [DEBUG] Endpoint funcionando correctamente');
-            console.log('📦 [DEBUG] Datos recibidos:', data);
-            return data;
-          } else {
-            console.error('❌ [DEBUG] Error en el endpoint');
-            const errorText = await res.text();
-            console.log('💥 [DEBUG] Error response:', errorText);
-          }
-        } catch(e){
-          console.error('💥 [DEBUG] Error probando API:', e);
-        }
-      };
-
-      // Función de debug para verificar archivos del servidor
-      window.debugCheckFiles = async function(){
-        console.log('🔧 [DEBUG] Verificando archivos multimedia en el servidor...');
-        try {
-          const res = await fetch('/api/debug/media-check', { credentials: 'include' });
-          console.log('📡 [DEBUG] Status:', res.status);
-
-          if (res.ok) {
-            const data = await res.json();
-            console.log('✅ [DEBUG] Verificación completada');
-            console.log('📦 [DEBUG] Resultados:', data);
-            return data;
-          } else {
-            console.error('❌ [DEBUG] Error en la verificación');
-            const errorText = await res.text();
-            console.log('💥 [DEBUG] Error response:', errorText);
-          }
-        } catch(e){
-          console.error('💥 [DEBUG] Error verificando archivos:', e);
-        }
-      };
-
-      // Función para limpiar cache del navegador
-      window.debugClearCache = function(){
-        console.log('🔧 [DEBUG] Limpiando cache del navegador...');
-        localStorage.clear();
-        sessionStorage.clear();
-        console.log('✅ [DEBUG] Cache limpiado');
-      };
-
-      // Función para mostrar información de debug en la página
-      window.debugShowInfo = function(){
-        const info = {
-          userAgent: navigator.userAgent,
-          url: window.location.href,
-          timestamp: new Date().toISOString(),
-          mediaElement: !!document.getElementById('promo-media'),
-          hasCredentials: !!document.cookie.includes('token')
-        };
-        console.log('🔧 [DEBUG] Información del navegador:', info);
-        return info;
-      };
-
-      // Botón de debug visual (opcional)
-      const debugButton = document.createElement('button');
-      debugButton.innerHTML = '🛠️ Debug';
-      debugButton.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 9999;
-        background: #667eea;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-size: 12px;
-        cursor: pointer;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        opacity: 0.7;
-        transition: opacity 0.3s;
-      `;
-      debugButton.onmouseover = () => debugButton.style.opacity = '1';
-      debugButton.onmouseout = () => debugButton.style.opacity = '0.7';
-
-      debugButton.onclick = function(){
-        console.log('🛠️ [DEBUG] Herramientas de debug activadas');
-        console.log('📋 Funciones disponibles: debugLoadMedia(), debugTestAPI(), debugCheckFiles(), debugClearCache()');
-        debugTestAPI();
-      };
-
-      // Solo agregar el botón si estamos en modo desarrollo o si hay errores
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        document.body.appendChild(debugButton);
-      }
-
-    })();
+      });
   </script>
   </body>
 </html>
