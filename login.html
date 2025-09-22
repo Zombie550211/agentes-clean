@@ -549,8 +549,7 @@
             
             try {
                 console.log('[LOGIN] Iniciando proceso de autenticación para:', username);
-                
-                // Enviar credenciales al servidor
+
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     credentials: 'include',
@@ -558,147 +557,84 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        username: username,
-                        password: password
-                    })
+                    body: JSON.stringify({ username, password })
                 });
-                
-                const data = await response.json();
-                console.log('[LOGIN] Respuesta del servidor:', { status: response.status, data });
-                
-                if (response.ok && data.success) {
-                    // Guardar token y datos del usuario
-                    try {
-                        const userInfo = { 
-                            id: data.user?.id,
-                            username: data.user?.username, 
-                            name: data.user?.username,
-                            role: data.user?.role || 'user',
-                            permissions: data.user?.permissions || []
-                        };
-                        
-                        // Guardar token y datos del usuario según la preferencia de "Recordarme"
-                        const storage = rememberMe ? localStorage : sessionStorage;
-                        storage.setItem('token', data.token);
-                        storage.setItem('user', JSON.stringify(userInfo));
-                        
-                        console.log('[LOGIN] Datos guardados en', rememberMe ? 'localStorage' : 'sessionStorage');
-                        
-                        // Mostrar mensaje de éxito
-                        messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
-                        messageDiv.className = 'alert alert-success';
-                        
-                        // Determinar la URL de redirección basada en el rol del usuario
-                        let redirectUrl = getUrlParameter('redirect');
-                        
-                        // Si el usuario es de Team Líneas, forzar redirección a lead-lineas.html
-                        const isTeamLineas = username.toLowerCase().startsWith('lineas-') || 
-                                          (data.user?.role || '').toLowerCase() === 'teamlineas';
-                        
-                        if (isTeamLineas) {
-                            // Actualizar el rol en los datos del usuario
-                            userInfo.role = 'teamlineas';
-                            storage.setItem('user', JSON.stringify(userInfo));
-                            
-                            console.log('[LOGIN] Usuario de Team Líneas detectado, redirigiendo a lead-lineas.html');
-                            redirectUrl = '/lead-lineas.html';
-                        } else if (!redirectUrl) {
-                            redirectUrl = '/inicio.html';
-                        }
-                        
-                        console.log(`[LOGIN] Redirigiendo a: ${redirectUrl}`);
-                        
-                        // Pequeño retraso para mostrar el mensaje de éxito
-                        setTimeout(() => {
-                            // Usar replace para evitar problemas con el botón de retroceso
-                            console.log(`[LOGIN] Redirigiendo a: ${redirectUrl}`);
-                            window.location.replace(redirectUrl);
-                        }, 500);
-                        
-                    } catch (storageError) {
-                        console.error('[LOGIN] Error al guardar datos de sesión:', storageError);
-                        messageDiv.textContent = 'Error al guardar la sesión. Intenta de nuevo.';
-                        messageDiv.className = 'alert alert-warning';
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('loading');
-                        const loginText = submitBtn.querySelector('.login-text');
-                        if (loginText) loginText.textContent = 'Iniciar sesión';
-                    }
-                    
+
+                const contentType = response.headers.get('content-type');
+                let data;
+
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
                 } else {
-                    // Determinar el mensaje de error apropiado
-                    let errorMessage = 'Error al iniciar sesión. Intenta de nuevo.';
-                    
-                    if (response.status === 401) {
-                        errorMessage = 'Credenciales inválidas. Verifica tu usuario y contraseña.';
-                    } else if (response.status === 429) {
-                        errorMessage = 'Demasiados intentos. Por favor, espera unos minutos antes de intentar de nuevo.';
-                    } else if (response.status >= 500) {
-                        errorMessage = 'Error del servidor. Por favor, intente más tarde.';
-                    } else if (data.message) {
-                        errorMessage = data.message;
-                    }
-                    
-                    console.warn('[LOGIN] Error en la autenticación:', { 
-                        status: response.status,
-                        statusText: response.statusText,
-                        message: data.message,
-                        data: data
-                    });
-                    
-                    // Mostrar mensaje de error al usuario
-                    messageDiv.textContent = errorMessage;
-                    messageDiv.className = 'alert alert-danger';
-                    
-                    // Enfocar el campo de usuario o contraseña según el error
-                    if (response.status === 401) {
-                        const usernameField = document.getElementById('username');
-                        const passwordField = document.getElementById('password');
-                        
-                        // Limpiar solo la contraseña para seguridad
-                        passwordField.value = '';
-                        
-                        // Enfocar el campo apropiado
-                        if (!usernameField.value.trim()) {
-                            usernameField.focus();
-                        } else {
-                            passwordField.focus();
-                        }
-                    }
-                    
-                    // Restaurar el botón
-                    submitBtn.disabled = false;
-                    submitBtn.classList.remove('loading');
-                    loginText.textContent = 'Iniciar sesión';
+                    // Si la respuesta no es JSON, es un error (ej. rate limit)
+                    const errorText = await response.text();
+                    throw new Error(errorText || 'El servidor devolvió una respuesta inesperada.');
                 }
-                
+
+                console.log('[LOGIN] Respuesta del servidor:', { status: response.status, data });
+
+                if (response.ok && data.success) {
+                    const userInfo = {
+                        id: data.user?.id,
+                        username: data.user?.username,
+                        name: data.user?.username,
+                        role: data.user?.role || 'user',
+                        permissions: data.user?.permissions || []
+                    };
+
+                    const storage = rememberMe ? localStorage : sessionStorage;
+                    storage.setItem('token', data.token);
+                    storage.setItem('user', JSON.stringify(userInfo));
+
+                    console.log('[LOGIN] Datos guardados en', rememberMe ? 'localStorage' : 'sessionStorage');
+
+                    messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
+                    messageDiv.className = 'alert alert-success';
+
+                    let finalRedirectUrl = getUrlParameter('redirect') || '/inicio.html';
+                    
+                    const isTeamLineas = (userInfo.role || '').toLowerCase().includes('lineas');
+                    if (isTeamLineas) {
+                        finalRedirectUrl = '/lead-lineas.html';
+                        console.log('[LOGIN] Usuario de Team Líneas detectado, redirigiendo a lead-lineas.html');
+                    }
+
+                    console.log(`[LOGIN] Redirigiendo a: ${finalRedirectUrl}`);
+                    setTimeout(() => {
+                        window.location.replace(finalRedirectUrl);
+                    }, 500);
+
+                } else {
+                    // Lanzar un error para que sea manejado por el bloque catch
+                    throw new Error(data.message || 'Credenciales inválidas');
+                }
+
             } catch (error) {
                 console.error('[LOGIN] Error en el proceso de autenticación:', error);
-                
-                // Restaurar el botón en caso de error
+
+                let errorMessage = 'Error de conexión. Verifica tu conexión e intenta de nuevo.';
+
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = 'No se pudo conectar al servidor. Verifica tu conexión a internet.';
+                } else if (error.message.includes('Too many requests')) {
+                    errorMessage = 'Has realizado demasiados intentos. Por favor, espera unos minutos.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                messageDiv.textContent = errorMessage;
+                messageDiv.className = 'alert alert-danger';
+
+                // Restaurar el botón
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.classList.remove('loading');
-                    const loginText = submitBtn.querySelector('.login-text');
-                    if (loginText) loginText.textContent = 'Iniciar sesión';
+                    if (loginText) loginText.textContent = originalText;
                 }
                 
-                // Determinar el tipo de error
-                let errorMessage = 'Error de conexión. Verifica tu conexión e intenta de nuevo.';
-                
-                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                    errorMessage = 'No se pudo conectar al servidor. Verifica tu conexión a internet.';
-                } else if (error.name === 'SyntaxError') {
-                    errorMessage = 'Error al procesar la respuesta del servidor. Intenta de nuevo.';
-                }
-                
-                // Mostrar mensaje de error
-                messageDiv.textContent = errorMessage;
-                messageDiv.className = 'alert alert-danger';
-                
-                // Enfocar el campo de contraseña
-                document.getElementById('password').focus();
+                const passwordField = document.getElementById('password');
+                passwordField.value = '';
+                passwordField.focus();
             }
         }
         

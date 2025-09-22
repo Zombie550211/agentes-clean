@@ -646,6 +646,9 @@
         
         // Asignar el HTML generado al elemento raíz
         root.innerHTML = html;
+
+        // Ahora, renderizar el gráfico de dona con los datos de los equipos
+        renderVentasPorEquipoChart(mainTeams);
         
         // Filtro eliminado: no se requiere manejar eventos de filtrado
       } catch (e) {
@@ -771,82 +774,67 @@
       return response;
     }
     
-    async function initCharts(){
-      console.log('Iniciando initCharts');
-      
-      // Verificar autenticación
-      if (!checkAuth()) return;
-      
-      // 1. Inicializar gráfico de ventas por día
-      const ventasDiaCtx = document.getElementById('chart-ventas-dia');
-      console.log('Elemento chart-ventas-dia encontrado:', !!ventasDiaCtx);
-      
-      if (ventasDiaCtx) {
-        // Mostrar indicador de carga
-        const chartContainer = ventasDiaCtx.closest('.chart-wrapper');
-        if (chartContainer) {
-          chartContainer.innerHTML = `
-            <div class="chart-loading">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-              </div>
-              <p class="mt-2">Cargando datos de ventas diarias...</p>
-            </div>
-          `;
-        }
-        
-        // Intentar cargar datos de la API, pero usar fallback inmediatamente si falla
-        try {
-          console.log('Intentando obtener datos de ventas diarias...');
-          const response = await fetchWithAuth('/api/leads?paraGrafica=true');
-          
-          if (!response || !response.ok) {
-            throw new Error('Error en la API');
-          }
-          
-          const result = await response.json();
-          if (!result.success || !Array.isArray(result.data)) {
-            throw new Error('Datos de ventas diarias inválidos');
-          }
-          
-          // Procesar datos para el gráfico
-          const ventasPorDia = result.data;
-          
-          // Ordenar por fecha
-          ventasPorDia.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-          
-          // Obtener etiquetas (fechas) y datos (ventas)
-          const fechas = ventasPorDia.map(item => {
-            // Formatear fecha como DD/MM
-            const date = new Date(item.fecha);
-            return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
-          });
-          
-          const ventasData = ventasPorDia.map(item => item.ventas || 0);
-          
-          // Renderizar el gráfico con los datos de ventas diarias
-          renderVentasDiarias(chartContainer, fechas, ventasData, false);
-          
-        } catch (error) {
-          console.error('Error al cargar datos de ventas diarias:', error);
-          console.log('Usando datos de prueba...');
-          
-          // Usar datos de prueba
-          const fechaActual = new Date();
-          const fechas = [];
-          const ventasData = [];
-          
-          // Generar datos de prueba para los últimos 7 días
-          for (let i = 6; i >= 0; i--) {
-            const fecha = new Date();
-            fecha.setDate(fecha.getDate() - i);
-            fechas.push(`${String(fecha.getDate()).padStart(2, '0')}/${String(fecha.getMonth() + 1).padStart(2, '0')}`);
-            ventasData.push(Math.floor(Math.random() * 20) + 5); // Números aleatorios para pruebas
-          }
-          
-          renderVentasDiarias(chartContainer, fechas, ventasData, true);
-        }
+    function renderVentasPorEquipoChart(teamData) {
+      const ctx = document.getElementById('chart-ventas-dia');
+      if (!ctx) return;
+
+      // Filtrar equipos sin ventas para no saturar el gráfico
+      const filteredData = teamData.filter(t => t.Total > 0);
+      const labels = filteredData.map(t => t.name);
+      const data = filteredData.map(t => t.Total);
+
+      // Paleta de colores atractiva
+      const colors = [
+        '#22b3ec', '#3498db', '#5dade2', '#85c1e9', '#aed6f1',
+        '#36c2cf', '#48c9b0', '#76d7c4', '#a3e4d7', '#d1f2eb'
+      ];
+
+      // Destruir el gráfico anterior si existe para evitar conflictos
+      if (window.ventasPorEquipoChart) {
+        window.ventasPorEquipoChart.destroy();
       }
+
+      window.ventasPorEquipoChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Ventas por Equipo',
+            data: data,
+            backgroundColor: colors,
+            borderColor: '#fff',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'right',
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed !== null) {
+                    label += context.parsed;
+                  }
+                  return label + ' ventas';
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function initCharts(){
+      // Esta función se deja vacía intencionalmente para dar paso al nuevo gráfico de dona.
+      console.log('initCharts ya no renderiza el gráfico de barras diario.');
     }
     
     // Función para renderizar el gráfico de ventas diarias
