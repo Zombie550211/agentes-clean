@@ -25,12 +25,12 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
 
     // Rango de fechas: hoy por defecto, o por querystring (YYYY-MM-DD)
     const { fechaInicio, fechaFin } = req.query || {};
-    const hoy = new Date();
-    // Cortes en horario LOCAL (no UTC)
+    // Obtener la fecha actual en la zona horaria de El Salvador (UTC-6)
+    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/El_Salvador' }));
     const yyyy = hoy.getFullYear();
     const mm = String(hoy.getMonth() + 1).padStart(2, '0');
     const dd = String(hoy.getDate()).padStart(2, '0');
-    const hoyStr = `${yyyy}-${mm}-${dd}`; // Formato YYYY-MM-DD (local)
+    const hoyStr = `${yyyy}-${mm}-${dd}`;
 
     const startStr = (fechaInicio && String(fechaInicio).trim()) || hoyStr;
     const endStr = (fechaFin && String(fechaFin).trim()) || hoyStr;
@@ -72,12 +72,17 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       }
     }
 
-    // Resolver nombre de colección (Costumers vs costumers)
-    const colls = await db.listCollections().toArray();
-    const hasProper = colls.some(c => c.name === 'Costumers');
-    const hasLower = colls.some(c => c.name === 'costumers');
-    const collName = hasProper ? 'Costumers' : (hasLower ? 'costumers' : 'Costumers');
-    const coll = db.collection(collName);
+    // Usar la colección correcta 'costumers' como especificó el usuario
+    const coll = db.collection('costumers');
+
+    // Construir el $match dinámico para el rango de fechas
+    // Construir el $match dinámico para el rango de fechas completo (agnóstico a la hora)
+    // Construir el $match dinámico para el rango de fechas completo en UTC
+    const matchStage = {
+      $match: {
+        dia_venta: startStr
+      }
+    };
 
     // Agregación por team, contando ICON/BAMO, Total y sumando puntaje (normalizando mercado a mayúsculas)
     const pipeline = [
@@ -101,7 +106,7 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
             }
           },
           puntaje_num: {
-            $convert: { input: { $ifNull: ['$puntaje', 0] }, to: 'double', onError: 0, onNull: 0 }
+            $toDouble: { $ifNull: ['$puntaje', 0] }
           }
         }
       },
@@ -196,23 +201,9 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
     const padded = BASE_TEAMS.map(k => byKey.get(k) || ({ TEAM: `TEAM ${k}`, ICON: 0, BAMO: 0, Total: 0, Puntaje: 0 }));
     const lineasTotalICON = (lineasAgg || []).reduce((s, r) => s + Number(r.ICON || 0), 0);
 
-    // Diagnóstico opcional: devolver una muestra de documentos que pasan el $match
-    let docsSample = undefined;
-    if (String(req.query?.debugDocs || '').toLowerCase() === '1') {
-      try {
-        docsSample = await coll
-          .find(matchStage.$match)
-          .project({ team: 1, supervisor: 1, mercado: 1, puntaje: 1, fecha_contratacion: 1, dia_venta: 1 })
-          .limit(50)
-          .toArray();
-      } catch (e) {
-        docsSample = [{ error: 'error loading docsSample', message: e?.message }];
-      }
-    }
-
     // Encabezados de diagnóstico
     res.set('X-Equipos-Source', 'aggregate');
-    res.set('X-Equipos-Coll', collName);
+    res.set('X-Equipos-Coll', 'costumers');
     const payload = {
       success: true,
       message: `OK-MONGO-AGG PADDED-${padded.length} LINEAS-${lineasAgg.length}`,
@@ -222,8 +213,7 @@ exports.obtenerEstadisticasEquipos = async (req, res) => {
       data: padded,
       lineas: lineasAgg,
       lineasTotalICON,
-      debugCount: { rawCount: data.length, paddedCount: padded.length },
-      docsSample
+      debugCount: { rawCount: data.length, paddedCount: padded.length }
     };
     if (String(req.query?.debug || '').toLowerCase() === '1') {
       payload.dataRaw = data;

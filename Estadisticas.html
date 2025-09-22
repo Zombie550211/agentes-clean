@@ -21,7 +21,6 @@
   <!-- Eliminado kit de Font Awesome (403). Se usa el CSS 5.15.4 ya cargado arriba. -->
   
   <!-- Luego cargar los scripts de la aplicación -->
-  <script src="agentes/js/auth-check.js"></script>
   <script src="/js/logout-handler.js"></script>
   <script src="/js/user-info.js"></script>
   <script src="/utils/teams.js"></script>
@@ -534,6 +533,7 @@
           console.error('Formato de respuesta inválido:', data);
           throw new Error('Formato de respuesta inválido');
         }
+
         
         // Si no hay datos, mostrar mensaje de "sin datos" con tabla vacía
         let teamData = [];
@@ -937,6 +937,7 @@
       window.ventasDiariasChart = new Chart(canvas, config);
     }
     
+
     // Función auxiliar para renderizar el gráfico
     function renderChart(container, labels, data, isFallback) {
       if (!container) return;
@@ -1110,7 +1111,7 @@
       const convRoot = document.getElementById('conversion-table');
       if (convRoot) {
         console.log('Elemento conversion-table encontrado, renderizando...');
-        renderConversionTable(convRoot);
+        renderConversionTable(document.getElementById('conversion-table'));
       } else {
         console.error('No se encontró el elemento con ID conversion-table');
       }
