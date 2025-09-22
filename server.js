@@ -512,7 +512,8 @@ app.get('/api/auth/verify-server', (req, res) => {
       username: null,
       error: error.message
     });
-  } // Fin del try/catch para /api/auth/verify-server
+  }
+}); // Fin del endpoint /api/auth/verify-server
 app.get('/api/auth/debug-storage', (req, res) => {
   res.json({
     success: true,
@@ -3065,54 +3066,6 @@ app.get('*', (req, res) => {
 // Arrancar servidor
 startServer(PORT);
 
-// Manejo de cierre graceful
-process.on('SIGINT', async () => {
-  console.log('\n[SHUTDOWN] Cerrando servidor...');
-  try {
-    if (activeServer) {
-      activeServer.close(() => {
-        console.log('[SHUTDOWN] Servidor cerrado');
-      });
-    }
-    await closeConnection();
-    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
-  } catch (error) {
-    console.error('[SHUTDOWN] Error cerrando conexión:', error);
-  }
-  process.exit(0);
-});
 
-// Manejo de señales de terminación
-process.on('SIGTERM', async () => {
-  console.log('\n[SHUTDOWN] Recibida señal SIGTERM...');
-  try {
-    if (activeServer) {
-      activeServer.close(() => {
-        console.log('[SHUTDOWN] Servidor cerrado');
-      });
-    }
-    await closeConnection();
-    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
-  } catch (error) {
-    console.error('[SHUTDOWN] Error cerrando conexión:', error);
-  }
-  process.exit(0);
-});
-
-// Manejo de señales de interrupción (Ctrl+C)
-process.on('SIGINT', async () => {
-  console.log('\n[SHUTDOWN] Recibida señal SIGINT (Ctrl+C)...');
-  try {
-    if (activeServer) {
-      activeServer.close(() => {
-        console.log('[SHUTDOWN] Servidor cerrado');
-      });
-    }
-    await closeConnection();
-    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
-  } catch (error) {
-    console.error('[SHUTDOWN] Error cerrando conexión:', error);
-  }
-  process.exit(0);
-});});
+// Exportar la aplicación
 module.exports = app;
