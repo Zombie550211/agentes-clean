@@ -81,6 +81,10 @@ const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 
  const publicPath = path.join(__dirname);
  const staticPath = publicPath;
 
+// Rate limiting (si disponible)
+const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
+const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
+
 // Montar rutas de API (DEBEN IR ANTES DE LOS ARCHIVOS ESTÁTICOS)
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/ranking', rankingRoutes);
@@ -255,9 +259,6 @@ if (helmet) {
     contentSecurityPolicy: false
   }));
 }
-// Rate limiting (si disponible)
-const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
-const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Crear registro para Team Lineas en colección dedicada "Lineas"
 // Consultar registros de Team Lineas (con filtrado por agente)
