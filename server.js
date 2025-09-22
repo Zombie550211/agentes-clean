@@ -1,3 +1,12 @@
+require('dotenv').config();
+
+// --- DEBUGGING: VERIFICAR VARIABLES DE ENTORNO ---
+console.log('[DEBUG] Verificando variables de Cloudinary...');
+console.log(`[DEBUG] CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME}`);
+console.log(`[DEBUG] CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY}`);
+console.log(`[DEBUG] CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? 'Cargado' : 'NO CARGADO O VACÍO'}`);
+console.log('--------------------------------------------------');
+
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -8,7 +17,6 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
 const cloudinary = require('cloudinary').v2;
-require('dotenv').config();
 
 // Configurar Cloudinary
 cloudinary.config({

@@ -1,47 +1,36 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
 const { protect, authorize } = require('../middleware/auth');
 const { getDb } = require('../config/db');
 
-// Colección en MongoDB para persistencia
+// Configuración de Multer para subida en memoria
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+
 const COLLECTION = 'employees_of_month';
 
-// GET - Obtener empleados del mes (público - todos pueden ver)
+// GET - Obtener empleados del mes
 router.get('/', async (req, res) => {
   try {
-    console.log('📋 Obteniendo empleados del mes (MongoDB)');
     const db = getDb();
-    const docs = await db.collection(COLLECTION).find({}).toArray();
-    const out = {};
-    for (const d of docs) {
-      out[d.employee] = {
-        employee: d.employee,
-        name: d.name,
-        description: d.description,
-        imageData: d.imageData,
-        imageClass: d.imageClass,
-        date: d.date,
-        updatedBy: d.updatedBy,
-        updatedAt: d.updatedAt
-      };
-    }
-    return res.json(out);
+    const employees = await db.collection(COLLECTION).find({}).toArray();
+    res.json(employees);
   } catch (error) {
     console.error('Error obteniendo empleados del mes:', error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
-// POST - Guardar/actualizar empleado del mes (protegido)
-router.post('/', protect, authorize('Administrador', 'Supervisor Team Lineas'), async (req, res) => {
+// POST - Guardar/actualizar datos de empleado del mes (sin imagen)
+router.post('/', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), async (req, res) => {
   try {
-    const { employee, name, description, imageData, imageClass, date } = req.body;
-    console.log('💾 Guardando empleado del mes:', employee);
-    if (!employee || !name || !imageData) {
-      return res.status(400).json({ message: 'Datos incompletos' });
+    const { employee, name, description, imageUrl, imageClass, date } = req.body;
+    if (!employee || !name || !imageUrl) {
+      return res.status(400).json({ message: 'Datos incompletos. Se requiere employee, name y imageUrl.' });
     }
     const db = getDb();
-    const now = new Date();
     await db.collection(COLLECTION).updateOne(
       { employee },
       {
@@ -49,39 +38,69 @@ router.post('/', protect, authorize('Administrador', 'Supervisor Team Lineas'), 
           employee,
           name,
           description: description || '',
-          imageData,
+          imageUrl, // Guardamos la URL de Cloudinary
           imageClass: imageClass || '',
           date: date || new Date().toLocaleDateString('es-ES'),
           updatedBy: req.user?.username || 'Sistema',
-          updatedAt: now
+          updatedAt: new Date()
         }
       },
       { upsert: true }
     );
-    console.log('✅ Empleado guardado exitosamente:', employee);
-    return res.json({ message: 'Empleado guardado correctamente', employee });
+    res.json({ message: 'Empleado guardado correctamente' });
   } catch (error) {
     console.error('Error guardando empleado del mes:', error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
-// DELETE - Eliminar empleado del mes (protegido)
-router.delete('/:employee', protect, authorize('Administrador', 'Supervisor Team Lineas'), async (req, res) => {
+// POST - Nuevo endpoint para subir la imagen a Cloudinary
+router.post('/upload-image', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), upload.single('employeeImage'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No se recibió ningún archivo.' });
+    }
+
+    const uploadResult = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'image',
+          folder: 'employees_of_the_month' // Carpeta dedicada en Cloudinary
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
+    });
+
+    res.json({ 
+      message: 'Imagen subida exitosamente a Cloudinary',
+      imageUrl: uploadResult.secure_url 
+    });
+
+  } catch (error) {
+    console.error('[CLOUDINARY EOM UPLOAD] Error:', error);
+    res.status(500).json({ message: 'Error subiendo la imagen a Cloudinary' });
+  }
+});
+
+
+// DELETE - Eliminar empleado del mes
+router.delete('/:employee', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), async (req, res) => {
   try {
     const { employee } = req.params;
-    console.log('🗑️ Eliminando empleado del mes:', employee);
     const db = getDb();
     const result = await db.collection(COLLECTION).deleteOne({ employee });
     if (result.deletedCount > 0) {
-      console.log('✅ Empleado eliminado exitosamente:', employee);
-      return res.json({ message: 'Empleado eliminado correctamente' });
+      res.json({ message: 'Empleado eliminado correctamente' });
     } else {
-      return res.status(404).json({ message: 'Empleado no encontrado' });
+      res.status(404).json({ message: 'Empleado no encontrado' });
     }
   } catch (error) {
     console.error('Error eliminando empleado del mes:', error);
-    return res.status(500).json({ message: 'Error interno del servidor' });
+    res.status(500).json({ message: 'Error interno del servidor' });
   }
 });
 
