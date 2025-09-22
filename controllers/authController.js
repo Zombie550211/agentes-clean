@@ -63,9 +63,37 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Crear y guardar el nuevo usuario
-    const user = new User(username, password, role);
-    await user.save();
+    // Conectar a la base de datos
+    let db;
+    try {
+      db = await connectToMongoDB();
+    } catch (dbError) {
+      console.error('[AUTH] Error conectando a MongoDB en registro:', dbError);
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
+    }
+
+    // Verificar si el usuario ya existe
+    const existingUser = await db.collection('users').findOne({ username });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'El nombre de usuario ya está en uso' });
+    }
+
+    // Hashear la contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Crear el nuevo objeto de usuario
+    const newUser = {
+      username,
+      password: hashedPassword,
+      role,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Insertar el nuevo usuario en la base de datos
+    const result = await db.collection('users').insertOne(newUser);
+    const user = { ...newUser, _id: result.insertedId }; // Construir el objeto user para el token
 
     // Función auxiliar para definir permisos por rol
     function getRolePermissions(role) {

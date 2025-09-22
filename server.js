@@ -7,7 +7,16 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
+const cloudinary = require('cloudinary').v2;
 require('dotenv').config();
+
+// Configurar Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
 
 // Carga condicional de Helmet y Rate Limit (si están instalados)
 let helmet = null;
@@ -101,19 +110,8 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Configuración de Multer para subida de archivos
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    // Generar nombre único: timestamp + nombre original
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    const name = path.basename(file.originalname, ext);
-    cb(null, name + '-' + uniqueSuffix + ext);
-  }
-});
+// Configuración de Multer para subida en memoria (para Cloudinary)
+const storage = multer.memoryStorage();
 
 // Filtro de archivos permitidos
 const fileFilter = (req, file, cb) => {
@@ -762,48 +760,48 @@ app.post('/api/auth/reset-password', protect, authorize('Administrador', 'admin'
 
 // ===== ENDPOINTS MULTIMEDIA =====
 
-// Endpoint para subir archivos multimedia
+// Endpoint para subir archivos multimedia a Cloudinary
 app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se recibió ningún archivo'
-      });
+      return res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
     }
+
+    // Subir el archivo a Cloudinary desde el buffer en memoria
+    const uploadResult = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'auto', // Detecta si es imagen o video
+          folder: 'dashboard_promos' // Carpeta en Cloudinary
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
+    });
 
     const MediaFile = require('./models/MediaFile');
     
-    // Determinar categoría del archivo
-    let category = 'image';
-    if (req.file.mimetype === 'image/gif') {
-      category = 'gif';
-    } else if (req.file.mimetype.startsWith('video/')) {
-      category = 'video';
-    }
-
-    // Crear URL del archivo
-    const fileUrl = `/uploads/${req.file.filename}`;
-
-    // Guardar información en la base de datos
     const mediaFile = new MediaFile({
-      filename: req.file.filename,
+      filename: uploadResult.public_id,
       originalName: req.file.originalname,
       mimetype: req.file.mimetype,
-      size: req.file.size,
-      path: req.file.path,
-      url: fileUrl,
+      size: uploadResult.bytes,
+      path: uploadResult.secure_url, // Usamos la URL segura de Cloudinary
+      url: uploadResult.secure_url, // La URL principal es la de Cloudinary
       uploadedBy: req.user.username,
-      category: category
+      category: uploadResult.resource_type
     });
 
     await mediaFile.save();
 
-    console.log(`[UPLOAD] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
+    console.log(`[CLOUDINARY] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
 
     res.json({
       success: true,
-      message: 'Archivo subido exitosamente',
+      message: 'Archivo subido exitosamente a Cloudinary',
       file: {
         id: mediaFile._id,
         name: mediaFile.originalName,
@@ -816,17 +814,8 @@ app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[UPLOAD] Error:', error);
-    
-    // Eliminar archivo si hubo error guardando en BD
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error subiendo archivo'
-    });
+    console.error('[CLOUDINARY UPLOAD] Error:', error);
+    res.status(500).json({ success: false, message: 'Error subiendo archivo a Cloudinary' });
   }
 });
 
@@ -857,31 +846,9 @@ app.get('/api/media', protect, async (req, res) => {
 
     console.log(`[MEDIA] Encontrados ${files.length} archivos en BD`);
 
-    // Verificar existencia de archivos y filtrar los que no existen
-    const uploadsDir = path.join(__dirname, 'uploads');
-    const validFiles = [];
+    console.log(`[MEDIA] Devolviendo ${files.length} archivos desde BD`);
 
-    for (const file of files) {
-      try {
-        const filePath = path.join(uploadsDir, path.basename(file.url));
-
-        // Si el archivo existe físicamente, incluirlo
-        if (fs.existsSync(filePath)) {
-          validFiles.push(file);
-          console.log(`[MEDIA] ✓ Archivo válido: ${file.originalName}`);
-        } else {
-          // Si no existe, eliminar la referencia de la base de datos
-          console.log(`[MEDIA] 🗑️ Eliminando referencia a archivo inexistente: ${file.url}`);
-          await collection.deleteOne({ _id: file._id });
-        }
-      } catch (error) {
-        console.error(`[MEDIA] Error verificando archivo ${file.url}:`, error);
-      }
-    }
-
-    console.log(`[MEDIA] Devolviendo ${validFiles.length} archivos válidos`);
-
-    const formattedFiles = validFiles.map(file => ({
+    const formattedFiles = files.map(file => ({
       id: file._id,
       name: file.originalName,
       url: file.url,
