@@ -4,7 +4,7 @@ const EmployeeOfMonth = require('../models/EmployeeOfMonth');
 const { protect, authorize } = require('../middleware/auth');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { getDb } = require('../config/db');
+const { getDb, connectToMongoDB } = require('../config/db');
 
 // Configuración de Multer para subida en memoria (para Cloudinary)
 const storage = multer.memoryStorage();
@@ -12,11 +12,21 @@ const upload = multer({ storage: storage });
 
 const COLLECTION = 'employees_of_month';
 
+async function ensureCollection() {
+  try {
+    const db = getDb();
+    return db.collection(COLLECTION);
+  } catch (err) {
+    await connectToMongoDB();
+    return getDb().collection(COLLECTION);
+  }
+}
+
 // GET - Obtener empleados del mes
 router.get('/', async (req, res) => {
   try {
-    const db = getDb();
-    const employees = await db.collection(COLLECTION).find({}).toArray();
+    const collection = await ensureCollection();
+    const employees = await collection.find({}).toArray();
     res.json(employees);
   } catch (error) {
     console.error('Error obteniendo empleados del mes:', error);
@@ -31,8 +41,8 @@ router.post('/', protect, authorize('Administrador', 'admin', 'Supervisor Team L
     if (!employee || !name || !imageUrl) {
       return res.status(400).json({ message: 'Datos incompletos. Se requiere employee, name y imageUrl.' });
     }
-    const db = getDb();
-    await db.collection(COLLECTION).updateOne(
+    const collection = await ensureCollection();
+    await collection.updateOne(
       { employee },
       {
         $set: {
@@ -92,8 +102,8 @@ router.post('/upload-image', protect, authorize('Administrador', 'admin', 'Super
 router.delete('/:employee', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), async (req, res) => {
   try {
     const { employee } = req.params;
-    const db = getDb();
-    const result = await db.collection(COLLECTION).deleteOne({ employee });
+    const collection = await ensureCollection();
+    const result = await collection.deleteOne({ employee });
     if (result.deletedCount > 0) {
       res.json({ message: 'Empleado eliminado correctamente' });
     } else {
