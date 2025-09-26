@@ -76,6 +76,7 @@
         { key: 'register', href: 'register.html' },
         { key: 'facturacion', href: 'facturacion.html' },
         { key: 'estadisticas', href: 'Estadisticas.html' },
+        { key: 'tabla-puntaje', href: 'Tabla de puntaje.html' },
         { key: 'multimedia', href: 'multimedia.html' }
       ];
 
@@ -96,6 +97,7 @@
           { key: 'register', match: 'register.html' },
           { key: 'facturacion', match: 'facturacion.html' },
           { key: 'estadisticas', match: 'estadisticas.html' },
+          { key: 'tabla-puntaje', match: 'tabla de puntaje.html' },
           { key: 'multimedia', match: 'multimedia.html' }
         ].find(m => path.endsWith(m.match));
         
