@@ -1,12 +1,3 @@
-require('dotenv').config();
-
-// --- DEBUGGING: VERIFICAR VARIABLES DE ENTORNO ---
-console.log('[DEBUG] Verificando variables de Cloudinary...');
-console.log(`[DEBUG] CLOUDINARY_CLOUD_NAME: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-console.log(`[DEBUG] CLOUDINARY_API_KEY: ${process.env.CLOUDINARY_API_KEY}`);
-console.log(`[DEBUG] CLOUDINARY_API_SECRET: ${process.env.CLOUDINARY_API_SECRET ? 'Cargado' : 'NO CARGADO O VACÍO'}`);
-console.log('--------------------------------------------------');
-
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -16,15 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { ObjectId } = require('mongodb');
-const cloudinary = require('cloudinary').v2;
-
-// Configurar Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true,
-});
+require('dotenv').config();
 
 // Carga condicional de Helmet y Rate Limit (si están instalados)
 let helmet = null;
@@ -50,9 +33,10 @@ const { connectToMongoDB, getDb, closeConnection } = require('./config/db');
 
 // Middleware de autenticación unificado
 const { protect, authorize } = require('./middleware/auth');
-const { getTeamStats } = require('./controllers/equipoController');
-const apiRoutes = require('./routes/api');
+
+// Importar rutas
 const authRoutes = require('./routes/auth');
+const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
 const equipoRoutes = require('./routes/equipoRoutes');
 const employeesOfMonthRoutes = require('./routes/employeesOfMonth');
@@ -76,6 +60,128 @@ const app = express();
 // En Render SIEMPRE se debe escuchar en process.env.PORT. En local usamos 10000 por defecto.
 const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
 const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
+
+// Paths base para servir archivos estáticos y vistas
+const publicPath = path.join(__dirname);
+const staticPath = publicPath;
+
+// Variable para almacenar la referencia del servidor activo
+let activeServer = null;
+
+// Función para iniciar el servidor
+function startServer(port) {
+  const server = app.listen(port, () => {
+    console.log(`[SERVER] Servidor iniciado en puerto ${port}`);
+    console.log(`[SERVER] Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[SERVER] URL: http://localhost:${port}`);
+  });
+
+  // Manejo de errores del servidor
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`[SERVER] Error: El puerto ${port} ya está en uso`);
+      console.error('[SERVER] Intenta detener otros procesos que usen este puerto');
+      process.exit(1);
+    } else {
+      console.error('[SERVER] Error del servidor:', error);
+    }
+  });
+
+  activeServer = server;
+  return server;
+}
+
+// Guard de acceso: multimedia.html solo para Administrador
+app.use('/multimedia.html', protect, (req, res, next) => {
+  const role = (req.user?.role || '').toString();
+  const allowed = ['Administrador', 'admin', 'administrador'];
+  if (!allowed.includes(role)) {
+    return res.status(403).send('Acceso denegado');
+  }
+  return res.sendFile(path.join(__dirname, 'multimedia.html'));
+});
+
+// Configuración de rutas de archivos estáticos
+app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'agentes')));
+
+// Iniciar conexión Mongoose
+try {
+  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Zombie550211:fDJneHzSCsiU5mdy@cluster0.ywxaotz.mongodb.net/crmagente?retryWrites=true&w=majority&appName=Cluster0';
+  mongoose.set('strictQuery', false);
+  mongoose.connect(MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+    maxPoolSize: 5
+  })
+  .then(() => console.log('[Mongoose] Conectado a MongoDB Atlas'))
+  .catch(err => console.error('[Mongoose] Error de conexión:', err?.message));
+} catch (e) {
+  console.error('[Mongoose] Excepción iniciando conexión:', e?.message);
+}
+
+// Configurar directorio para uploads
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// Configuración de Multer para subida de archivos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    // Generar nombre único: timestamp + nombre original
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, name + '-' + uniqueSuffix + ext);
+  }
+});
+
+// Filtro de archivos permitidos
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+    'video/mp4', 'video/mov', 'video/avi', 'video/quicktime'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Tipo de archivo no permitido'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB límite
+  }
+});
+
+// Helper para opciones de cookie dinámicas según request (soporte localhost:10000 en HTTP)
+function cookieOptionsForReq(req, baseOpts) {
+  const defaultOpts = baseOpts || {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
+  };
+  const proto = (req.headers && req.headers['x-forwarded-proto']) || req.protocol;
+  const isHttps = (proto === 'https') || req.secure;
+  const host = (req.headers && req.headers.host) || '';
+  const isLocal10000 = /localhost:10000$/i.test(host);
+  if (isLocal10000 || !isHttps) {
+    return { ...defaultOpts, secure: false, sameSite: 'lax' };
+  }
+  return defaultOpts;
+}
 
 // CORS endurecido con lista blanca desde .env (ALLOWED_ORIGINS) + orígenes conocidos
 const parseAllowedOrigins = (raw) => (raw || '')
@@ -138,118 +244,6 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// Configuración de middlewares ESENCIALES (deben ir primero)
-app.use(cors(corsOptions));
-app.use(express.json()); // Middleware para parsear JSON
-app.use(express.urlencoded({ extended: true })); // Middleware para parsear cuerpos de formularios
-if (cookieParser) {
-  app.use(cookieParser());
-}
-
-// Middlewares de seguridad
-if (helmet) {
-  app.use(helmet({
-    contentSecurityPolicy: false
-  }));
-}
-
- // Paths base para servir archivos estáticos y vistas
- const publicPath = path.join(__dirname);
- const staticPath = publicPath;
-
-// Rate limiting (si disponible)
-const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
-const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
-
-// Montar rutas de API (DEBEN IR DESPUÉS de los middlewares de parseo)
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/ranking', rankingRoutes);
-app.use('/api/employees-of-month', employeesOfMonthRoutes);
-app.use('/api/equipos', equipoRoutes);
-app.use('/api', apiRoutes); // Esta ruta más general debe ir después de las más específicas
-
-// Guard de acceso: multimedia.html solo para Administrador
-app.use('/multimedia.html', protect, (req, res, next) => {
-  const role = (req.user?.role || '').toString();
-  const allowed = ['Administrador', 'admin', 'administrador'];
-  if (!allowed.includes(role)) {
-    return res.status(403).send('Acceso denegado');
-  }
-  return res.sendFile(path.join(__dirname, 'multimedia.html'));
-});
-
-// Configuración de rutas de archivos estáticos (AHORA VAN DESPUÉS DE LA API)
-app.use(express.static(path.join(__dirname)));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname, 'agentes')));
-
-// Iniciar conexión Mongoose
-try {
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Zombie550211:fDJneHzSCsiU5mdy@cluster0.ywxaotz.mongodb.net/crmagente?retryWrites=true&w=majority&appName=Cluster0';
-  mongoose.set('strictQuery', false);
-  mongoose.connect(MONGODB_URI, {
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-    maxPoolSize: 5
-  })
-  .then(() => console.log('[Mongoose] Conectado a MongoDB Atlas'))
-  .catch(err => console.error('[Mongoose] Error de conexión:', err?.message));
-} catch (e) {
-  console.error('[Mongoose] Excepción iniciando conexión:', e?.message);
-}
-
-// Configurar directorio para uploads
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-app.use('/uploads', express.static(uploadsDir));
-
-// Configuración de Multer para subida en memoria (para Cloudinary)
-const storage = multer.memoryStorage();
-
-// Filtro de archivos permitidos
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
-    'video/mp4', 'video/mov', 'video/avi', 'video/quicktime'
-  ];
-  
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Tipo de archivo no permitido'), false);
-  }
-};
-
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB límite
-  }
-});
-
-// Helper para opciones de cookie dinámicas según request (soporte localhost:10000 en HTTP)
-function cookieOptionsForReq(req, baseOpts) {
-  const defaultOpts = baseOpts || {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    path: '/',
-  };
-  const proto = (req.headers && req.headers['x-forwarded-proto']) || req.protocol;
-  const isHttps = (proto === 'https') || req.secure;
-  const host = (req.headers && req.headers.host) || '';
-  const isLocal10000 = /localhost:10000$/i.test(host);
-  if (isLocal10000 || !isHttps) {
-    return { ...defaultOpts, secure: false, sameSite: 'lax' };
-  }
-  return defaultOpts;
-}
-
-
 // Inicializar la conexión a la base de datos
 let db;
 (async () => {
@@ -262,6 +256,22 @@ let db;
   }
 })();
 
+// Configuración de middlewares
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+if (cookieParser) {
+  app.use(cookieParser());
+}
+// Helmet (si disponible)
+if (helmet) {
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
+}
+// Rate limiting (si disponible)
+const makeLimiter = (opts) => rateLimit ? rateLimit.rateLimit(opts) : ((req, res, next) => next());
+const authLimiter = makeLimiter({ windowMs: 15 * 60 * 1000, limit: 100, standardHeaders: 'draft-7', legacyHeaders: false });
 
 // Crear registro para Team Lineas en colección dedicada "Lineas"
 // Consultar registros de Team Lineas (con filtrado por agente)
@@ -458,6 +468,13 @@ app.use('/api/leads', (req, res, next) => {
   next();
 });
 
+// Usar rutas de autenticación (aplicar limiter suave al grupo si disponible)
+app.use('/api/auth', authLimiter, authRoutes);
+// Montar rutas de API públicas
+app.use('/api', apiRoutes);
+app.use('/api/ranking', rankingRoutes);
+app.use('/api/employees-of-month', employeesOfMonthRoutes);
+app.use('/api/equipos', equipoRoutes);
 
 // Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)
 // Wrapper mínimo por compatibilidad con referencias existentes
@@ -521,8 +538,9 @@ app.get('/api/auth/verify-server', (req, res) => {
       username: null,
       error: error.message
     });
-  }
-}); // Fin del endpoint /api/auth/verify-server
+  } // Fin del try/catch para /api/auth/verify-server
+});
+
 app.get('/api/auth/debug-storage', (req, res) => {
   res.json({
     success: true,
@@ -772,48 +790,48 @@ app.post('/api/auth/reset-password', protect, authorize('Administrador', 'admin'
 
 // ===== ENDPOINTS MULTIMEDIA =====
 
-// Endpoint para subir archivos multimedia a Cloudinary
+// Endpoint para subir archivos multimedia
 app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: 'No se recibió ningún archivo' });
+      return res.status(400).json({
+        success: false,
+        message: 'No se recibió ningún archivo'
+      });
     }
-
-    // Subir el archivo a Cloudinary desde el buffer en memoria
-    const uploadResult = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: 'auto', // Detecta si es imagen o video
-          folder: 'dashboard_promos' // Carpeta en Cloudinary
-        },
-        (error, result) => {
-          if (error) return reject(error);
-          resolve(result);
-        }
-      );
-      uploadStream.end(req.file.buffer);
-    });
 
     const MediaFile = require('./models/MediaFile');
     
+    // Determinar categoría del archivo
+    let category = 'image';
+    if (req.file.mimetype === 'image/gif') {
+      category = 'gif';
+    } else if (req.file.mimetype.startsWith('video/')) {
+      category = 'video';
+    }
+
+    // Crear URL del archivo
+    const fileUrl = `/uploads/${req.file.filename}`;
+
+    // Guardar información en la base de datos
     const mediaFile = new MediaFile({
-      filename: uploadResult.public_id,
+      filename: req.file.filename,
       originalName: req.file.originalname,
       mimetype: req.file.mimetype,
-      size: uploadResult.bytes,
-      path: uploadResult.secure_url, // Usamos la URL segura de Cloudinary
-      url: uploadResult.secure_url, // La URL principal es la de Cloudinary
+      size: req.file.size,
+      path: req.file.path,
+      url: fileUrl,
       uploadedBy: req.user.username,
-      category: uploadResult.resource_type
+      category: category
     });
 
     await mediaFile.save();
 
-    console.log(`[CLOUDINARY] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
+    console.log(`[UPLOAD] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
 
     res.json({
       success: true,
-      message: 'Archivo subido exitosamente a Cloudinary',
+      message: 'Archivo subido exitosamente',
       file: {
         id: mediaFile._id,
         name: mediaFile.originalName,
@@ -826,8 +844,17 @@ app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[CLOUDINARY UPLOAD] Error:', error);
-    res.status(500).json({ success: false, message: 'Error subiendo archivo a Cloudinary' });
+    console.error('[UPLOAD] Error:', error);
+    
+    // Eliminar archivo si hubo error guardando en BD
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error subiendo archivo'
+    });
   }
 });
 
@@ -858,9 +885,31 @@ app.get('/api/media', protect, async (req, res) => {
 
     console.log(`[MEDIA] Encontrados ${files.length} archivos en BD`);
 
-    console.log(`[MEDIA] Devolviendo ${files.length} archivos desde BD`);
+    // Verificar existencia de archivos y filtrar los que no existen
+    const uploadsDir = path.join(__dirname, 'uploads');
+    const validFiles = [];
 
-    const formattedFiles = files.map(file => ({
+    for (const file of files) {
+      try {
+        const filePath = path.join(uploadsDir, path.basename(file.url));
+
+        // Si el archivo existe físicamente, incluirlo
+        if (fs.existsSync(filePath)) {
+          validFiles.push(file);
+          console.log(`[MEDIA] ✓ Archivo válido: ${file.originalName}`);
+        } else {
+          // Si no existe, eliminar la referencia de la base de datos
+          console.log(`[MEDIA] 🗑️ Eliminando referencia a archivo inexistente: ${file.url}`);
+          await collection.deleteOne({ _id: file._id });
+        }
+      } catch (error) {
+        console.error(`[MEDIA] Error verificando archivo ${file.url}:`, error);
+      }
+    }
+
+    console.log(`[MEDIA] Devolviendo ${validFiles.length} archivos válidos`);
+
+    const formattedFiles = validFiles.map(file => ({
       id: file._id,
       name: file.originalName,
       url: file.url,
@@ -882,7 +931,7 @@ app.get('/api/media', protect, async (req, res) => {
   }
 });
 
-
+// Endpoint para eliminar archivo multimedia
 app.delete('/api/media/:id', protect, async (req, res) => {
   try {
     if (!db) await connectToMongoDB();
@@ -1719,7 +1768,7 @@ app.get('/api/customers', protect, async (req, res) => {
         console.log('[DEBUG] Rol supervisor: forceAll ignorado. Filtro aplicado. IDs agentes:', bothTypesArray.map(x=>x.toString()), ' | Campos supervisor:', supervisorTextFields, ' | Nombres sup:', supNameCandidates, ' | Campos agente:', agentTextFields, ' | Nombres agentes:', agentNameCandidates);
       } else {
         // Solo roles privilegiados ven todo; para cualquier otro rol, filtrar por su propio ID
-        const privileged = ['Administrador','Backoffice','Supervisor','Supervisor Team Lineas'];
+        const privileged = ['administrador','admin','backoffice','supervisor','supervisor team lineas'];
         if (privileged.includes(role)) {
           console.log('[DEBUG] Rol privilegiado: sin filtro por agenteId');
         } else {
@@ -1743,7 +1792,7 @@ app.get('/api/customers', protect, async (req, res) => {
     const agenteIdParamRaw = (req.query.agenteId || req.query.agentId || '').toString().trim();
     if (agenteIdParamRaw) {
       console.log('[DEBUG] Parámetro agenteId recibido:', agenteIdParamRaw);
-      if (req.user && (req.user.role === 'Agentes' || req.user.role === 'Lineas-Agentes')) {
+      if (req.user && (role === 'agentes' || role === 'lineas-agentes' || role === 'agent')) {
         // Un agente siempre se filtra a sí mismo 
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
         // Mantener restricción propia, ignorando el parámetro explícito
@@ -1835,7 +1884,7 @@ app.get('/api/customers', protect, async (req, res) => {
     if (!agenteIdParamRaw && agenteParam) {
       console.log('[DEBUG] Parámetro agente recibido:', agenteParam);
       // Si el usuario autenticado es 'agent', forzamos su propio ID y omitimos el parámetro
-      if (req.user && (req.user.role === 'Agentes' || req.user.role === 'Lineas-Agentes')) {
+      if (req.user && (role === 'agentes' || role === 'lineas-agentes' || role === 'agent')) {
         console.log('[DEBUG] Rol agent: ignorando parámetro agente y usando su propio ID con filtro tolerante');
         const currentUserId = (req.user?._id?.toString?.() || req.user?.id?.toString?.() || String(req.user?._id || req.user?.id || ''));
         // Construir filtro robusto por múltiples campos de ID con soporte string y ObjectId
@@ -2840,26 +2889,6 @@ app.post('/api/leads', protect, async (req, res) => {
   }
 });
 
-let activeServer = null;
-function startServer(port, retries = 10) {
-  const p = Number(port) || 10000;
-  const server = app.listen(p, '0.0.0.0', () => {
-    // Archivo server.js - Configuración del servidor Express
-    // Este archivo contiene todos los endpoints de la API del CRM
-    console.log(`\n=== Configuración del Servidor ===\nServidor corriendo en el puerto: ${p}\nEntorno: ${process.env.NODE_ENV || 'development'}\n- Local: http://localhost:${p}\n- Red local: http://${getLocalIp()}:${p}\n======================================\n`);
-  });
-  activeServer = server;
-  server.on('error', (err) => {
-    if (err && err.code === 'EADDRINUSE' && retries > 0) {
-      console.warn(`[PORT] ${p} en uso. Reintentando en ${p + 1}...`);
-      setTimeout(() => startServer(p + 1, retries - 1), 200);
-    } else {
-      console.error('[SERVER] Error al iniciar:', err);
-      process.exit(1);
-    }
-  });
-}
-
 // Función para obtener la IP local
 function getLocalIp() {
   const os = require('os');
@@ -2877,6 +2906,157 @@ function getLocalIp() {
 }
 
 // Endpoints para Empleados del Mes (solo administradores o supervisores de equipo líneas para edición, público para lectura)
+app.get('/api/employees-of-month', async (req, res) => {
+  try {
+    console.log('🌐 Cargando empleados del mes...');
+
+    // Verificar si la base de datos está conectada
+    if (!db) {
+      console.log('Base de datos no conectada, intentando conectar...');
+      await connectToMongoDB();
+    }
+
+    // Verificar si existe la colección
+    const collections = await db.listCollections().toArray();
+    const collectionName = 'employeesOfMonth';
+    const collectionExists = collections.some(c => c.name === collectionName);
+
+    if (!collectionExists) {
+      console.log(`Colección ${collectionName} no existe, devolviendo array vacío`);
+      return res.json({
+        success: true,
+        message: 'No hay empleados del mes registrados',
+        employees: {}
+      });
+    }
+
+    const employeesCollection = db.collection(collectionName);
+
+    // Obtener todos los empleados del mes
+    const employees = await employeesCollection.find({}).toArray();
+
+    // Convertir a objeto para facilitar el acceso desde frontend
+    const employeesObj = {};
+    employees.forEach(emp => {
+      const key = emp.position || emp.employee || 'first';
+      employeesObj[key] = {
+        employee: emp.employee || key,
+        name: emp.name || 'Sin nombre',
+        description: emp.description || 'Sin descripción',
+        imageData: emp.imageData || null,
+        imageClass: emp.imageClass || 'square',
+        date: emp.date || new Date().toLocaleDateString('es-ES')
+      };
+    });
+
+    console.log('✅ Empleados del mes cargados:', Object.keys(employeesObj).length);
+    return res.json({
+      success: true,
+      message: 'Empleados del mes cargados correctamente',
+      employees: employeesObj
+    });
+  } catch (error) {
+    console.error('❌ Error cargando empleados del mes:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al cargar empleados del mes',
+      error: error.message
+    });
+  }
+});
+
+// Guardar empleado del mes
+app.post('/api/employees-of-month', protect, authorize('Administrador', 'Supervisor Team Lineas'), async (req, res) => {
+  try {
+    console.log('💾 Guardando empleado del mes...');
+
+    // Verificar si la base de datos está conectada
+    if (!db) {
+      console.log('Base de datos no conectada, intentando conectar...');
+      await connectToMongoDB();
+    }
+
+    const { employee, name, description, imageData } = req.body || {};
+
+    if (!employee || !name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere el empleado y nombre'
+      });
+    }
+
+    const employeesCollection = db.collection('employeesOfMonth');
+
+    // Guardar o actualizar empleado
+    const result = await employeesCollection.findOneAndUpdate(
+      { employee: employee },
+      {
+        $set: {
+          employee: employee,
+          name: name,
+          description: description || 'Sin descripción',
+          imageData: imageData,
+          date: new Date().toLocaleDateString('es-ES'),
+          updatedAt: new Date()
+        }
+      },
+      {
+        upsert: true,
+        returnDocument: 'after'
+      }
+    );
+
+    console.log('✅ Empleado del mes guardado:', employee);
+    return res.json({
+      success: true,
+      message: 'Empleado del mes guardado correctamente',
+      data: result.value
+    });
+  } catch (error) {
+    console.error('❌ Error guardando empleado del mes:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al guardar empleado del mes',
+      error: error.message
+    });
+  }
+});
+
+// Eliminar empleado del mes
+app.delete('/api/employees-of-month/:employee', protect, authorize('Administrador', 'Supervisor Team Lineas'), async (req, res) => {
+  try {
+    console.log('🗑️ Eliminando empleado del mes:', req.params.employee);
+
+    // Verificar si la base de datos está conectada
+    if (!db) {
+      console.log('Base de datos no conectada, intentando conectar...');
+      await connectToMongoDB();
+    }
+
+    const employeesCollection = db.collection('employeesOfMonth');
+    const result = await employeesCollection.deleteOne({ employee: req.params.employee });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Empleado del mes no encontrado'
+      });
+    }
+
+    console.log('✅ Empleado del mes eliminado:', req.params.employee);
+    return res.json({
+      success: true,
+      message: 'Empleado del mes eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando empleado del mes:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al eliminar empleado del mes',
+      error: error.message
+    });
+  }
+});
 
 // Manejar rutas de la aplicación (SPA) - DEBE IR AL FINAL
 app.get('*', (req, res) => {
@@ -2893,6 +3073,39 @@ app.get('*', (req, res) => {
 // Arrancar servidor
 startServer(PORT);
 
+// Manejo de cierre graceful
+process.on('SIGINT', async () => {
+  console.log('\n[SHUTDOWN] Cerrando servidor...');
+  try {
+    if (activeServer) {
+      activeServer.close(() => {
+        console.log('[SHUTDOWN] Servidor cerrado');
+      });
+    }
+    await closeConnection();
+    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
+  } catch (error) {
+    console.error('[SHUTDOWN] Error cerrando conexión:', error);
+  }
+  process.exit(0);
+});
+
+// Manejo de señales de terminación
+process.on('SIGTERM', async () => {
+  console.log('\n[SHUTDOWN] Recibida señal SIGTERM...');
+  try {
+    if (activeServer) {
+      activeServer.close(() => {
+        console.log('[SHUTDOWN] Servidor cerrado');
+      });
+    }
+    await closeConnection();
+    console.log('[SHUTDOWN] Conexión a la base de datos cerrada');
+  } catch (error) {
+    console.error('[SHUTDOWN] Error cerrando conexión:', error);
+  }
+  process.exit(0);
+});
 
 // Exportar la aplicación
 module.exports = app;

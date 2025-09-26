@@ -1939,7 +1939,7 @@
     async function fetchLeadsAgente() {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        // Nota: /api/customers es público; si no hay token, no abortar, solo omitir el header
+        // Nota: /api/leads requiere autenticación; si no hay token, se omite el header
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
         // Detectar si es usuario Team Líneas
@@ -1949,7 +1949,7 @@
         const isTeamLineasUser = role === 'teamlineas' || username.startsWith('lineas-') || username.includes('lineas');
 
         // Construir URL según el tipo de usuario
-        let url = isTeamLineasUser ? '/api/lineas' : '/api/customers?page=1&limit=100';
+        let url = isTeamLineasUser ? '/api/lineas' : '/api/leads?page=1&limit=100';
         let alreadyFilteredByAgent = isTeamLineasUser; // Team Líneas ya filtra automáticamente por agente
         
         console.log(`[fetchLeadsAgente] Rol: ${role}, Username: ${username}, Team Líneas: ${isTeamLineasUser}`);
@@ -2002,7 +2002,7 @@
         }
         console.log('[fetchLeadsAgente] Datos recibidos (resumen):', {
           tipo: Array.isArray(data) ? 'array' : typeof data,
-          len: Array.isArray(data) ? data.length : (data && Array.isArray(data.leads) ? data.leads.length : (data && Array.isArray(data.data) ? data.data.length : 0))
+          len: Array.isArray(data) ? data.length : (data && Array.isArray(data.data) ? data.data.length : 0)
         });
         
         // Extraer datos según el endpoint
@@ -2011,8 +2011,8 @@
           // Para /api/lineas, los datos vienen en data.data
           leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
         } else {
-          // Para /api/customers, los datos vienen directamente o en data.leads
-          leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.leads) ? data.leads : []);
+          // Para /api/leads, los datos vienen directamente o en data.data
+          leadsRaw = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
         }
 
         // Paginación: si el backend reporta más páginas, descargarlas y combinarlas
@@ -2039,8 +2039,8 @@
                 const d = await r.json();
                 const arr = Array.isArray(d)
                   ? d
-                  : (Array.isArray(d.leads) ? d.leads
-                    : (Array.isArray(d.customers) ? d.customers
+                  : (Array.isArray(d.data) ? d.data
+                    : (Array.isArray(d.data) ? d.data
                       : (Array.isArray(d.data) ? d.data : [])));
                 console.log(`[fetchLeadsAgente] Página ${p} retornó ${arr.length} registros`);
                 leadsRaw = leadsRaw.concat(arr);
