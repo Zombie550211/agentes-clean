@@ -1518,7 +1518,7 @@
     // Función para cargar estadísticas personales del usuario para el sidebar
     async function loadUserStatsForSidebar(username) {
       try {
-        // Obtener datos de leads/customers del usuario
+        // Obtener datos de la colección costumers (mismo endpoint que Costumer.html)
         const response = await fetch('/api/leads', {
           method: 'GET',
           credentials: 'include'
@@ -1536,11 +1536,11 @@
             lead.ownerId === username
           );
 
-          // Calcular ventas del mes actual
+          // Calcular ventas del mes actual - usando campos de costumers
           const currentMonth = new Date().getMonth();
           const currentYear = new Date().getFullYear();
           const monthlyLeads = userLeads.filter(lead => {
-            const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+            const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
             return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
           });
 
@@ -1550,15 +1550,23 @@
             sidebarUserSales.textContent = monthlyLeads.length;
           }
 
-          // Calcular puntos totales
-          const totalPoints = userLeads.reduce((sum, lead) => {
-            const points = parseFloat(lead.puntaje || lead.points || 0);
-            return sum + points;
-          }, 0);
+          // Verificar rol del usuario para mostrar puntos
+          const userData = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+          const userRole = (userData.role || '').toLowerCase();
+          const isAdminOrBackoffice = ['admin', 'administrador', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'].includes(userRole);
 
-          const sidebarUserPoints = document.getElementById('sidebar-user-points');
-          if (sidebarUserPoints) {
-            sidebarUserPoints.textContent = totalPoints.toFixed(1);
+          // Solo calcular y mostrar puntos si no es admin/backoffice
+          if (!isAdminOrBackoffice) {
+            // Calcular puntos totales
+            const totalPoints = userLeads.reduce((sum, lead) => {
+              const points = parseFloat(lead.puntaje || lead.points || 0);
+              return sum + points;
+            }, 0);
+
+            const sidebarUserPoints = document.getElementById('sidebar-user-points');
+            if (sidebarUserPoints) {
+              sidebarUserPoints.textContent = totalPoints.toFixed(1);
+            }
           }
         }
       } catch (error) {
@@ -1572,7 +1580,7 @@
       try {
         console.log('🔄 Cargando datos del dashboard...');
         
-        // Obtener datos de leads/customers
+        // Obtener datos de la colección costumers (mismo endpoint que Costumer.html)
         const response = await fetch('/api/leads', {
           method: 'GET',
           credentials: 'include'
@@ -1582,7 +1590,9 @@
           const data = await response.json();
           const leads = data.data || [];
           
-          console.log('📊 Datos cargados:', leads.length, 'registros');
+          console.log('📊 Datos cargados desde costumers:', leads.length, 'registros');
+          console.log('📊 Estructura de datos:', leads[0] ? Object.keys(leads[0]) : 'Sin datos');
+          console.log('📊 Ejemplo de registro:', leads[0] || 'Sin datos');
           
           // Calcular métricas generales
           await updateDashboardMetrics(leads, user);
@@ -1606,22 +1616,25 @@
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
       
-      // Filtrar leads del mes actual
+      // Filtrar costumers del mes actual - usando campos correctos
       const monthlyLeads = leads.filter(lead => {
-        const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
+        const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
         return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
       });
       
-      // Calcular métricas
+      // Calcular métricas usando campos de costumers
       const totalLeads = leads.length;
-      const totalSales = leads.filter(lead => lead.status === 'vendido' || lead.status === 'cerrado').length;
-      const conversionRate = totalLeads > 0 ? ((totalSales / totalLeads) * 100).toFixed(1) : 0;
+      const totalSales = monthlyLeads.length; // Usar ventas del mes actual
+      const pendingLeads = leads.filter(lead => {
+        const status = (lead.status || '').toLowerCase();
+        return status.includes('pend') || status.includes('espera') || status === 'pendiente';
+      }).length;
       const totalRevenue = leads.reduce((sum, lead) => sum + (parseFloat(lead.valor || lead.revenue || 0)), 0);
       
-      // Actualizar elementos del DOM
+      // Actualizar elementos del DOM con métricas unificadas
       document.getElementById('total-leads').textContent = totalLeads;
       document.getElementById('total-sales').textContent = totalSales;
-      document.getElementById('conversion-rate').textContent = conversionRate + '%';
+      document.getElementById('conversion-rate').textContent = pendingLeads;
       document.getElementById('total-revenue').textContent = '$' + totalRevenue.toLocaleString();
       
       // Calcular cambios (simulados por ahora)
@@ -1636,33 +1649,95 @@
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
       
-      // Filtrar leads del usuario
-      const userLeads = leads.filter(lead => 
-        lead.agenteNombre === user.username || 
-        lead.agente === user.username ||
-        lead.createdBy === user.username ||
-        lead.ownerId === user.username
-      );
+      // Verificar rol del usuario para mostrar/ocultar KPIs específicos
+      const userRole = (user.role || '').toLowerCase();
+      const isAdminOrBackoffice = ['admin', 'administrador', 'backoffice', 'b:o', 'b.o', 'b-o', 'bo'].includes(userRole);
       
-      // Calcular estadísticas del usuario
-      const userMonthlySales = userLeads.filter(lead => {
-        const leadDate = new Date(lead.fecha_contratacion || lead.createdAt || lead.fecha);
-        return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
-      }).length;
+      // Mostrar/ocultar KPIs según el rol del usuario
+      const pointsCard = document.getElementById('points-stat-card');
+      const teamCard = document.getElementById('team-stat-card');
+      const rankingCard = document.getElementById('ranking-stat-card');
+      const cancelledCard = document.getElementById('cancelled-stat-card');
+      const pendingCard = document.getElementById('pending-stat-card');
       
-      const userTotalPoints = userLeads.reduce((sum, lead) => {
-        return sum + parseFloat(lead.puntaje || lead.points || 0);
-      }, 0);
+      if (isAdminOrBackoffice) {
+        // Para Admin/Backoffice: ocultar KPIs de agente y mostrar KPIs administrativos
+        if (pointsCard) pointsCard.style.display = 'none';
+        if (teamCard) teamCard.style.display = 'none';
+        if (rankingCard) rankingCard.style.display = 'none';
+        if (cancelledCard) cancelledCard.style.display = 'flex';
+        if (pendingCard) pendingCard.style.display = 'flex';
+      } else {
+        // Para Agentes: mostrar KPIs de agente y ocultar KPIs administrativos
+        if (pointsCard) pointsCard.style.display = 'flex';
+        if (teamCard) teamCard.style.display = 'flex';
+        if (rankingCard) rankingCard.style.display = 'flex';
+        if (cancelledCard) cancelledCard.style.display = 'none';
+        if (pendingCard) pendingCard.style.display = 'none';
+      }
       
-      // Actualizar elementos del DOM
-      document.getElementById('user-sales-count').textContent = userMonthlySales;
-      document.getElementById('user-points-total').textContent = userTotalPoints.toFixed(1);
-      document.getElementById('user-team-name').textContent = user.team || 'Sin equipo';
+      if (isAdminOrBackoffice) {
+        // Para Admin/Backoffice: calcular métricas globales
+        const allLeads = leads; // Usar todos los leads, no filtrar por usuario
+        
+        // Ventas del mes actual (todas) - usando campos de costumers
+        const monthlySales = allLeads.filter(lead => {
+          const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
+          return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+        }).length;
+        
+        // Canceladas del mes actual - usando campos de costumers
+        const cancelledSales = allLeads.filter(lead => {
+          const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
+          const isThisMonth = leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+          const status = (lead.status || '').toLowerCase();
+          return isThisMonth && (status.includes('cancel') || status.includes('anulad') || status === 'cancelado');
+        }).length;
+        
+        // Pendientes del mes actual - usando campos de costumers
+        const pendingSales = allLeads.filter(lead => {
+          const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
+          const isThisMonth = leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+          const status = (lead.status || '').toLowerCase();
+          return isThisMonth && (status.includes('pend') || status.includes('espera') || status === 'pendiente');
+        }).length;
+        
+        // Actualizar KPIs administrativos
+        document.getElementById('user-sales-count').textContent = monthlySales;
+        document.getElementById('cancelled-count').textContent = cancelledSales;
+        document.getElementById('pending-count').textContent = pendingSales;
+        
+      } else {
+        // Para Agentes: calcular métricas personales
+        const userLeads = leads.filter(lead => 
+          lead.agenteNombre === user.username || 
+          lead.agente === user.username ||
+          lead.createdBy === user.username ||
+          lead.ownerId === user.username
+        );
+        
+        // Ventas del mes del agente - usando campos de costumers
+        const userMonthlySales = userLeads.filter(lead => {
+          const leadDate = new Date(lead.dia_venta || lead.fecha_contratacion || lead.createdAt || lead.fecha);
+          return leadDate.getMonth() === currentMonth && leadDate.getFullYear() === currentYear;
+        }).length;
+        
+        const userTotalPoints = userLeads.reduce((sum, lead) => {
+          return sum + parseFloat(lead.puntaje || lead.points || 0);
+        }, 0);
+        
+        // Actualizar KPIs de agente
+        document.getElementById('user-sales-count').textContent = userMonthlySales;
+        document.getElementById('user-points-total').textContent = userTotalPoints.toFixed(1);
+        document.getElementById('user-team-name').textContent = user.team || 'Sin equipo';
+        
+        // Calcular ranking (simulado)
+        const allAgents = [...new Set(leads.map(lead => lead.agenteNombre || lead.agente).filter(Boolean))];
+        const userRanking = Math.floor(Math.random() * allAgents.length) + 1;
+        document.getElementById('user-ranking').textContent = `#${userRanking}`;
+      }
       
-      // Calcular ranking (simulado)
-      const allAgents = [...new Set(leads.map(lead => lead.agenteNombre || lead.agente).filter(Boolean))];
-      const userRanking = Math.floor(Math.random() * allAgents.length) + 1;
-      document.getElementById('user-ranking').textContent = `#${userRanking}`;
+      console.log(`🔍 KPIs configurados - Usuario: ${user.username}, Rol: ${userRole}, Admin/BO: ${isAdminOrBackoffice}`);
     }
 
     // Función para crear gráficos
@@ -1810,7 +1885,8 @@
               <div class="stat-label">Ventas este mes</div>
             </div>
           </div>
-          <div class="stat-card">
+          <!-- KPI Puntos (solo agentes) -->
+          <div class="stat-card" id="points-stat-card">
             <div class="stat-icon">
               <i class="fas fa-star"></i>
             </div>
@@ -1819,7 +1895,20 @@
               <div class="stat-label">Puntos totales</div>
             </div>
           </div>
-          <div class="stat-card">
+          
+          <!-- KPI Canceladas (solo admin/backoffice) -->
+          <div class="stat-card" id="cancelled-stat-card" style="display: none;">
+            <div class="stat-icon" style="color: #ef4444;">
+              <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-number" id="cancelled-count">0</div>
+              <div class="stat-label">Canceladas</div>
+            </div>
+          </div>
+
+          <!-- KPI Equipo (solo agentes) -->
+          <div class="stat-card" id="team-stat-card">
             <div class="stat-icon">
               <i class="fas fa-users"></i>
             </div>
@@ -1828,7 +1917,20 @@
               <div class="stat-label">Equipo</div>
             </div>
           </div>
-          <div class="stat-card">
+          
+          <!-- KPI Pendientes (solo admin/backoffice) -->
+          <div class="stat-card" id="pending-stat-card" style="display: none;">
+            <div class="stat-icon" style="color: #f59e0b;">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+              <div class="stat-number" id="pending-count">0</div>
+              <div class="stat-label">Ventas pendientes</div>
+            </div>
+          </div>
+
+          <!-- KPI Ranking (solo agentes) -->
+          <div class="stat-card" id="ranking-stat-card">
             <div class="stat-icon">
               <i class="fas fa-trophy"></i>
             </div>
