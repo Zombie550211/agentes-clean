@@ -37,8 +37,15 @@ function initMonthlyCutoff() {
  * Crea la navegación de meses
  */
 function createMonthNavigation() {
+  console.log('[createMonthNavigation] 🔧 Iniciando creación de navegación de meses...');
+
   const mainContent = document.querySelector('.main-content');
   const summaryContainer = document.querySelector('.summary-cards-container');
+
+  console.log('[createMonthNavigation] Elementos encontrados:', {
+    mainContent: !!mainContent,
+    summaryContainer: !!summaryContainer
+  });
 
   if (!mainContent || !summaryContainer) {
     console.error('[Monthly Cutoff] No se encontraron contenedores necesarios');
@@ -65,6 +72,7 @@ function createMonthNavigation() {
 
   // Insertar antes del contenedor de tarjetas
   summaryContainer.insertAdjacentHTML('beforebegin', monthNavHTML);
+  console.log('[createMonthNavigation] ✅ Navegación de meses creada e insertada');
 }
 
 /**
@@ -214,26 +222,42 @@ function updateFooterTexts() {
  * Configura los eventos de navegación
  */
 function setupMonthNavigation() {
+  console.log('[setupMonthNavigation] 🔧 Configurando eventos de navegación...');
+
   const prevBtn = document.getElementById('prev-month');
   const nextBtn = document.getElementById('next-month');
 
+  console.log('[setupMonthNavigation] Botones encontrados:', {
+    prevBtn: !!prevBtn,
+    nextBtn: !!nextBtn
+  });
+
   if (prevBtn) {
+    console.log('[setupMonthNavigation] ✅ Configurando evento click para botón Anterior');
     prevBtn.addEventListener('click', () => {
+      console.log('[setupMonthNavigation] 🖱️ Click en botón Anterior');
       navigateMonth(-1);
     });
   }
 
   if (nextBtn) {
+    console.log('[setupMonthNavigation] ✅ Configurando evento click para botón Siguiente');
     nextBtn.addEventListener('click', () => {
+      console.log('[setupMonthNavigation] 🖱️ Click en botón Siguiente');
       navigateMonth(1);
     });
   }
+
+  console.log('[setupMonthNavigation] ✅ Eventos de navegación configurados');
 }
 
 /**
  * Navega entre meses
  */
 function navigateMonth(direction) {
+  console.log(`[navigateMonth] 🔄 Iniciando navegación con dirección: ${direction}`);
+  console.log(`[navigateMonth] Mes actual antes: ${currentMonth}/${currentYear}`);
+
   const newMonth = currentMonth + direction;
 
   if (newMonth < 1) {
@@ -246,16 +270,21 @@ function navigateMonth(direction) {
     currentMonth = newMonth;
   }
 
+  console.log(`[navigateMonth] Nuevo mes después: ${currentMonth}/${currentYear}`);
+
   // Actualizar título
   const monthTitle = document.getElementById('current-month-title');
   if (monthTitle) {
-    monthTitle.textContent = `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
+    const newTitle = `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`;
+    console.log(`[navigateMonth] Actualizando título a: ${newTitle}`);
+    monthTitle.textContent = newTitle;
   }
 
   // Actualizar textos de footer
   updateFooterTexts();
 
   // Cargar datos del nuevo mes
+  console.log(`[navigateMonth] 🔄 Cargando datos del nuevo mes...`);
   loadMonthData(currentYear, currentMonth);
 }
 
@@ -562,27 +591,44 @@ function showKPIError() {
     }
   });
 }
-
 /**
  * Actualiza la tabla con separación mensual
  */
 function updateTableWithMonthSeparation(leads, year, month) {
+  console.log(`[updateTableWithMonthSeparation] 🔄 Procesando ${leads.length} leads para ${year}-${month}`);
+
   const leadsByMonth = new Map();
 
-  leads.forEach(lead => {
+  leads.forEach((lead, index) => {
     const diaVenta = lead.dia_venta || lead.fecha_contratacion || lead.fecha || '';
     if (diaVenta) {
-      const leadDate = new Date(diaVenta);
-      const leadMonth = leadDate.getMonth() + 1;
-      const leadYear = leadDate.getFullYear();
-      const monthKey = `${leadYear}-${leadMonth}`;
+      const leadDate = normalizeDate(diaVenta);
+      if (leadDate && !isNaN(leadDate.getTime())) {
+        const leadMonth = leadDate.getMonth() + 1;
+        const leadYear = leadDate.getFullYear();
+        const monthKey = `${leadYear}-${leadMonth}`;
 
-      if (!leadsByMonth.has(monthKey)) {
-        leadsByMonth.set(monthKey, []);
+        if (!leadsByMonth.has(monthKey)) {
+          leadsByMonth.set(monthKey, []);
+        }
+        leadsByMonth.get(monthKey).push(lead);
+
+        if (index < 3) {
+          console.log(`[updateTableWithMonthSeparation] Lead ${index + 1}: ${lead.nombre_cliente} | Fecha: ${diaVenta} | Procesado como: ${monthKey}`);
+        }
+      } else {
+        if (index < 3) {
+          console.log(`[updateTableWithMonthSeparation] Lead ${index + 1} fecha inválida: ${diaVenta}`);
+        }
       }
-      leadsByMonth.get(monthKey).push(lead);
+    } else {
+      if (index < 3) {
+        console.log(`[updateTableWithMonthSeparation] Lead ${index + 1} sin fecha: ${lead.nombre_cliente}`);
+      }
     }
   });
+
+  console.log(`[updateTableWithMonthSeparation] ✅ Leads organizados por meses:`, Array.from(leadsByMonth.entries()).map(([key, leads]) => `${key}: ${leads.length}`).join(', '));
 
   renderTableWithSeparators(leadsByMonth, year, month);
 }
