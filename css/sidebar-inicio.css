@@ -15,6 +15,11 @@
   display: flex;
   flex-direction: column;
   overflow: hidden; /* Evita que las sombras/elementos internos se salgan */
+  font-family: 'Roboto', sans-serif;
+}
+
+.sidebar.sidebar-inicio * {
+  font-family: 'Roboto', sans-serif;
 }
 
 /* Título y separadores */

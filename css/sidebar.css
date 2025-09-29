@@ -11,6 +11,11 @@
   box-shadow: 2px 0 10px rgba(0,0,0,0.05);
   border-right: 1px solid #e5e7eb;
   z-index: 1000;
+  font-family: 'Roboto', sans-serif;
+}
+
+.sidebar * {
+  font-family: 'Roboto', sans-serif;
 }
 
 /* Información del usuario - Estilo moderno */

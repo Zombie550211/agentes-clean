@@ -36,6 +36,12 @@
 body{
   background: var(--color-bg);
   color: var(--color-text);
+  font-family: 'Roboto', sans-serif;
+}
+
+/* Aplicar fuente global */
+*, *::before, *::after {
+  font-family: 'Roboto', sans-serif;
 }
 
 /* Tarjetas / contenedores */
