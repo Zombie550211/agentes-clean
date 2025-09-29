@@ -126,7 +126,7 @@
   <script src="agentes/js/auth-check.js"></script>
   <script src="/js/logout-handler.js"></script>
   <script src="/js/user-info.js"></script>
-  <script src="js/sidebar-loader.js"></script>
+  <script src="js/sidebar-loader.js"></script>`n  <script src="js/monthly-cutoff.js"></script>
   <!-- Teams API: definición de equipos, supervisores y agentes -->
   <script src="utils/teams.js?v=20250904"></script>
   <style>
@@ -908,6 +908,158 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <script src="utils/teams.js"></script>
   <script>
+    // Función para crear toolbar de supervisor
+    window.createSupervisorToolbar = function(leads) {
+      console.log('🔧 [createSupervisorToolbar] Iniciando creación de toolbar...');
+      
+      try {
+        // Detectar si el usuario es supervisor
+        const userObj = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
+        const rawRole = (userObj.role || userObj?.usuario?.role || '').toString().toLowerCase();
+        const roleIsSupervisor = rawRole === 'supervisor';
+        
+        console.log('[createSupervisorToolbar] Usuario:', userObj.username);
+        console.log('[createSupervisorToolbar] Rol:', rawRole);
+        console.log('[createSupervisorToolbar] Es supervisor:', roleIsSupervisor);
+        
+        if (!roleIsSupervisor) {
+          console.log('[createSupervisorToolbar] Usuario no es supervisor, abortando');
+          return;
+        }
+        
+        // Obtener agentes del equipo usando Teams API
+        const teamsApi = window.Teams;
+        if (!teamsApi) {
+          console.warn('[createSupervisorToolbar] Teams API no disponible');
+          return;
+        }
+        
+        const supervisorName = userObj.username || '';
+        const teamAgents = teamsApi.getAgentsBySupervisor(supervisorName) || [];
+        
+        console.log('[createSupervisorToolbar] Supervisor:', supervisorName);
+        console.log('[createSupervisorToolbar] Agentes del equipo:', teamAgents);
+        
+        if (teamAgents.length === 0) {
+          console.warn('[createSupervisorToolbar] No se encontraron agentes para el supervisor');
+          return;
+        }
+        
+        // Buscar el elemento tbody
+        const tbodyEl = document.getElementById('costumer-tbody');
+        if (!tbodyEl) {
+          console.error('[createSupervisorToolbar] No se encontró costumer-tbody');
+          return;
+        }
+        
+        const tableEl = tbodyEl.closest('table');
+        const tableResponsive = tableEl ? tableEl.closest('.table-responsive') : null;
+        
+        // Crear o reutilizar la barra de filtros
+        let bar = document.getElementById('supervisor-agent-filter');
+        if (!bar) {
+          bar = document.createElement('div');
+          bar.id = 'supervisor-agent-filter';
+          bar.style.cssText = `
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          `;
+          
+          // Insertar antes de la tabla
+          if (tableResponsive) {
+            tableResponsive.parentElement.insertBefore(bar, tableResponsive);
+          } else if (tableEl) {
+            tableEl.parentElement.insertBefore(bar, tableEl);
+          }
+          
+          console.log('[createSupervisorToolbar] ✅ Toolbar creada e insertada');
+        }
+        
+        // Limpiar contenido
+        bar.innerHTML = '';
+        
+        // Agregar título
+        const titleSpan = document.createElement('span');
+        titleSpan.textContent = 'Filtrar por agente:';
+        titleSpan.style.cssText = 'font-weight: 600; font-size: 14px; color: #334155; margin-right: 12px;';
+        bar.appendChild(titleSpan);
+        
+        // Función para crear botones
+        const createButton = (label, value) => {
+          const btn = document.createElement('button');
+          btn.textContent = label;
+          btn.type = 'button';
+          btn.style.cssText = `
+            padding: 6px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            background: #ffffff;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+          `;
+          
+          const isActive = (window.supervisorAgentFilter || null) === value;
+          if (isActive) {
+            btn.style.background = '#1d4ed8';
+            btn.style.color = '#ffffff';
+            btn.style.borderColor = '#1d4ed8';
+          }
+          
+          btn.addEventListener('click', () => {
+            window.supervisorAgentFilter = value;
+            console.log('[createSupervisorToolbar] Filtro seleccionado:', value || 'Todos');
+            
+            // Re-renderizar tabla
+            if (typeof window.renderCostumerTable === 'function' && window.ultimaListaLeads) {
+              window.renderCostumerTable(window.ultimaListaLeads);
+              window.createSupervisorToolbar(window.ultimaListaLeads);
+            }
+          });
+          
+          btn.addEventListener('mouseenter', () => {
+            if (!isActive) {
+              btn.style.background = '#f1f5f9';
+            }
+          });
+          
+          btn.addEventListener('mouseleave', () => {
+            if (!isActive) {
+              btn.style.background = '#ffffff';
+            }
+          });
+          
+          return btn;
+        };
+        
+        // Agregar botón "Todos"
+        bar.appendChild(createButton('Todos', null));
+        
+        // Agregar botón por cada agente
+        teamAgents.forEach(agentCanonical => {
+          const displayName = teamsApi.getDisplayName(agentCanonical) || 
+                             agentCanonical.replace(/\b\w/g, c => c.toUpperCase());
+          bar.appendChild(createButton(displayName, agentCanonical));
+        });
+        
+        console.log('[createSupervisorToolbar] ✅ Toolbar completada con', teamAgents.length + 1, 'botones');
+        
+      } catch (error) {
+        console.error('[createSupervisorToolbar] Error:', error);
+      }
+    };
+  </script>
+  <script>
     // Funci¨®n para verificar el rol del usuario y mostrar/ocultar elementos seg¨²n corresponda
     function checkUserRole() {
       try {
@@ -1315,9 +1467,12 @@
 
       // Cargar datos iniciales
       if (typeof cargarDatosIniciales === 'function') {
-        cargarDatosIniciales();
-      } else if (typeof fetchLeadsAgente === 'function') {
-        fetchLeadsAgente();
+        console.log('[LEGACY init] Llamando a cargarDatosIniciales (que ahora debería estar vacío o usar monthly-cutoff)');
+        // NOTA: La carga real ahora es manejada por monthly-cutoff.js
+        // cargarDatosIniciales(); // Deshabilitado para evitar doble carga
+      } else {
+        console.log('[LEGACY init] No se encontró cargarDatosIniciales.');
+        // fetchLeadsAgente(); // Deshabilitado
       }
     });
   </script>
@@ -1935,8 +2090,10 @@
       }
     }
 
-    // Cargar leads del agente desde backend y actualizar UI
+    // Cargar leads del agente desde backend y actualizar UI - DESHABILITADA
     async function fetchLeadsAgente() {
+      console.log('[LEGACY fetch] fetchLeadsAgente deshabilitado para prevenir conflicto con monthly-cutoff.js');
+      return; // Salir para no ejecutar lógica antigua
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         // Nota: /api/leads requiere autenticación; si no hay token, se omite el header
@@ -2198,6 +2355,18 @@
         } else {
             console.error('La funci¨®n renderCostumerTable no est¨¢ disponible');
         }
+        
+        // Crear toolbar de supervisor DESPUÉS de renderizar la tabla
+        if (typeof window.createSupervisorToolbar === 'function') {
+            console.log('🔧 [fetchLeadsAgente] Llamando a createSupervisorToolbar...');
+            console.log('🔧 [fetchLeadsAgente] Datos disponibles:', !!normalizedLeads, 'Cantidad:', normalizedLeads?.length || 0);
+            window.createSupervisorToolbar(normalizedLeads);
+            console.log('🔧 [fetchLeadsAgente] createSupervisorToolbar ejecutada');
+        } else {
+            console.error('❌ [fetchLeadsAgente] createSupervisorToolbar NO está disponible');
+            console.log('🔧 [fetchLeadsAgente] Verificando funciones disponibles:', Object.keys(window).filter(k => k.includes('create')));
+        }
+        
         // Logs de diagn¨®stico de asignaci¨®n (por TEAM y agente)
         try { if (typeof logDiagnosticoAsignacion === 'function') logDiagnosticoAsignacion(normalizedLeads); } catch(_) {}
         updateSummaryCards(normalizedLeads);
@@ -3133,13 +3302,28 @@
           || teamForUser
         );
         try {
+          console.log('===========================================');
+          console.log('🔍 [DETECCIÓN SUPERVISOR] Iniciando...');
           console.log('[Toolbar Supervisor] usuarioActual =', currentUserName);
           console.log('[Toolbar Supervisor] usuarioCanon =', currentCanon);
+          console.log('[Toolbar Supervisor] userObj =', userObj);
+          console.log('[Toolbar Supervisor] rawRole =', rawRole);
           console.log('[Toolbar Supervisor] roleIsSupervisor =', roleIsSupervisor, '| teamForUser =', teamForUser);
           console.log('[Toolbar Supervisor] isSupervisorUser =', isSupervisorUser);
           console.log('[Toolbar Supervisor] Teams API lista =', !!teamsApiRoot);
+          console.log('===========================================');
         } catch(_) {}
+        
+        if (!isSupervisorUser) {
+          console.warn('⚠️ [Toolbar Supervisor] Usuario NO detectado como supervisor. Toolbar NO se creará.');
+          console.log('[Toolbar Supervisor] Razones posibles:');
+          console.log('  - roleIsSupervisor:', roleIsSupervisor);
+          console.log('  - teamForUser:', teamForUser);
+          console.log('  - Teams API disponible:', !!teamsApiRoot);
+        }
+        
         if (isSupervisorUser) {
+          console.log('✅ [Toolbar Supervisor] Usuario ES supervisor. Creando toolbar...');
           // --- Toolbar de filtro por agente (TEAM SUPERVISOR) ---
           (function ensureSupervisorAgentFilterToolbar(){
             try {
@@ -3187,27 +3371,61 @@
               } catch(_) {}
               // Compartir lista con el bloque de render para evitar inconsistencias
               try { window.__teamAgentsCanon = Array.isArray(teamAgents) ? teamAgents.slice() : []; } catch(_) {}
+              console.log('[Toolbar Supervisor] Intentando crear toolbar de filtros...');
+              console.log('[Toolbar Supervisor] teamAgents =', teamAgents);
               const tbodyEl = document.getElementById('costumer-tbody');
-              if (!tbodyEl) return;
+              console.log('[Toolbar Supervisor] tbodyEl encontrado:', !!tbodyEl);
+              if (!tbodyEl) {
+                console.warn('[Toolbar Supervisor] No se encontró el elemento costumer-tbody, abortando creación de toolbar');
+                return;
+              }
               const tableEl = tbodyEl.closest('table');
-              const host = tableEl ? tableEl : tbodyEl;
+              const tableResponsive = tableEl ? tableEl.closest('.table-responsive') : null;
+              const host = tableResponsive || tableEl || tbodyEl;
+              console.log('[Toolbar Supervisor] host para insertar toolbar:', host?.className || host?.tagName);
+              
               let bar = document.getElementById('irania-agent-filter');
               if (!bar) {
+                console.log('[Toolbar Supervisor] Creando nuevo elemento de toolbar...');
                 bar = document.createElement('div');
                 bar.id = 'irania-agent-filter';
-                bar.style.margin = '10px 0';
+                bar.style.margin = '15px 0';
                 bar.style.display = 'flex';
                 bar.style.flexWrap = 'wrap';
                 bar.style.gap = '8px';
-                (host.parentElement || host).insertBefore(bar, host);
-                bar.style.position = 'sticky';
-                bar.style.top = '0';
+                bar.style.alignItems = 'center';
+                bar.style.position = 'relative';
                 bar.style.zIndex = '10';
-                bar.style.background = '#ffffff';
-                bar.style.padding = '8px 8px';
+                bar.style.background = '#f8fafc';
+                bar.style.padding = '12px 16px';
+                bar.style.borderRadius = '8px';
+                bar.style.border = '1px solid #e2e8f0';
+                bar.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                
+                // Insertar ANTES de la tabla
+                if (tableResponsive) {
+                  tableResponsive.parentElement.insertBefore(bar, tableResponsive);
+                } else if (tableEl) {
+                  tableEl.parentElement.insertBefore(bar, tableEl);
+                } else {
+                  tbodyEl.parentElement.insertBefore(bar, tbodyEl);
+                }
+                console.log('[Toolbar Supervisor] Toolbar insertada en el DOM');
+              } else {
+                console.log('[Toolbar Supervisor] Reutilizando toolbar existente');
               }
               // Limpiar y reconstruir botones
               bar.innerHTML = '';
+              
+              // Agregar título/etiqueta
+              const titleSpan = document.createElement('span');
+              titleSpan.textContent = 'Filtrar por agente:';
+              titleSpan.style.fontWeight = '600';
+              titleSpan.style.fontSize = '14px';
+              titleSpan.style.color = '#334155';
+              titleSpan.style.marginRight = '12px';
+              bar.appendChild(titleSpan);
+              
               const mkBtn = (label, value) => {
                 const b = document.createElement('button');
                 b.textContent = label;
@@ -3236,15 +3454,19 @@
                 });
                 return b;
               };
+              console.log('[Toolbar Supervisor] Creando botón "Todos"...');
               bar.appendChild(mkBtn('Todos', null));
+              console.log('[Toolbar Supervisor] Creando botones para', teamAgents.length, 'agentes...');
               teamAgents.forEach(a => {
                 const teamsApi = (window && window.Teams) ? window.Teams : null;
                 const label = (teamsApi && typeof teamsApi.getDisplayName === 'function')
                   ? teamsApi.getDisplayName(a)
                   : a.replace(/\b\w/g, c => c.toUpperCase());
+                console.log('[Toolbar Supervisor] Creando botón para agente:', label);
                 bar.appendChild(mkBtn(label, a));
               });
-              try { console.log('[Toolbar Supervisor] Total chips renderizados =', 1 + teamAgents.length); } catch(_) {}
+              console.log('[Toolbar Supervisor] ✅ Toolbar creada exitosamente con', 1 + teamAgents.length, 'botones');
+              console.log('[Toolbar Supervisor] Toolbar visible:', bar.style.display !== 'none');
               // Encabezado de columnas: sin comportamiento sticky (restaurado al estado original)
             } catch(e) { console.warn('Toolbar TEAM IRANIA:', e); }
           })();
@@ -3624,6 +3846,10 @@
 
     // Funci¨®n para actualizar las tarjetas de resumen
     function updateSummaryCards(leads) {
+      // SISTEMA DESHABILITADO - Usar monthly-cutoff.js en su lugar
+      console.log('[LEGACY KPIs] Sistema original deshabilitado - usando monthly-cutoff.js');
+      return;
+      
       // Obtener referencias a los elementos del DOM primero
       const ventasHoyElement = document.getElementById('costumer-ventas-hoy');
       const ventasMesElement = document.getElementById('costumer-ventas-mes');
@@ -4002,5 +4228,6 @@
   
   <!-- Script de cierre de sesi¨®n unificado -->
   <script src="js/auth-logout.js"></script>
+  <script src="js/monthly-cutoff.js"></script>
 </body>
 </html>

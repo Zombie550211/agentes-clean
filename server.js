@@ -61,35 +61,8 @@ const app = express();
 const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
 const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
 
-// Paths base para servir archivos estáticos y vistas
-const publicPath = path.join(__dirname);
-const staticPath = publicPath;
-
 // Variable para almacenar la referencia del servidor activo
 let activeServer = null;
-
-// Función para iniciar el servidor
-function startServer(port) {
-  const server = app.listen(port, () => {
-    console.log(`[SERVER] Servidor iniciado en puerto ${port}`);
-    console.log(`[SERVER] Entorno: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`[SERVER] URL: http://localhost:${port}`);
-  });
-
-  // Manejo de errores del servidor
-  server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-      console.error(`[SERVER] Error: El puerto ${port} ya está en uso`);
-      console.error('[SERVER] Intenta detener otros procesos que usen este puerto');
-      process.exit(1);
-    } else {
-      console.error('[SERVER] Error del servidor:', error);
-    }
-  });
-
-  activeServer = server;
-  return server;
-}
 
 // Guard de acceso: multimedia.html solo para Administrador
 app.use('/multimedia.html', protect, (req, res, next) => {
@@ -432,11 +405,11 @@ const loginLimiter = makeLimiter({ windowMs: 10 * 60 * 1000, limit: 20, standard
 // Ruta protegida para Costumer.html (solo administradores) - DEBE IR ANTES de express.static
 app.get('/Costumer.html', protect, (req, res) => {
   // Servir Costumer.html a cualquier usuario autenticado (visibilidad de datos se controla en los endpoints)
-  return res.sendFile(path.join(publicPath, 'Costumer.html'));
+  return res.sendFile(path.join(__dirname, 'Costumer.html'));
 });
 
 // Servir archivos estáticos (EXCEPTO Costumer.html que ya está protegido)
-app.use(express.static(staticPath, {
+app.use(express.static(__dirname, {
   extensions: ['html', 'htm'],
   setHeaders: (res, filePath) => {
     // Configurar los headers correctos para archivos estáticos
@@ -453,20 +426,13 @@ app.use(express.static(staticPath, {
 
 // En caso de que esta ruta se evalúe después de static, servir igualmente a usuarios autenticados
 app.get('/Costumer.html', protect, (req, res) => {
-  return res.sendFile(path.join(publicPath, 'Costumer.html'));
+  return res.sendFile(path.join(__dirname, 'Costumer.html'));
 });
 
 // Handle CORS preflight for all routes
 app.options('*', cors(corsOptions));
 
-// Middleware para loggear todas las peticiones a /api/leads
-app.use('/api/leads', (req, res, next) => {
-  console.error('🔥🔥🔥 PETICIÓN A /api/leads INTERCEPTADA EN SERVER.JS 🔥🔥🔥');
-  console.error('Method:', req.method);
-  console.error('URL:', req.url);
-  console.error('Query:', req.query);
-  next();
-});
+// El middleware de logueo para /api/leads ha sido eliminado ya que el endpoint duplicado fue deshabilitado.
 
 // Usar rutas de autenticación (aplicar limiter suave al grupo si disponible)
 app.use('/api/auth', authLimiter, authRoutes);
@@ -2214,7 +2180,7 @@ app.get('/', (req, res) => {
 
 // Ruta de la aplicación principal (protección vía frontend con auth-check.js)
 app.get('/inicio', (req, res) => {
-  res.sendFile(path.join(publicPath, 'lead.html'));
+  res.sendFile(path.join(__dirname, 'lead.html'));
 });
 
 // Ruta protegida para Costumer.html (solo administradores)
@@ -2222,7 +2188,7 @@ app.get('/Costumer.html', protect, (req, res, next) => {
   // Verificar si el usuario es administrador
   if (req.user && req.user.role === 'admin') {
     // Si es administrador, servir el archivo
-    return res.sendFile(path.join(publicPath, 'Costumer.html'));
+    return res.sendFile(path.join(__dirname, 'Costumer.html'));
   } else {
     // Si no es administrador, redirigir a página de inicio con mensaje de error
     return res.redirect('/inicio?error=Acceso denegado. Se requiere rol de administrador.');
@@ -2237,8 +2203,9 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/crmage
 
 // La función connectToMongoDB ahora se importa desde ./config/db.js
 
-// Endpoint unificado para obtener clientes con soporte para paginación y datos de gráficas
-// Solo accesible para administradores
+// --- ENDPOINT DUPLICADO DESHABILITADO ---
+// Este endpoint fue movido a routes/api.js para manejar todos los roles
+/*
 app.get('/api/leads', protect, (req, res, next) => {
   // Verificar si el usuario es administrador
   if (!req.user || req.user.role !== 'admin') {
@@ -2673,8 +2640,11 @@ app.post('/api/customers', protect, async (req, res) => {
     });
   }
 });
+*/
 
-// Endpoint para obtener leads con filtros (solo administradores)
+// --- ENDPOINT DUPLICADO DESHABILITADO ---
+// Este endpoint fue movido a routes/api.js para manejar todos los roles
+/*
 app.get('/api/leads', protect, (req, res, next) => {
   // Verificar si el usuario es administrador
   if (!req.user || req.user.role !== 'admin') {
@@ -2791,7 +2761,7 @@ app.get('/api/leads', protect, (req, res, next) => {
     });
   }
 });
-
+*/
 
 
 // Endpoint para crear un nuevo lead
@@ -3065,10 +3035,30 @@ app.get('*', (req, res) => {
     return res.status(404).send('Archivo no encontrado');
   }
   // Para cualquier otra ruta, servir lead.html (útil para SPA)
-  res.sendFile(path.join(publicPath, 'lead.html'));
+  res.sendFile(path.join(__dirname, 'lead.html'));
 });
 
-// (el listener anterior fue consolidado con startServer)
+// Función para iniciar el servidor
+function startServer(port) {
+  const server = app.listen(port, () => {
+    console.log(`[SERVER] Servidor corriendo en el puerto ${port}`);
+    console.log(`[SERVER] Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[SERVER] URL: http://localhost:${port}`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`[SERVER] Error: El puerto ${port} ya está en uso`);
+      console.error('[SERVER] Intenta detener otros procesos que usen este puerto');
+      process.exit(1);
+    } else {
+      console.error('[SERVER] Error del servidor:', error);
+    }
+  });
+
+  activeServer = server;
+  return server;
+}
 
 // Arrancar servidor
 startServer(PORT);

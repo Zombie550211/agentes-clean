@@ -5,6 +5,35 @@ const { protect } = require('../middleware/auth');
 const User = require('../models/User');
 const { connectToMongoDB, getDb } = require('../config/db');
 
+// --- INICIO: Lógica de Equipos (adaptada de utils/teams.js) ---
+const norm = (s) => {
+  try {
+    return String(s || '').normalize('NFD').replace(/\p{Diacritic}+/gu, '').trim().toLowerCase().replace(/[^a-z0-9 ]+/g, '').replace(/\s+/g, ' ');
+  } catch { return ''; }
+};
+
+const TEAMS = {
+  'team irania': { supervisor: 'irania serrano', agents: ['josue renderos', 'tatiana ayala', 'giselle diaz', 'miguel nunez', 'roxana martinez', 'irania serrano'] },
+  'team bryan pleitez': { supervisor: 'bryan pleitez', agents: ['abigail galdamez', 'alexander rivera', 'diego mejia', 'evelin garcia', 'fabricio panameno', 'luis chavarria', 'steven varela'] },
+  'team marisol beltran': { supervisor: 'marisol beltran', agents: ['fernanda castillo', 'jonathan morales', 'katerine gomez', 'kimberly iglesias', 'stefani martinez', 'eduardo rivas'] },
+  'team roberto velasquez': { supervisor: 'roberto velasquez', agents: ['cindy flores', 'daniela bonilla', 'francisco aguilar', 'levy ceren', 'lisbeth cortez', 'lucia ferman', 'nelson ceren'] },
+  'team randal martinez': { supervisor: 'randal martinez', agents: ['anderson guzman', 'carlos grande', 'guadalupe santana', 'julio chavez', 'priscila hernandez', 'riquelmi torres'] },
+  'team lineas': { supervisor: 'jonathan figueroa', additionalSupervisors: ['luis gutierrez'], agents: ['lineas-carlos', 'lineas-cristian r', 'lineas-edward', 'lineas-jocelyn', 'lineas-oscar r', 'lineas-daniel', 'lineas-karla', 'lineas-sandy', 'lineas-angie', 'luis gutierrez'] }
+};
+
+const getAgentsBySupervisor = (supName) => {
+  const normalizedSupName = norm(supName);
+  for (const teamKey in TEAMS) {
+    const team = TEAMS[teamKey];
+    if (norm(team.supervisor) === normalizedSupName || (team.additionalSupervisors && team.additionalSupervisors.map(norm).includes(normalizedSupName))) {
+      // Devolver nombres de agentes y también el del supervisor para que vea sus propios leads
+      return [...(team.agents || []), team.supervisor, ...(team.additionalSupervisors || [])];
+    }
+  }
+  return [];
+};
+// --- FIN: Lógica de Equipos ---
+
 // Middleware para manejar la conexión a la base de datos
 const withDatabase = async (req, res, next) => {
   try {
@@ -78,7 +107,42 @@ router.get('/leads', protect, withDatabase, async (req, res) => {
     console.error('[DEBUG] Rol del usuario:', usuarioAutenticado?.role || 'no autenticado');
     
     // Filtros de visibilidad por rol - REACTIVADO
-    if (!esAdmin && !esBackoffice) {
+    if (esSupervisor) {
+      const supervisorName = (usuarioAutenticado?.username || '').trim();
+      console.error(`[DEBUG] Rol Supervisor detectado: ${supervisorName}`);
+      
+      const agentsOfSupervisor = getAgentsBySupervisor(supervisorName);
+      // Normalizar nombres para la consulta
+      const normalizedAgents = agentsOfSupervisor.map(norm).filter(Boolean);
+
+      console.error(`[DEBUG] Agentes encontrados para supervisor:`, normalizedAgents);
+
+      if (normalizedAgents.length > 0) {
+        // Crear expresiones regulares para búsqueda case-insensitive
+        const agentRegexps = normalizedAgents.map(agent => new RegExp(`^${agent.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i'));
+
+        console.error(`[DEBUG] Expresiones regulares para agentes:`, agentRegexps);
+
+        const supervisorFilter = {
+          $or: [
+            { agenteNombre: { $in: agentRegexps } },
+            { agente: { $in: agentRegexps } },
+            { createdBy: { $in: agentRegexps } },
+            { owner: { $in: agentRegexps } },
+            { registradoPor: { $in: agentRegexps } },
+            { usuario: { $in: agentRegexps } },
+            // Fallback a los nombres normalizados por si acaso
+            { agenteNombre: { $in: normalizedAgents } },
+            { agente: { $in: normalizedAgents } }
+          ]
+        };
+        allFilters.push(supervisorFilter);
+      } else {
+        // Si el supervisor no tiene agentes, no debería ver nada (o solo lo suyo)
+        // Para seguridad, filtramos por su propio nombre como fallback.
+        allFilters.push({ agenteNombre: supervisorName });
+      }
+    } else if (!esAdmin && !esBackoffice) {
       const userName = (usuarioAutenticado?.username || '').trim();
       const userId = usuarioAutenticado?._id?.toString() || usuarioAutenticado?.id?.toString() || '';
       
