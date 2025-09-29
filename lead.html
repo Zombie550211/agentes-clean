@@ -3577,8 +3577,8 @@
               // Enviar a /api/lineas
               customerResponse = await makeRequest('/api/lineas', lineasData);
             } else {
-              // Envío estándar a /api/customers
-              customerResponse = await makeRequest("/api/customers", customerDataToSend);
+              // Envío estándar a /api/leads
+              customerResponse = await makeRequest("/api/leads", customerDataToSend);
             }
           
           console.log('=== RESPUESTAS DEL SERVIDOR ===');
