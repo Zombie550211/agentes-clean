@@ -284,6 +284,28 @@
       color: #f97316;
     }
 
+    /* Estilos para la imagen del astronauta */
+    .astronaut-image {
+      width: 70%;
+      height: 70%;
+      object-fit: contain;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    .first-place .astronaut-image {
+      width: 75%;
+      height: 75%;
+    }
+
+    @keyframes float {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
     .position-badge {
       position: absolute;
       bottom: -10px;
@@ -1856,9 +1878,7 @@
                 <div class="podium-item second-place">
                   <div class="podium-line"></div>
                   <div class="podium-circle">
-                    <div class="medal-icon">
-                      <i class="fas fa-medal"></i>
-                    </div>
+                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
                     <div class="position-badge">2°</div>
                   </div>
                   <div class="agent-info">
@@ -1872,9 +1892,7 @@
                 <div class="podium-item first-place">
                   <div class="podium-line"></div>
                   <div class="podium-circle">
-                    <div class="trophy-icon">
-                      <i class="fas fa-trophy"></i>
-                    </div>
+                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
                     <div class="position-badge">1°</div>
                   </div>
                   <div class="agent-info">
@@ -1888,9 +1906,7 @@
                 <div class="podium-item third-place">
                   <div class="podium-line"></div>
                   <div class="podium-circle">
-                    <div class="medal-icon">
-                      <i class="fas fa-award"></i>
-                    </div>
+                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
                     <div class="position-badge">3°</div>
                   </div>
                   <div class="agent-info">
