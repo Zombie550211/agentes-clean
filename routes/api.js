@@ -660,4 +660,182 @@ router.get('/debug/collections', protect, withDatabase, async (req, res) => {
   }
 });
 
+// Ruta GET para obtener un lead específico por ID
+router.get('/leads/:id', protect, withDatabase, async (req, res) => {
+  console.log('\n===========================================');
+  console.log('🔍 ENDPOINT GET /api/leads/:id EJECUTÁNDOSE');
+  console.log('===========================================');
+  
+  const db = req.db;
+  const leadId = req.params.id;
+  const usuarioAutenticado = req.user || null;
+
+  try {
+    // Validar que tenemos una base de datos
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible'
+      });
+    }
+
+    // Validar ID
+    if (!leadId || !ObjectId.isValid(leadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de registro inválido'
+      });
+    }
+
+    console.log('[GET /leads/:id] ID del lead:', leadId);
+    console.log('[GET /leads/:id] Usuario:', usuarioAutenticado?.username || 'Desconocido');
+
+    // Obtener la colección
+    const collection = db.collection('costumers');
+
+    // Buscar el registro
+    const registro = await collection.findOne({ _id: new ObjectId(leadId) });
+    
+    if (!registro) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registro no encontrado'
+      });
+    }
+
+    console.log('[GET /leads/:id] ✅ Registro encontrado');
+
+    return res.status(200).json({
+      success: true,
+      data: registro
+    });
+
+  } catch (error) {
+    console.error('[ERROR GET /leads/:id]', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener el registro',
+      error: error.message
+    });
+  }
+});
+
+// Ruta PUT para actualizar un lead por ID
+router.put('/leads/:id', protect, withDatabase, async (req, res) => {
+  console.log('\n===========================================');
+  console.log('📝 ENDPOINT PUT /api/leads/:id EJECUTÁNDOSE');
+  console.log('===========================================');
+  
+  const db = req.db;
+  const leadId = req.params.id;
+  const datosActualizados = req.body;
+  const usuarioAutenticado = req.user || null;
+
+  try {
+    // Validar que tenemos una base de datos
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: 'Base de datos no disponible'
+      });
+    }
+
+    // Validar ID
+    if (!leadId || !ObjectId.isValid(leadId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de registro inválido'
+      });
+    }
+
+    console.log('[PUT /leads/:id] ID del lead:', leadId);
+    console.log('[PUT /leads/:id] Usuario:', usuarioAutenticado?.username || 'Desconocido');
+    console.log('[PUT /leads/:id] Datos a actualizar:', datosActualizados);
+
+    // Obtener la colección
+    const collection = db.collection('costumers');
+
+    // Verificar que el registro existe
+    const registroExistente = await collection.findOne({ _id: new ObjectId(leadId) });
+    
+    if (!registroExistente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Registro no encontrado'
+      });
+    }
+
+    // Verificar permisos: solo admin, backoffice y supervisor pueden editar
+    const userRole = (usuarioAutenticado?.role || '').toLowerCase();
+    const rolesPermitidos = ['admin', 'administrador', 'backoffice', 'supervisor'];
+    
+    if (!rolesPermitidos.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para editar registros'
+      });
+    }
+
+    // Preparar los datos para actualizar (solo campos permitidos)
+    const camposPermitidos = {
+      nombre_cliente: datosActualizados.nombre_cliente,
+      telefono_principal: datosActualizados.telefono_principal,
+      telefono_alterno: datosActualizados.telefono_alterno,
+      numero_cuenta: datosActualizados.numero_cuenta,
+      autopago: datosActualizados.autopago,
+      direccion: datosActualizados.direccion,
+      tipo_servicios: datosActualizados.tipo_servicios,
+      sistema: datosActualizados.sistema,
+      riesgo: datosActualizados.riesgo,
+      dia_venta: datosActualizados.dia_venta,
+      dia_instalacion: datosActualizados.dia_instalacion,
+      status: datosActualizados.status,
+      mercado: datosActualizados.mercado,
+      supervisor: datosActualizados.supervisor,
+      comentario: datosActualizados.comentario,
+      motivo_llamada: datosActualizados.motivo_llamada,
+      zip_code: datosActualizados.zip_code,
+      puntaje: datosActualizados.puntaje
+    };
+
+    // Agregar metadatos de actualización
+    camposPermitidos.actualizadoEn = new Date();
+    camposPermitidos.actualizadoPor = usuarioAutenticado?.username || usuarioAutenticado?.id || 'Sistema';
+
+    // Actualizar el registro
+    const resultado = await collection.updateOne(
+      { _id: new ObjectId(leadId) },
+      { $set: camposPermitidos }
+    );
+
+    if (resultado.modifiedCount === 0) {
+      console.warn('[PUT /leads/:id] No se modificó ningún registro');
+      return res.status(200).json({
+        success: true,
+        message: 'No hubo cambios en el registro',
+        data: registroExistente
+      });
+    }
+
+    // Obtener el registro actualizado
+    const registroActualizado = await collection.findOne({ _id: new ObjectId(leadId) });
+
+    console.log('[PUT /leads/:id] ✅ Registro actualizado exitosamente');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Registro actualizado exitosamente',
+      data: registroActualizado
+    });
+
+  } catch (error) {
+    console.error('[ERROR PUT /leads/:id]', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al actualizar el registro',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

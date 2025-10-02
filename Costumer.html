@@ -789,6 +789,207 @@
     </div>
   </div>
 
+  <!-- Modal para Editar Lead -->
+  <div id="editarModal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); overflow-y: auto;">
+    <div style="position: relative; margin: 50px auto; width: 90%; max-width: 800px; background-color: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+      <!-- Encabezado del modal -->
+      <div style="padding: 20px 30px; border-bottom: 2px solid #e2e8f0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px 12px 0 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin: 0; color: white; font-size: 24px; font-weight: 700;">
+              <i class="fas fa-edit"></i> Editar Registro
+            </h3>
+            <p style="margin: 5px 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Modifica la información del cliente</p>
+          </div>
+          <button onclick="cerrarModalEdicion()" style="background: rgba(255,255,255,0.2); border: none; width: 40px; height: 40px; border-radius: 50%; font-size: 24px; cursor: pointer; color: white; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">&times;</button>
+        </div>
+      </div>
+      
+      <!-- Contenido del formulario -->
+      <div style="padding: 30px; max-height: 70vh; overflow-y: auto;">
+        <input type="hidden" id="edit-id">
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+          <!-- Nombre Cliente -->
+          <div style="grid-column: span 2;">
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-user"></i> Nombre del Cliente
+            </label>
+            <input type="text" id="edit-nombre" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Teléfono Principal -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-phone"></i> Teléfono Principal
+            </label>
+            <input type="tel" id="edit-telefono" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Teléfono Alterno -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-phone-alt"></i> Teléfono Alterno
+            </label>
+            <input type="tel" id="edit-telefono-alt" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Número de Cuenta -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-credit-card"></i> Número de Cuenta
+            </label>
+            <input type="text" id="edit-numero-cuenta" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Autopago -->
+          <div>
+            <label style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 8px; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#f8fafc'">
+              <input type="checkbox" id="edit-autopago" style="width: 18px; height: 18px; cursor: pointer;">
+              <span style="color: #334155; font-weight: 600; font-size: 14px;">
+                <i class="fas fa-money-check-alt"></i> Autopago
+              </span>
+            </label>
+          </div>
+
+          <!-- Dirección -->
+          <div style="grid-column: span 2;">
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-map-marker-alt"></i> Dirección
+            </label>
+            <input type="text" id="edit-direccion" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Tipo de Servicios -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-concierge-bell"></i> Tipo de Servicios
+            </label>
+            <input type="text" id="edit-tipo-servicios" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Sistema -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-cogs"></i> Sistema
+            </label>
+            <select id="edit-sistema" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+              <option value="">Seleccionar...</option>
+              <option value="SARA">SARA</option>
+              <option value="N/A">N/A</option>
+            </select>
+          </div>
+
+          <!-- Riesgo -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-exclamation-triangle"></i> Riesgo
+            </label>
+            <select id="edit-riesgo" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+              <option value="">Seleccionar...</option>
+              <option value="LOW">LOW</option>
+              <option value="N/A">N/A</option>
+            </select>
+          </div>
+
+          <!-- Mercado -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-store"></i> Mercado
+            </label>
+            <select id="edit-mercado" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+              <option value="">Seleccionar...</option>
+              <option value="ICON">ICON</option>
+              <option value="BAMO">BAMO</option>
+            </select>
+          </div>
+
+          <!-- Día de Venta -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-calendar-check"></i> Día de Venta
+            </label>
+            <input type="date" id="edit-dia-venta" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Día de Instalación -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-calendar-alt"></i> Día de Instalación
+            </label>
+            <input type="date" id="edit-dia-instalacion" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Status -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-info-circle"></i> Status
+            </label>
+            <select id="edit-status" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease; background: white;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+              <option value="">Seleccionar...</option>
+              <option value="pending">Pending</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="hold">Hold</option>
+              <option value="rescheduled">Rescheduled</option>
+            </select>
+          </div>
+
+          <!-- Supervisor -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-user-tie"></i> Supervisor
+            </label>
+            <input type="text" id="edit-supervisor" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Motivo de Llamada -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-phone-volume"></i> Motivo de Llamada
+            </label>
+            <input type="text" id="edit-motivo-llamada" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- ZIP Code -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-map-pin"></i> ZIP Code
+            </label>
+            <input type="text" id="edit-zip-code" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Puntaje -->
+          <div>
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-star"></i> Puntaje
+            </label>
+            <input type="number" id="edit-puntaje" step="0.01" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+          </div>
+
+          <!-- Comentario -->
+          <div style="grid-column: span 2;">
+            <label style="display: block; margin-bottom: 8px; color: #334155; font-weight: 600; font-size: 14px;">
+              <i class="fas fa-comment"></i> Comentario
+            </label>
+            <textarea id="edit-comentario" rows="3" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; transition: all 0.3s ease;" onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'" onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer con botones -->
+      <div style="padding: 20px 30px; border-top: 2px solid #e2e8f0; background: #f8fafc; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 12px;">
+        <button onclick="cerrarModalEdicion()" style="background: #e2e8f0; color: #64748b; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='#cbd5e1'" onmouseout="this.style.background='#e2e8f0'">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button onclick="guardarCambiosLead()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(102,126,234,0.3);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(102,126,234,0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(102,126,234,0.3)'">
+          <i class="fas fa-save"></i> Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script>
     // Helper: obtener leads por agentId desde backend (fallback para vista Supervisor)
@@ -1550,12 +1751,12 @@
       }
     }
 
-    // Funciones para el manejo de comentarios
-    function abrirComentarios(leadId) {
+    // Funciones para el manejo de comentarios - Asegurar que estén en scope global
+    window.abrirComentarios = function(leadId) {
       leadActual = leadId;
       document.getElementById('comentariosModal').style.display = 'block';
       cargarComentarios(leadId);
-    }
+    };
 
     function cerrarComentarios() {
       document.getElementById('comentariosModal').style.display = 'none';
@@ -4018,18 +4219,146 @@
       }
     }
 
-    // Funciones de ejemplo para editar/eliminar
-    function editarLead(id) {
+    // Funciones de ejemplo para editar/eliminar - Asegurar que estén en scope global
+    window.editarLead = async function(id) {
       console.log('Editar lead:', id);
-      // Implementar l¨®gica de edici¨®n
+      
+      if (!id) {
+        alert('Error: No se proporcionó un ID válido');
+        return;
+      }
+
+      try {
+        // Intentar obtener el lead desde el backend
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        
+        const response = await fetch(`/api/leads/${id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('No se pudo obtener el registro');
+        }
+
+        const data = await response.json();
+        const lead = data.data || data;
+        
+        if (!lead) {
+          alert('Error: No se encontró el registro con ID: ' + id);
+          return;
+        }
+
+        // Abrir modal de edición
+        abrirModalEdicion(lead);
+      } catch (error) {
+        console.error('Error al editar lead:', error);
+        alert('Error al cargar los datos del registro: ' + error.message);
+      }
+    };
+
+    // Función para abrir el modal de edición
+    function abrirModalEdicion(lead) {
+      const modal = document.getElementById('editarModal');
+      if (!modal) {
+        console.error('Modal de edición no encontrado');
+        return;
+      }
+
+      // Poblar campos del formulario
+      document.getElementById('edit-id').value = lead._id || lead.id || '';
+      document.getElementById('edit-nombre').value = lead.nombre_cliente || '';
+      document.getElementById('edit-telefono').value = lead.telefono_principal || '';
+      document.getElementById('edit-telefono-alt').value = lead.telefono_alterno || '';
+      document.getElementById('edit-numero-cuenta').value = lead.numero_cuenta || '';
+      document.getElementById('edit-autopago').checked = lead.autopago || false;
+      document.getElementById('edit-direccion').value = lead.direccion || '';
+      document.getElementById('edit-tipo-servicios').value = lead.tipo_servicios || '';
+      document.getElementById('edit-sistema').value = lead.sistema || '';
+      document.getElementById('edit-riesgo').value = lead.riesgo || '';
+      document.getElementById('edit-dia-venta').value = lead.dia_venta || '';
+      document.getElementById('edit-dia-instalacion').value = lead.dia_instalacion || '';
+      document.getElementById('edit-status').value = lead.status || '';
+      document.getElementById('edit-mercado').value = lead.mercado || '';
+      document.getElementById('edit-supervisor').value = lead.supervisor || '';
+      document.getElementById('edit-comentario').value = lead.comentario || '';
+      document.getElementById('edit-motivo-llamada').value = lead.motivo_llamada || '';
+      document.getElementById('edit-zip-code').value = lead.zip_code || '';
+      document.getElementById('edit-puntaje').value = lead.puntaje || '';
+
+      // Mostrar modal
+      modal.style.display = 'block';
     }
 
-    function eliminarLead(id) {
-      if (confirm('?Est¨¢s seguro de que deseas eliminar este registro?')) {
-        console.log('Eliminar lead:', id);
-        // Implementar l¨®gica de eliminaci¨®n
+    // Función para cerrar el modal de edición
+    window.cerrarModalEdicion = function() {
+      const modal = document.getElementById('editarModal');
+      if (modal) {
+        modal.style.display = 'none';
       }
-    }
+    };
+
+    // Función para guardar los cambios
+    window.guardarCambiosLead = async function() {
+      const leadId = document.getElementById('edit-id').value;
+      
+      const datosActualizados = {
+        nombre_cliente: document.getElementById('edit-nombre').value,
+        telefono_principal: document.getElementById('edit-telefono').value,
+        telefono_alterno: document.getElementById('edit-telefono-alt').value,
+        numero_cuenta: document.getElementById('edit-numero-cuenta').value,
+        autopago: document.getElementById('edit-autopago').checked,
+        direccion: document.getElementById('edit-direccion').value,
+        tipo_servicios: document.getElementById('edit-tipo-servicios').value,
+        sistema: document.getElementById('edit-sistema').value,
+        riesgo: document.getElementById('edit-riesgo').value,
+        dia_venta: document.getElementById('edit-dia-venta').value,
+        dia_instalacion: document.getElementById('edit-dia-instalacion').value,
+        status: document.getElementById('edit-status').value,
+        mercado: document.getElementById('edit-mercado').value,
+        supervisor: document.getElementById('edit-supervisor').value,
+        comentario: document.getElementById('edit-comentario').value,
+        motivo_llamada: document.getElementById('edit-motivo-llamada').value,
+        zip_code: document.getElementById('edit-zip-code').value,
+        puntaje: parseFloat(document.getElementById('edit-puntaje').value) || 0
+      };
+
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const response = await fetch(`/api/leads/${leadId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(datosActualizados)
+        });
+
+        if (!response.ok) {
+          throw new Error('Error al actualizar el registro');
+        }
+
+        alert('✅ Registro actualizado exitosamente');
+        cerrarModalEdicion();
+        
+        // Recargar la tabla
+        location.reload();
+      } catch (error) {
+        console.error('Error al guardar cambios:', error);
+        alert('❌ Error al actualizar el registro: ' + error.message);
+      }
+    };
+
+    window.eliminarLead = function(id) {
+      if (confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+        console.log('Eliminar lead:', id);
+        alert('Función de eliminación - ID: ' + id + '\n\nEsta funcionalidad se implementará próximamente.');
+        // TODO: Implementar lógica de eliminación
+      }
+    };
   </script>
   <!-- Cargar primero el m¨®dulo de datos de clientes -->
   <script src="js/data/costumer-mock-data.js"></script>

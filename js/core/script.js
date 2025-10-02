@@ -217,6 +217,15 @@ function renderCostumerTablePage() {
             const zipCode = lead.zip_code || 'N/A';
             const puntaje = lead.puntaje || 'N/A';
 
+            const leadId = lead._id || lead.id || '';
+            const comentariosVenta = lead.comentarios_venta || '';
+            const displayComment = comentariosVenta ? (comentariosVenta.length > 40 ? comentariosVenta.substring(0, 40) + '...' : comentariosVenta) : 'Sin comentarios';
+            
+            // Debug: verificar si tenemos el ID
+            if (index === 0) {
+                console.log('[renderCostumerTablePage] Primer lead:', { leadId, nombre, comentariosVenta });
+            }
+            
             row.innerHTML = `
                 <td>${nombre}</td>
                 <td>${telefono}</td>
@@ -237,11 +246,84 @@ function renderCostumerTablePage() {
                 <td>${motivoLlamada}</td>
                 <td>${zipCode}</td>
                 <td>${puntaje}</td>
-                <td>
-                    <button class="action-btn" onclick="gestionarComentarios('${lead._id || ''}')"><i class="fas fa-comment"></i> Ver</button>
+                <td style="min-width: 180px;">
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${comentariosVenta 
+                            ? `<div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #eff6ff; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                                <i class="fas fa-comment-dots" style="color: #3b82f6; font-size: 12px;"></i>
+                                <span style="font-size: 12px; color: #1e40af; font-weight: 500;">${displayComment}</span>
+                               </div>`
+                            : `<div style="display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f3f4f6; border-radius: 6px;">
+                                <i class="fas fa-comment-slash" style="color: #9ca3af; font-size: 12px;"></i>
+                                <span style="font-size: 12px; color: #6b7280;">Sin comentarios</span>
+                               </div>`
+                        }
+                        <button onclick="event.stopPropagation(); abrirComentarios('${leadId}')" 
+                                style="background: ${comentariosVenta ? '#3b82f6' : '#10b981'}; 
+                                       color: white; 
+                                       border: none; 
+                                       padding: 6px 12px; 
+                                       border-radius: 6px; 
+                                       font-size: 11px; 
+                                       font-weight: 600;
+                                       cursor: pointer;
+                                       display: flex;
+                                       align-items: center;
+                                       gap: 6px;
+                                       transition: all 0.2s ease;
+                                       box-shadow: 0 1px 3px rgba(0,0,0,0.1);"
+                                onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.15)';"
+                                onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)';">
+                            <i class="fas fa-${comentariosVenta ? 'edit' : 'plus-circle'}"></i>
+                            ${comentariosVenta ? 'Gestionar' : 'Agregar'}
+                        </button>
+                    </div>
                 </td>
-                <td>
-                    <button class="action-btn" onclick="verAcciones('${lead._id || ''}')"><i class="fas fa-ellipsis-h"></i></button>
+                <td style="min-width: 160px;">
+                    <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                        <button onclick="editarLead('${leadId}')" 
+                                title="Editar registro"
+                                style="background: #f59e0b; 
+                                       color: white; 
+                                       border: none; 
+                                       padding: 8px 12px; 
+                                       border-radius: 6px; 
+                                       cursor: pointer;
+                                       display: flex;
+                                       align-items: center;
+                                       gap: 6px;
+                                       font-size: 11px;
+                                       font-weight: 600;
+                                       transition: all 0.2s ease;
+                                       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                                       white-space: nowrap;"
+                                onmouseover="this.style.background='#d97706'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.15)';"
+                                onmouseout="this.style.background='#f59e0b'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)';">
+                            <i class="fas fa-edit"></i>
+                            <span>Editar</span>
+                        </button>
+                        <button onclick="eliminarLead('${leadId}')" 
+                                title="Eliminar registro"
+                                style="background: #ef4444; 
+                                       color: white; 
+                                       border: none; 
+                                       padding: 8px 12px; 
+                                       border-radius: 6px; 
+                                       cursor: pointer;
+                                       display: flex;
+                                       align-items: center;
+                                       gap: 6px;
+                                       font-size: 11px;
+                                       font-weight: 600;
+                                       transition: all 0.2s ease;
+                                       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                                       white-space: nowrap;"
+                                onmouseover="this.style.background='#dc2626'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px rgba(0,0,0,0.15)';"
+                                onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)'; this.style.boxShadow='0 1px 3px rgba(0,0,0,0.1)';">
+                            <i class="fas fa-trash-alt"></i>
+                            <span>Eliminar</span>
+                        </button>
+                    </div>
                 </td>`;
 
             tbody.appendChild(row);
@@ -267,11 +349,4 @@ function filterTable(searchTerm) {
 }
 
 // --- FUNCIONES DE MODAL Y ACCIONES ---
-
-function gestionarComentarios(leadId) {
-    console.log('Gestionar comentarios para lead:', leadId);
-}
-
-function verAcciones(leadId) {
-    console.log('Ver acciones para lead:', leadId);
-}
+// Estas funciones son placeholders que serán sobrescritas por Costumer.html si está disponible

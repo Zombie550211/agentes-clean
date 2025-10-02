@@ -75,9 +75,32 @@ app.use('/multimedia.html', protect, (req, res, next) => {
 });
 
 // Configuración de rutas de archivos estáticos
-app.use(express.static(path.join(__dirname)));
+app.use('/images', express.static(path.join(__dirname, 'public', 'images'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.mp4')) {
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      res.setHeader('Accept-Ranges', 'bytes');
+    }
+  }
+}));
+
+// Servir otros archivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(path.join(__dirname, 'agentes')));
+
+// Servir archivos HTML
+app.use(express.static(__dirname, {
+  extensions: ['html', 'htm'],
+  index: false,
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
 
 // Iniciar conexión Mongoose
 try {
@@ -408,20 +431,58 @@ app.get('/Costumer.html', protect, (req, res) => {
   return res.sendFile(path.join(__dirname, 'Costumer.html'));
 });
 
+// Ruta específica para el video
+app.get('/videos/:filename', (req, res) => {
+  const filename = req.params.filename;
+  // Asegurarse de que la ruta sea correcta
+  const videoPath = path.join(__dirname, 'public', 'images', filename);
+  console.log('Buscando video en:', videoPath);
+  console.log('El archivo existe?', fs.existsSync(videoPath) ? 'Sí' : 'No');
+  
+  // Verificar si el archivo existe
+  if (fs.existsSync(videoPath)) {
+    const stat = fs.statSync(videoPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-')
+      const start = parseInt(parts[0], 10)
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+      const chunksize = (end - start) + 1
+      const file = fs.createReadStream(videoPath, { start, end })
+      const head = {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': 'video/mp4',
+      }
+      res.writeHead(206, head)
+      file.pipe(res)
+    } else {
+      const head = {
+        'Content-Length': fileSize,
+        'Content-Type': 'video/mp4',
+      }
+      res.writeHead(200, head)
+      fs.createReadStream(videoPath).pipe(res)
+    }
+  } else {
+    res.status(404).send('Video no encontrado');
+  }
+});
+
 // Servir archivos estáticos (EXCEPTO Costumer.html que ya está protegido)
 app.use(express.static(__dirname, {
   extensions: ['html', 'htm'],
+  index: false,  // Evitar que se sirva index.html automáticamente
   setHeaders: (res, filePath) => {
-    // Configurar los headers correctos para archivos estáticos
     if (filePath.endsWith('.css')) {
       res.setHeader('Content-Type', 'text/css');
     } else if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript');
     }
-  },
-  // Evitar que se sirva directamente Costumer.html
-  index: false,
-  redirect: false
+  }
 }));
 
 // En caso de que esta ruta se evalúe después de static, servir igualmente a usuarios autenticados
@@ -2813,8 +2874,11 @@ app.post('/api/leads', protect, async (req, res) => {
       fuente: leadData.fuente || 'WEB',
       asignadoA: leadData.asignadoA || null,
       notas: leadData.notas || [],
-      // Agregar el ID del agente que creó el lead
+      // IMPORTANTE: Agregar el nombre del agente que creó el lead
+      agente: req.user?.username || 'Agente Desconocido', // Nombre del usuario autenticado
+      agenteNombre: req.user?.username || 'Agente Desconocido', // Nombre del usuario autenticado
       agenteId: req.user?.id, // ID del usuario autenticado
+      createdBy: req.user?.username, // Agregar también createdBy para compatibilidad
       historial: [{
         accion: 'CREADO',
         fecha: new Date(),
