@@ -895,17 +895,30 @@ app.get('/api/media', protect, async (req, res) => {
     const collection = db.collection('mediafiles');
 
     // Filtros opcionales
-    const { category, limit = 50, offset = 0 } = req.query;
+    const { category, limit = 50, offset = 0, orderBy = 'uploadDate', sort = 'desc' } = req.query;
 
     let query = {};
     if (category && category !== 'all') {
       query.category = category;
     }
 
-    console.log('[MEDIA] Ejecutando consulta a mediafiles...');
+    // Configurar ordenamiento dinámico
+    const allowedSortFields = {
+      'uploadDate': 'uploadDate',
+      'createdAt': 'createdAt', 
+      'updatedAt': 'updatedAt',
+      'originalName': 'originalName',
+      'size': 'size'
+    };
+    
+    const sortField = allowedSortFields[orderBy] || 'uploadDate';
+    const sortDirection = sort.toLowerCase() === 'asc' ? 1 : -1;
+    const sortSpec = { [sortField]: sortDirection };
+
+    console.log(`[MEDIA] Ejecutando consulta a mediafiles con orden: ${JSON.stringify(sortSpec)}`);
     const files = await collection
       .find(query)
-      .sort({ uploadDate: -1 })
+      .sort(sortSpec)
       .limit(parseInt(limit))
       .skip(parseInt(offset))
       .toArray();

@@ -7,6 +7,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
 // Middleware para proteger rutas
 exports.protect = async (req, res, next) => {
   console.log('[AUTH] Iniciando verificación de autenticación');
+  console.log('[AUTH] Cookies disponibles:', req.cookies);
+  console.log('[AUTH] Cookie token específica:', req.cookies?.token);
   let token;
 
   // 1. Verificar si el token está en los headers
