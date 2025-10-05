@@ -43,7 +43,7 @@
         const currentPage = window.location.pathname.split('/').pop() || 'index.html';
         
         // Verificar si la página está en la lista de exclusiones
-        const isExcluded = CRM_CONFIG.excludedPages.some(page => 
+        const isExcluded = CRM_CONFIG.inactivity.excludedPages.some(page => 
             currentPage.includes(page)
         );
         

@@ -210,14 +210,53 @@
       z-index: 1;
     }
 
-    /* Podio Circular */
+    /* Contenedor del podio */
+    .podium-container {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 60px auto;
+      max-width: 800px;
+    }
+
+    .podium-background {
+      width: 100%;
+      height: auto;
+      max-width: 600px;
+      object-fit: contain;
+    }
+
+    /* Podio usando la imagen real */
     .circular-podium {
+      position: relative;
+      width: 100%;
+      max-width: 800px;
+      margin: 60px auto;
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      gap: 80px;
-      margin: 60px 0;
-      position: relative;
+    }
+    
+    /* Imagen de fondo del podio */
+    .podium-background-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-width: 700px;
+    }
+    
+    /* Contenedor absoluto para los astronautas */
+    .astronauts-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 0;
     }
 
     .podium-item {
@@ -225,6 +264,12 @@
       flex-direction: column;
       align-items: center;
       position: relative;
+      z-index: 2;
+    }
+    
+    /* Posicionamiento usando la imagen real */
+    .podium-item {
+      position: absolute;
     }
 
     .podium-line {
@@ -275,6 +320,11 @@
       border-color: #f97316;
     }
 
+    /* Los pedestales ahora están en la imagen de fondo */
+    .podium-item::after {
+      display: none;
+    }
+
     .medal-icon, .trophy-icon {
       font-size: 2.5rem;
       color: #9ca3af;
@@ -302,6 +352,30 @@
       height: 75%;
     }
 
+    /* Estilos para la imagen de primer lugar */
+    .primerlugar-image {
+      width: 75%;
+      height: 75%;
+      object-fit: contain;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    /* Estilos para la imagen de segundo lugar */
+    .segundolugar-image {
+      width: 70%;
+      height: 70%;
+      object-fit: contain;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    /* Estilos para la imagen de tercer lugar */
+    .tercerlugar-image {
+      width: 70%;
+      height: 70%;
+      object-fit: contain;
+      animation: float 3s ease-in-out infinite;
+    }
+
     @keyframes float {
       0%, 100% {
         transform: translateY(0px);
@@ -313,26 +387,33 @@
 
     .position-badge {
       position: absolute;
-      bottom: -10px;
-      right: -10px;
-      width: 40px;
-      height: 40px;
+      bottom: -8px;
+      right: -8px;
+      width: 35px;
+      height: 35px;
       border-radius: 50%;
-      background: #9ca3af;
+      background: #f97316;
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: 700;
       border: 3px solid white;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
 
     .first-place .position-badge {
       background: #fbbf24;
-      width: 50px;
-      height: 50px;
-      font-size: 1.2rem;
+      width: 40px;
+      height: 40px;
+      font-size: 1.1rem;
+      bottom: -10px;
+      right: -10px;
+    }
+
+    .second-place .position-badge {
+      background: #9ca3af;
     }
 
     .third-place .position-badge {
@@ -346,44 +427,63 @@
     .agent-info h3 {
       margin: 0 0 8px 0;
       font-size: 1.25rem;
-      font-weight: 600;
+      font-weight: 700;
       color: #1f2937;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
     }
 
     .agent-info p {
       margin: 0 0 16px 0;
       color: #6b7280;
       font-size: 0.875rem;
-      font-weight: 400;
-      padding: 4px 12px;
-      background: #f3f4f6;
-      border-radius: 12px;
+      font-weight: 500;
+      padding: 6px 14px;
+      background: rgba(243, 244, 246, 0.9);
+      border-radius: 15px;
       display: inline-block;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
     }
 
     .first-place .agent-info p {
-      background: #fef3c7;
+      background: rgba(254, 243, 199, 0.9);
       color: #92400e;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .second-place .agent-info p {
+      background: rgba(249, 250, 251, 0.9);
+      color: #4b5563;
+      border: 1px solid rgba(107, 114, 128, 0.3);
     }
 
     .third-place .agent-info p {
-      background: #fed7aa;
+      background: rgba(254, 215, 170, 0.9);
       color: #c2410c;
+      border: 1px solid rgba(234, 88, 12, 0.3);
     }
 
     .score {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #9ca3af;
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #6b7280;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 
     .first-place .score {
-      color: #fbbf24;
-      font-size: 2.5rem;
+      color: #f59e0b;
+      font-size: 2.8rem;
+      text-shadow: 0 3px 6px rgba(245, 158, 11, 0.3);
+    }
+
+    .second-place .score {
+      color: #6b7280;
+      font-size: 2.4rem;
     }
 
     .third-place .score {
-      color: #f97316;
+      color: #ea580c;
+      font-size: 2.2rem;
     }
 
     /* Otros participantes */
@@ -899,9 +999,41 @@
     .circular-podium{ gap: 90px; align-items: flex-end; }
     .podium-item{ position: relative; padding-bottom: 60px; }
 
-    /* Quitar aro decorativo de la versión anterior */
-    .podium-circle{ width: 120px; height: 120px; border-radius: 18px; background: #ffffff; border: 2px solid rgba(15,23,42,.06); box-shadow: 0 10px 20px rgba(0,0,0,.08); }
+    /* Círculos del podio estilo imagen objetivo */
+    .podium-circle { 
+      width: 100px; 
+      height: 100px; 
+      border-radius: 50%; 
+      background: white; 
+      border: 4px solid white; 
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15); 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
     .podium-circle::before{ content: none !important; }
+    
+    /* Tamaño y estilo especial para el primer lugar */
+    .first-place .podium-circle {
+      width: 120px;
+      height: 120px;
+      border: 5px solid #ffd700;
+      box-shadow: 0 10px 25px rgba(255,215,0,0.4);
+    }
+    
+    /* Ajustar imágenes dentro de los círculos */
+    .podium-circle img {
+      width: 80%;
+      height: 80%;
+      object-fit: contain;
+      border-radius: 50%;
+    }
+    
+    .first-place .podium-circle img {
+      width: 85%;
+      height: 85%;
+    }
 
     /* Barra superior (corona) más delgada y vibrante */
     .podium-line{ width: 120px; height: 6px; border-radius: 999px; margin-bottom: 14px; background: linear-gradient(90deg,#22d3ee,#a78bfa,#f472b6); }
@@ -944,25 +1076,28 @@
     .podium-item .podium-circle { animation: none !important; }
   </style>
   <style>
-    /* Podio: oro/plata/bronce + corona y animación (solo CSS) */
-    .podium-item.first-place{ --pedestal-h: 90px; }
-    .podium-item.second-place{ --pedestal-h: 60px; }
-    .podium-item.third-place{ --pedestal-h: 45px; }
-
-    .podium-item.first-place::after{
-      background: linear-gradient(180deg, #fff8e1 0%, #fde68a 100%);
-      border-color: rgba(202,138,4,.25);
-      box-shadow: 0 22px 40px rgba(202,138,4,.25), inset 0 1px 0 rgba(255,255,255,.9);
+    /* Podio con imagen de fondo - sin pedestales artificiales */
+    .podium-item {
+      position: relative;
+      z-index: 2;
     }
-    .podium-item.second-place::after{
-      background: linear-gradient(180deg, #f8fafc 0%, #e5e7eb 100%);
-      border-color: rgba(107,114,128,.25);
-      box-shadow: 0 18px 34px rgba(107,114,128,.22), inset 0 1px 0 rgba(255,255,255,.9);
+    
+    /* Ocultar pedestales artificiales ya que usamos la imagen de fondo */
+    .podium-item::after {
+      display: none !important;
     }
-    .podium-item.third-place::after{
-      background: linear-gradient(180deg, #fff7ed 0%, #fdba74 100%);
-      border-color: rgba(180,83,9,.25);
-      box-shadow: 0 18px 34px rgba(180,83,9,.22), inset 0 1px 0 rgba(255,255,255,.9);
+    
+    /* Ajustar posicionamiento para coincidir con la imagen */
+    .podium-item.first-place {
+      margin-bottom: 80px; /* Ajustar según la altura del pedestal central */
+    }
+    
+    .podium-item.second-place {
+      margin-bottom: 40px; /* Ajustar según la altura del pedestal izquierdo */
+    }
+    
+    .podium-item.third-place {
+      margin-bottom: 20px; /* Ajustar según la altura del pedestal derecho */
     }
 
     /* Corona para el primer lugar */
@@ -1021,6 +1156,171 @@
     /* Overrides: ocultar título y subtítulo del ranking */
     .ranking-title, .ranking-subtitle { display: none !important; }
     .ranking-header { padding-top: 8px !important; padding-bottom: 8px !important; }
+    
+    /* Ocultar las líneas decorativas superiores ya que usamos imagen de fondo */
+    .podium-line { display: none !important; }
+    
+    /* Podio con imagen ranking.png */
+    .ranking-podium-final {
+      position: relative !important;
+      display: flex !important;
+      justify-content: center !important;
+      margin: 40px auto !important;
+      max-width: 1000px !important;
+    }
+    
+    /* Imagen base del ranking */
+    .ranking-base-image {
+      width: 100% !important;
+      height: auto !important;
+      max-width: 900px !important;
+      display: block !important;
+      position: relative !important;
+      z-index: 1 !important;
+    }
+    
+    /* Overlay para astronautas */
+    .astronauts-overlay {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 2 !important; /* encima de la base */
+      pointer-events: none !important; /* evita capturar clics y sombras raras */
+    }
+    
+    /* Posiciones de astronautas */
+    .astronaut-position {
+      position: absolute !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+    }
+    
+    /* Posicionamiento específico */
+    .second-pos {
+      left: 20% !important;
+      top: 15% !important;   /* un poco más abajo sobre la tapa izq */
+      transform: translateX(-50%) !important;
+    }
+    
+    .first-pos {
+      left: 50% !important;
+      top: -5% !important;   /* subir un poco más */
+      transform: translateX(-50%) !important;
+    }
+    
+    .third-pos {
+      left: 80% !important;
+      top: 18% !important;   /* un poco más abajo */
+      transform: translateX(-50%) !important;
+    }
+    
+    /* Wrapper de astronautas */
+    .astronaut-wrapper {
+      width: 380px !important;
+      height: 380px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      position: relative !important;
+      margin-bottom: 8px !important;
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+    
+    .astronaut-wrapper.winner {
+      width: 460px !important;
+      height: 460px !important;
+    }
+    
+    /* Imágenes de astronautas sin fondo */
+    .astronaut-image {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: contain !important;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.25)) !important; /* base */
+      background: transparent !important;
+      clip-path: none !important; /* PNG transparente: no recortamos */
+      -webkit-clip-path: none !important;
+      display: block !important; /* elimina espacio-inline del img */
+    }
+
+    /* Glow por lugar */
+    .first-pos .astronaut-image {
+      filter: 
+        drop-shadow(0 8px 12px rgba(0,0,0,0.25))
+        drop-shadow(0 0 14px rgba(139,92,246,.55)) /* morado medio */
+        drop-shadow(0 0 28px rgba(168,85,247,.35)) !important; /* morado vivo */
+    }
+    .second-pos .astronaut-image,
+    .third-pos .astronaut-image {
+      filter:
+        drop-shadow(0 8px 12px rgba(0,0,0,0.25))
+        drop-shadow(0 0 14px rgba(59,130,246,.55))  /* azul medio */
+        drop-shadow(0 0 28px rgba(37,99,235,.35)) !important; /* azul vivo */
+    }
+    
+    /* Badges de posición */
+    .position-badge { display: none !important; }
+    
+    .position-badge.gold {
+      background: #fbbf24 !important;
+      width: 28px !important;
+      height: 28px !important;
+      font-size: 14px !important;
+    }
+    
+    /* Información de astronautas en la parte azul del podio */
+    .astronaut-info {
+      text-align: center !important;
+      margin-top: 90px !important; /* empuja el texto hacia la base azul */
+    }
+    
+    /* Afinar por pedestal */
+    /* Colocar textos justo bajo la tapa (zona marcada en verde) */
+    .first-pos .astronaut-info { margin-top: 12px !important; }
+    .second-pos .astronaut-info { margin-top: -17px !important; }
+    .third-pos .astronaut-info { margin-top: -24px !important; }
+    
+    .astronaut-name {
+      font-size: 1.4rem !important;
+      font-weight: 900 !important;
+      color: #ffffff !important; /* máximo contraste */
+      margin-bottom: 6px !important;
+      white-space: nowrap !important;
+      letter-spacing: .3px !important;
+      -webkit-text-stroke: 0.6px rgba(0,0,0,.35) !important; /* contorno sutil */
+      text-shadow:
+        0 3px 6px rgba(0,0,0,.55),
+        0 0 10px rgba(0,0,0,.25),
+        0 0 2px rgba(0,0,0,.35) !important; /* refuerzo */
+    }
+    
+    .astronaut-score {
+      font-size: 3rem !important;
+      font-weight: 900 !important;
+      color: #ffe06a !important; /* dorado brillante */
+      margin: 0 !important;
+      -webkit-text-stroke: 1.2px rgba(0,0,0,.45) !important; /* contorno para legibilidad */
+      text-shadow:
+        0 4px 10px rgba(0,0,0,.6),
+        0 0 14px rgba(255,224,106,.45),
+        0 0 2px rgba(0,0,0,.6) !important;
+    }
+    
+    .astronaut-score.winner {
+      font-size: 3.2rem !important;
+      color: #ffe990 !important;
+      -webkit-text-stroke: 1.2px rgba(0,0,0,.45) !important;
+    }
+    
+    /* Efecto hover para los círculos */
+    .podium-circle:hover {
+      transform: scale(1.05);
+      transition: transform 0.3s ease;
+    }
   </style>
   <style>
     /* Overrides: ocultar etiquetas de rol bajo los nombres */
@@ -1881,47 +2181,46 @@
             </div>
             
             <div class="ranking-content">
-              <!-- Podio Circular -->
-              <div class="circular-podium">
-                <!-- Segundo Lugar -->
-                <div class="podium-item second-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
-                    <div class="position-badge">2°</div>
+              <!-- Podio con imagen ranking.png -->
+              <div class="ranking-podium-final">
+                <img src="images/ranking.png" alt="Podio Ranking" class="ranking-base-image">
+                
+                <!-- Astronautas posicionados sobre la imagen -->
+                <div class="astronauts-overlay">
+                  <!-- Segundo Lugar -->
+                  <div class="astronaut-position second-pos">
+                    <div class="astronaut-wrapper">
+                      <img src="images/segundolugar-removebg-preview.png" class="astronaut-image" alt="Anderson Guzman">
+                      <div class="position-badge">2</div>
+                    </div>
+                    <div class="astronaut-info">
+                      <div class="astronaut-name">Anderson Guzman</div>
+                      <div class="astronaut-score">3.3</div>
+                    </div>
                   </div>
-                  <div class="agent-info">
-                    <h3>Roxana Martínez</h3>
-                    <p>Team Roberto</p>
-                    <div class="score">16.7</div>
-                  </div>
-                </div>
 
-                <!-- Primer Lugar -->
-                <div class="podium-item first-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
-                    <div class="position-badge">1°</div>
+                  <!-- Primer Lugar -->
+                  <div class="astronaut-position first-pos">
+                    <div class="astronaut-wrapper winner">
+                      <img src="images/primer_lugar-removebg-preview.png" class="astronaut-image" alt="Jonathan Morales">
+                      <div class="position-badge gold">1</div>
+                    </div>
+                    <div class="astronaut-info">
+                      <div class="astronaut-name">Jonathan Morales</div>
+                      <div class="astronaut-score winner">4.6</div>
+                    </div>
                   </div>
-                  <div class="agent-info">
-                    <h3>Julio Chavez</h3>
-                    <p>Team Irania</p>
-                    <div class="score">18.9</div>
-                  </div>
-                </div>
 
-                <!-- Tercer Lugar -->
-                <div class="podium-item third-place">
-                  <div class="podium-line"></div>
-                  <div class="podium-circle">
-                    <img src="images/astronaut-trophy.png" alt="Astronauta" class="astronaut-image">
-                    <div class="position-badge">3°</div>
-                  </div>
-                  <div class="agent-info">
-                    <h3>Katerine Gomez</h3>
-                    <p>Team Marisol</p>
-                    <div class="score">16.7</div>
+                  <!-- Tercer Lugar -->
+                  <div class="astronaut-position third-pos">
+                    <div class="astronaut-wrapper">
+                      <img src="images/tercerlugar-removebg-preview.png" class="astronaut-image" alt="Giselle Diaz">
+                      <div class="position-badge">3</div>
+                    </div>
+                    <div class="astronaut-info">
+                      <div class="astronaut-name">Giselle Diaz</div>
+                      <div class="astronaut-score">3.1</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1982,6 +2281,47 @@
           } catch(error){
             console.error('Error obteniendo usuario:', error);
             return null;
+          }
+        }
+
+        // ====== RANKING: Cargar Top 3 desde backend ======
+        async function loadRankingTop3(){
+          try {
+            console.log('[RANKING] 🔄 Solicitando top 3...');
+            const res = await fetch('/api/ranking?forceAll=1', { credentials: 'include' });
+            if (!res.ok) throw new Error('Respuesta no OK en /api/ranking');
+            const data = await res.json();
+            console.log('[RANKING] 📦 Datos recibidos:', data);
+
+            const list = Array.isArray(data?.ranking) ? data.ranking : [];
+            if (list.length === 0) {
+              console.warn('[RANKING] ❗ No hay datos de ranking');
+              return;
+            }
+
+            // Asegurar top3
+            const top1 = list[0];
+            const top2 = list[1];
+            const top3 = list[2];
+
+            const setSlot = (selectorBase, item) => {
+              if (!item) return;
+              const nameEl = document.querySelector(`${selectorBase} .astronaut-name`);
+              const scoreEl = document.querySelector(`${selectorBase} .astronaut-score`);
+              const imgEl = document.querySelector(`${selectorBase} .astronaut-image`);
+              if (nameEl) nameEl.textContent = item.nombre || item.name || '—';
+              if (scoreEl) scoreEl.textContent = (typeof item.promedio === 'number' ? item.promedio : (typeof item.puntos === 'number' ? (Math.round(item.puntos*10)/10) : '—'));
+              // Si en el futuro llega imageUrl
+              if (imgEl && item.imageUrl) imgEl.src = item.imageUrl;
+            };
+
+            setSlot('.first-pos', top1);
+            setSlot('.second-pos', top2);
+            setSlot('.third-pos', top3);
+
+            console.log('[RANKING] ✅ Podio actualizado desde BD');
+          } catch (err) {
+            console.error('[RANKING] ❌ Error cargando top 3:', err);
           }
         }
 
@@ -2145,6 +2485,13 @@
 
         if(promoFileInput) promoFileInput.addEventListener('change', handleUpload);
         console.log('[PROMO] ✅ Carga inicial completada');
+
+        // Cargar ranking siempre (independiente del rol)
+        try {
+          await loadRankingTop3();
+        } catch(e){
+          console.warn('[RANKING] No se pudo cargar el top 3 en init:', e);
+        }
 
         // --- Lógica de Resize ---
         let _resizeT;
