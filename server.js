@@ -917,10 +917,11 @@ app.get('/api/media', protect, async (req, res) => {
 
     console.log(`[MEDIA] Ejecutando consulta a mediafiles con orden: ${JSON.stringify(sortSpec)}`);
     const files = await collection
-      .find(query)
-      .sort(sortSpec)
-      .limit(parseInt(limit))
-      .skip(parseInt(offset))
+      .find(query, { 
+        sort: sortSpec,
+        limit: parseInt(limit),
+        skip: parseInt(offset)
+      })
       .toArray();
 
     console.log(`[MEDIA] Encontrados ${files.length} archivos en BD`);
