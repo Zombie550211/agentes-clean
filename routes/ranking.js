@@ -177,40 +177,86 @@ router.get('/', async (req, res) => {
     // Orden ASC para que una venta con fecha 01 se coloque junto a las del 01
     // Pipeline de agregación para calcular el ranking directamente en MongoDB
     const aggregationPipeline = [
-      // 1. Filtrar solo documentos con un agente asignado
-      { 
+      // 1. Filtrar documentos con algún identificador de agente (id o nombre)
+      {
         $match: {
-          agenteId: { $exists: true, $ne: null },
-          agenteNombre: { $exists: true, $ne: null, $ne: "", $ne: "Agente Desconocido" }
-        } 
+          $or: [
+            { agenteId: { $exists: true, $ne: null } },
+            { agenteNombre: { $exists: true, $ne: null, $ne: "" } },
+            { agente: { $exists: true, $ne: null, $ne: "" } },
+            { createdBy: { $exists: true, $ne: null, $ne: "" } }
+          ]
+        }
       },
-      
+
       // 2. Filtrar documentos por fecha
       { $match: filter },
-      
-      // 2. Convertir 'puntaje' a número para asegurar la suma correcta
+
+      // 3. Convertir 'puntaje' a número y calcular nombre evitando placeholders
       {
         $addFields: {
-          puntajeNumerico: { $toDouble: { $ifNull: ["$puntaje", 0] } }
+          puntajeNumerico: { $toDouble: { $ifNull: ["$puntaje", 0] } },
+          nombreCalculado: {
+            $let: {
+              vars: {
+                n1: { $ifNull: ["$agenteNombre", ""] },
+                n2: { $ifNull: ["$agente", ""] },
+                n3: { $ifNull: ["$createdBy", "Agente Desconocido"] }
+              },
+              in: {
+                $let: {
+                  vars: { a1: { $toLower: { $trim: { input: "$$n1" } } } },
+                  in: {
+                    $cond: [
+                      { $in: ["$$a1", ["", "agente", "agente desconocido"]] },
+                      {
+                        $let: {
+                          vars: { a2: { $toLower: { $trim: { input: "$$n2" } } } },
+                          in: {
+                            $cond: [
+                              { $in: ["$$a2", ["", "agente", "agente desconocido"]] },
+                              "$$n3",
+                              "$$n2"
+                            ]
+                          }
+                        }
+                      },
+                      "$$n1"
+                    ]
+                  }
+                }
+              }
+            }
+          }
         }
       },
-      
-      // 3. Agrupar por agente y calcular ventas y puntos
+      // 3b. Calcular clave de agente: usar agenteId; si no existe, usar nombre normalizado
+      {
+        $addFields: {
+          agenteClave: {
+            $ifNull: [
+              "$agenteId",
+              { $toLower: { $trim: { input: "$nombreCalculado" } } }
+            ]
+          }
+        }
+      },
+
+      // 4. Agrupar por la clave calculada de agente y calcular ventas y puntos
       {
         $group: {
-          _id: "$agenteId", // Agrupar por el ID del agente
-          nombre: { $first: "$agenteNombre" }, // Tomar el primer nombre que aparezca
-          ventas: { $sum: 1 }, // Contar el número de documentos (ventas)
-          puntos: { $sum: "$puntajeNumerico" } // Sumar los puntajes numéricos
+          _id: "$agenteClave", // Agrupar por ID si existe, de lo contrario por nombre
+          nombre: { $first: "$nombreCalculado" },
+          ventas: { $sum: 1 },
+          puntos: { $sum: "$puntajeNumerico" }
         }
       },
       
-      // 4. Ordenar por puntos de forma descendente
+      // 5. Ordenar por puntos de forma descendente
       { $sort: { puntos: -1 } },
       
-      // 5. Limitar al top 10
-      { $limit: 10 },
-
+      // La limitación se aplica dinámicamente más adelante
+      
       // 6. Formatear la salida
       {
         $project: {
@@ -230,13 +276,21 @@ router.get('/', async (req, res) => {
       }
     ];
 
+    // Aplicar límite dinámico
+    const qLimit = parseInt(req.query.limit, 10);
+    const limit = !isNaN(qLimit) && qLimit > 0 ? qLimit : (req.query.limit === '0' ? 0 : 10);
+
+    if (limit > 0) {
+      aggregationPipeline.push({ $limit: limit });
+    }
+
     const ranking = await db.collection('costumers').aggregate(aggregationPipeline).toArray();
 
-    // Redondear y formatear los resultados
+    // Los puntajes ahora son exactos (sin redondeo)
     const formattedRanking = ranking.map(agent => ({
       ...agent,
-      puntos: Math.round(agent.puntos * 10) / 10,
-      promedio: Math.round(agent.promedio * 10) / 10
+      puntos: agent.puntos, // Puntaje exacto
+      promedio: agent.promedio // Promedio exacto, se puede redondear en el frontend si es necesario
     }));
 
     // El ranking ya está ordenado y limitado por la agregación.
@@ -275,25 +329,84 @@ router.get('/', async (req, res) => {
     };
 
     if (debugMode) {
-      // El objeto `agentStats` ya no existe. El debug ahora muestra el resultado de la agregación.
+      // Resultado principal del ranking (ya formateado)
       const agentDebug = formattedRanking.map(a => ({
         id: a.id,
         nombre: a.nombre,
         ventas: a.ventas,
-        puntos: a.puntos, // Ya está redondeado
+        puntos: a.puntos,
         promedio: a.promedio
       }));
+
+      // Pipeline para identificar el detalle detrás de "Agente Desconocido"
+      let desconocidoDetalle = [];
+      try {
+        const unknownPipeline = [
+          // Mismo filtro de fecha
+          { $match: filter },
+          // Considerar documentos relevantes (algún identificador de agente o id)
+          {
+            $match: {
+              $or: [
+                { agenteId: { $exists: true, $ne: null } },
+                { agenteNombre: { $exists: true, $ne: null, $ne: "" } },
+                { agente: { $exists: true, $ne: null, $ne: "" } },
+                { createdBy: { $exists: true, $ne: null, $ne: "" } }
+              ]
+            }
+          },
+          // Calcular nombre/claves como en el ranking
+          {
+            $addFields: {
+              puntajeNumerico: { $toDouble: { $ifNull: ["$puntaje", 0] } },
+              nombreCalculado: {
+                $ifNull: [
+                  "$agenteNombre",
+                  { $ifNull: ["$agente", { $ifNull: ["$createdBy", "Agente Desconocido"] }] }
+                ]
+              }
+            }
+          },
+          // Filtrar solo los que terminaron como Agente Desconocido
+          { $match: { nombreCalculado: "Agente Desconocido" } },
+          // Desglosar por posibles pistas de autoría
+          {
+            $group: {
+              _id: { createdBy: "$createdBy", agenteId: "$agenteId" },
+              ventas: { $sum: 1 },
+              puntos: { $sum: "$puntajeNumerico" },
+              ejemplos: { $push: { _id: "$_id", puntaje: "$puntajeNumerico" } }
+            }
+          },
+          { $sort: { ventas: -1, puntos: -1 } },
+          { $limit: 10 },
+          {
+            $project: {
+              _id: 0,
+              createdBy: "$_id.createdBy",
+              agenteId: "$_id.agenteId",
+              ventas: 1,
+              puntos: 1,
+              ejemplos: { $slice: ["$ejemplos", 5] }
+            }
+          }
+        ];
+        desconocidoDetalle = await db.collection('costumers').aggregate(unknownPipeline).toArray();
+      } catch (e) {
+        desconocidoDetalle = [{ error: e.message }];
+      }
 
       basePayload.debug = {
         usedFallback: false,
         aggregationResult: agentDebug,
-        aggregationPipeline: JSON.stringify(aggregationPipeline, null, 2) // Muestra el pipeline usado
+        aggregationPipeline: JSON.stringify(aggregationPipeline, null, 2),
+        desconocidoDetalle
       };
     }
 
     res.json(basePayload);
     
-  } catch (error) {d
+  } catch (error) {
     console.error('Error al obtener ranking:', error);
     res.status(500).json({
       success: false,
