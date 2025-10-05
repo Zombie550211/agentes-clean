@@ -59,8 +59,13 @@ class RankingManager {
       
       if (data.success && data.ranking) {
         console.log('Datos del ranking recibidos:', data.ranking);
+        this.rankingData = data.ranking; // Guardar los datos
         this.updatePodium(data.ranking);
         this.updateOtherRanks(data.ranking);
+
+        // Disparar evento para notificar que los datos están listos
+        document.dispatchEvent(new CustomEvent('ranking:loaded', { detail: data }));
+
       } else {
         throw new Error(data.message || 'Error al obtener datos del ranking');
       }

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../config/db');
+const { getDb, connectToMongoDB } = require('../config/db');
 
 // Datos de prueba para ranking cuando MongoDB no esté disponible
 const datosRankingPrueba = [
@@ -108,8 +108,15 @@ router.get('/', async (req, res) => {
     try {
       db = getDb();
     } catch (error) {
-      console.log('[RANKING] MongoDB no disponible, usando datos de prueba');
-      db = null;
+      console.log('[RANKING] getDb() falló. Intentando conectar a MongoDB...');
+      try {
+        await connectToMongoDB();
+        db = getDb();
+        console.log('[RANKING] Conexión a MongoDB restablecida.');
+      } catch (err2) {
+        console.log('[RANKING] No se pudo conectar a MongoDB. Se devolverán datos de prueba. Motivo:', err2.message);
+        db = null;
+      }
     }
     
     if (!db) {
@@ -138,55 +145,103 @@ router.get('/', async (req, res) => {
     const qEnd = (req.query.fechaFin && String(req.query.fechaFin).trim()) || hoyStr;
     const forceAll = String(req.query.forceAll || '0').toLowerCase();
     const noDateFilter = forceAll === '1' || forceAll === 'true';
+    const debugMode = ['1','true','yes','on'].includes(String(req.query.debug || '0').toLowerCase());
 
-    const filter = noDateFilter ? {} : { fecha_contratacion: { $gte: qStart, $lte: qEnd } };
+    // Filtro por mes usando:
+    // - fecha_contratacion (string YYYY-MM-DD) entre qStart..qEnd
+    // - dia_venta (string DD/MM/YYYY) que termine con /MM/YYYY
+    // - createdAt (ISODate) entre los límites (por si aplica)
+    let filter = {};
+    if (!noDateFilter) {
+      // Derivar MM y YYYY para regex de dia_venta
+      const mmForRegex = (qStart || mesInicioStr).slice(5,7); // MM
+      const yyyyForRegex = (qStart || mesInicioStr).slice(0,4); // YYYY
+      const diaVentaRegex = new RegExp(`\\/${mmForRegex}\\/${yyyyForRegex}$`); // \/10\/2025$
+
+      // Calcular límites ISO para createdAt (inicio inclusive, fin exclusivo +1 día)
+      const startIso = new Date(`${qStart}T00:00:00.000Z`);
+      const endDate = new Date(`${qEnd}T00:00:00.000Z`);
+      // mover endDate al día siguiente para rango exclusivo
+      const endIso = new Date(endDate.getTime() + 24*60*60*1000);
+
+      filter = {
+        $or: [
+          { fecha_contratacion: { $gte: qStart, $lte: qEnd } },
+          { dia_venta: { $regex: diaVentaRegex } },
+          { createdAt: { $gte: startIso, $lt: endIso } }
+        ]
+      };
+    }
 
     // Importante: si fecha_contratacion es string YYYY-MM-DD, sort lexicográfico funciona
     // Orden ASC para que una venta con fecha 01 se coloque junto a las del 01
-    const customers = await db
-      .collection('costumers')
-      .find(filter)
-      .sort({ fecha_contratacion: 1, _id: 1 })
-      .toArray();
-    
-    // Agrupar por agente y calcular estadísticas
-    const agentStats = {};
-    
-    customers.forEach(customer => {
-      const agenteId = customer.agenteId || customer.creadoPor;
-      const agenteNombre = customer.agenteNombre || 'Agente Desconocido';
+    // Pipeline de agregación para calcular el ranking directamente en MongoDB
+    const aggregationPipeline = [
+      // 1. Filtrar solo documentos con un agente asignado
+      { 
+        $match: {
+          agenteId: { $exists: true, $ne: null },
+          agenteNombre: { $exists: true, $ne: null, $ne: "", $ne: "Agente Desconocido" }
+        } 
+      },
       
-      if (!agenteId) return; // Saltar si no hay agente asignado
+      // 2. Filtrar documentos por fecha
+      { $match: filter },
       
-      if (!agentStats[agenteId]) {
-        agentStats[agenteId] = {
-          id: agenteId,
-          nombre: agenteNombre,
-          ventas: 0,
-          puntos: 0,
-          clientes: []
-        };
+      // 2. Convertir 'puntaje' a número para asegurar la suma correcta
+      {
+        $addFields: {
+          puntajeNumerico: { $toDouble: { $ifNull: ["$puntaje", 0] } }
+        }
+      },
+      
+      // 3. Agrupar por agente y calcular ventas y puntos
+      {
+        $group: {
+          _id: "$agenteId", // Agrupar por el ID del agente
+          nombre: { $first: "$agenteNombre" }, // Tomar el primer nombre que aparezca
+          ventas: { $sum: 1 }, // Contar el número de documentos (ventas)
+          puntos: { $sum: "$puntajeNumerico" } // Sumar los puntajes numéricos
+        }
+      },
+      
+      // 4. Ordenar por puntos de forma descendente
+      { $sort: { puntos: -1 } },
+      
+      // 5. Limitar al top 10
+      { $limit: 10 },
+
+      // 6. Formatear la salida
+      {
+        $project: {
+          _id: 0, // Excluir el _id del grupo
+          id: "$_id",
+          nombre: "$nombre",
+          ventas: "$ventas",
+          puntos: "$puntos",
+          promedio: {
+            $cond: [
+              { $gt: ["$ventas", 0] },
+              { $divide: ["$puntos", "$ventas"] },
+              0
+            ]
+          }
+        }
       }
-      
-      agentStats[agenteId].ventas += 1;
-      agentStats[agenteId].puntos += parseFloat(customer.puntaje) || 0;
-      agentStats[agenteId].clientes.push(customer);
-    });
-    
-    // Convertir a array y ordenar por puntos
-    const ranking = Object.values(agentStats)
-      .map(agent => ({
-        id: agent.id,
-        nombre: agent.nombre,
-        ventas: agent.ventas,
-        puntos: Math.round(agent.puntos * 10) / 10, // Redondear a 1 decimal
-        promedio: agent.ventas > 0 ? Math.round((agent.puntos / agent.ventas) * 10) / 10 : 0
-      }))
-      .sort((a, b) => b.puntos - a.puntos) // Ordenar por puntos descendente
-      .slice(0, 10); // Top 10
-    
-    // Asignar posiciones y roles
-    const rankingConPosiciones = ranking.map((agent, index) => {
+    ];
+
+    const ranking = await db.collection('costumers').aggregate(aggregationPipeline).toArray();
+
+    // Redondear y formatear los resultados
+    const formattedRanking = ranking.map(agent => ({
+      ...agent,
+      puntos: Math.round(agent.puntos * 10) / 10,
+      promedio: Math.round(agent.promedio * 10) / 10
+    }));
+
+    // El ranking ya está ordenado y limitado por la agregación.
+    // Simplemente asignamos posiciones y roles.
+    const rankingConPosiciones = formattedRanking.map((agent, index) => {
       let cargo = 'Agente';
       if (index === 0) cargo = 'Agente Ejecutivo';
       else if (index === 1) cargo = 'Agente Senior';
@@ -200,16 +255,45 @@ router.get('/', async (req, res) => {
       };
     });
     
-    console.log(`Ranking generado con ${rankingConPosiciones.length} agentes`);
+    console.log(`Ranking generado con ${rankingConPosiciones.length} agentes.`);
+
+    // Calcular totales por separado para no afectar el ranking principal
+    const totalClientes = await db.collection('costumers').countDocuments(filter);
+    const totalAgentesResult = await db.collection('costumers').aggregate([
+      { $match: filter },
+      { $group: { _id: "$agenteId" } },
+      { $count: "count" }
+    ]).toArray();
+    const totalAgentes = totalAgentesResult.length > 0 ? totalAgentesResult[0].count : 0;
     
-    res.json({
+    const basePayload = {
       success: true,
       ranking: rankingConPosiciones,
-      totalAgentes: Object.keys(agentStats).length,
-      totalClientes: customers.length
-    });
+      totalAgentes: totalAgentes,
+      totalClientes: totalClientes,
+      periodo: { fechaInicio: qStart, fechaFin: qEnd, sinFiltroFecha: noDateFilter }
+    };
+
+    if (debugMode) {
+      // El objeto `agentStats` ya no existe. El debug ahora muestra el resultado de la agregación.
+      const agentDebug = formattedRanking.map(a => ({
+        id: a.id,
+        nombre: a.nombre,
+        ventas: a.ventas,
+        puntos: a.puntos, // Ya está redondeado
+        promedio: a.promedio
+      }));
+
+      basePayload.debug = {
+        usedFallback: false,
+        aggregationResult: agentDebug,
+        aggregationPipeline: JSON.stringify(aggregationPipeline, null, 2) // Muestra el pipeline usado
+      };
+    }
+
+    res.json(basePayload);
     
-  } catch (error) {
+  } catch (error) {d
     console.error('Error al obtener ranking:', error);
     res.status(500).json({
       success: false,
