@@ -124,7 +124,16 @@ if (!fs.existsSync(uploadsDir)) {
 }
 app.use('/uploads', express.static(uploadsDir));
 
-// Configuración de Multer para subida de archivos
+// Cloudinary (SIEMPRE)
+const cloudinary = require('cloudinary').v2;
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
+
+// Configuración de Multer para subida de archivos (diskStorage temporal antes de subir a Cloudinary)
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadsDir);
@@ -144,20 +153,16 @@ const fileFilter = (req, file, cb) => {
     'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
     'video/mp4', 'video/mov', 'video/avi', 'video/quicktime'
   ];
-  
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Tipo de archivo no permitido'), false);
   }
 };
-
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB límite
-  }
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Helper para opciones de cookie dinámicas según request (soporte localhost:10000 en HTTP)
@@ -826,33 +831,68 @@ app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
         message: 'No se recibió ningún archivo'
       });
     }
-
-    const MediaFile = require('./models/MediaFile');
+    // Conectar a BD si es necesario
+    if (!db) await connectToMongoDB();
+    const collection = db.collection('mediafiles');
     
-    // Determinar categoría del archivo
-    let category = 'image';
-    if (req.file.mimetype === 'image/gif') {
-      category = 'gif';
-    } else if (req.file.mimetype.startsWith('video/')) {
-      category = 'video';
+    // Determinar categoría del archivo (permite override desde el cliente)
+    let categoryOverride = (req.body && req.body.category) || req.query.category || req.headers['x-media-category'];
+    let category = null;
+    if (categoryOverride && typeof categoryOverride === 'string') {
+      category = categoryOverride.toLowerCase();
+    } else {
+      category = 'image';
+      if (req.file.mimetype === 'image/gif') {
+        category = 'gif';
+      } else if (req.file.mimetype.startsWith('video/')) {
+        category = 'video';
+      }
+    }
+    
+    // URL del archivo (local por defecto); si hay Cloudinary, subir allí
+    let fileUrl = `/uploads/${req.file.filename}`;
+    let cloudinaryPublicId = null;
+    let source = 'local';
+    
+    const hasCloudinary = cloudinary && process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET;
+    if (hasCloudinary) {
+      try {
+        const folder = `crm/${category || 'general'}`;
+        const result = await cloudinary.uploader.upload(req.file.path, {
+          folder,
+          resource_type: 'auto',
+        });
+        fileUrl = result.secure_url;
+        cloudinaryPublicId = result.public_id;
+        source = 'cloudinary';
+        // Borrar archivo local tras subir a Cloudinary
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (e) {
+        console.warn('[UPLOAD] Cloudinary fallo, se mantiene archivo local:', e.message);
+      }
     }
 
-    // Crear URL del archivo
-    const fileUrl = `/uploads/${req.file.filename}`;
-
-    // Guardar información en la base de datos
-    const mediaFile = new MediaFile({
+    // Guardar información en la base de datos (Mongo nativo)
+    const now = new Date();
+    const doc = {
       filename: req.file.filename,
       originalName: req.file.originalname,
       mimetype: req.file.mimetype,
       size: req.file.size,
       path: req.file.path,
       url: fileUrl,
+      cloudinaryPublicId,
+      source,
       uploadedBy: req.user.username,
-      category: category
-    });
-
-    await mediaFile.save();
+      category: category,
+      uploadDate: now,
+      createdAt: now,
+      updatedAt: now
+    };
+    const insertResult = await collection.insertOne(doc);
+    const saved = { _id: insertResult.insertedId, ...doc };
 
     console.log(`[UPLOAD] Archivo subido: ${req.file.originalname} por ${req.user.username}`);
 
@@ -860,13 +900,14 @@ app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
       success: true,
       message: 'Archivo subido exitosamente',
       file: {
-        id: mediaFile._id,
-        name: mediaFile.originalName,
-        url: mediaFile.url,
-        type: mediaFile.mimetype,
-        size: mediaFile.size,
-        category: mediaFile.category,
-        uploadDate: mediaFile.uploadDate
+        id: saved._id,
+        name: saved.originalName,
+        url: saved.url,
+        type: saved.mimetype,
+        size: saved.size,
+        category: saved.category,
+        uploadDate: saved.uploadDate,
+        source: saved.source
       }
     });
 
@@ -926,21 +967,26 @@ app.get('/api/media', protect, async (req, res) => {
 
     console.log(`[MEDIA] Encontrados ${files.length} archivos en BD`);
 
-    // Verificar existencia de archivos y filtrar los que no existen
+    // Verificar existencia de archivos locales y aceptar Cloudinary sin verificación en disco
     const uploadsDir = path.join(__dirname, 'uploads');
     const validFiles = [];
 
     for (const file of files) {
       try {
-        const filePath = path.join(uploadsDir, path.basename(file.url));
-
-        // Si el archivo existe físicamente, incluirlo
-        if (fs.existsSync(filePath)) {
+        const isCloudinary = file.source === 'cloudinary' || /https?:\/\/res\.cloudinary\.com\//i.test(file.url || '');
+        if (isCloudinary) {
+          // Para Cloudinary, confiamos en la URL segura almacenada
           validFiles.push(file);
-          console.log(`[MEDIA] ✓ Archivo válido: ${file.originalName}`);
+          console.log(`[MEDIA] ✓ Archivo Cloudinary: ${file.originalName}`);
+          continue;
+        }
+
+        const filePath = path.join(uploadsDir, path.basename(file.url || ''));
+        if (file.url && fs.existsSync(filePath)) {
+          validFiles.push(file);
+          console.log(`[MEDIA] ✓ Archivo local válido: ${file.originalName}`);
         } else {
-          // Si no existe, eliminar la referencia de la base de datos
-          console.log(`[MEDIA] 🗑️ Eliminando referencia a archivo inexistente: ${file.url}`);
+          console.log(`[MEDIA] 🗑️ Eliminando referencia a archivo local inexistente: ${file.url}`);
           await collection.deleteOne({ _id: file._id });
         }
       } catch (error) {

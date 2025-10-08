@@ -1,279 +1,217 @@
-(function(){
-  // Normalizador seguro de nombres (quita acentos, espacios extra y pasa a lower)
-  const norm = (s) => {
-    try {
-      return String(s || '')
-        .normalize('NFD')
-        .replace(/\p{Diacritic}+/gu, '')
-        .trim()
-        .toLowerCase()
-        // eliminar signos de puntuación y separadores no alfanuméricos (conservar espacios)
-        .replace(/[^a-z0-9 ]+/g, '')
-        .replace(/\s+/g, ' ');
-    } catch { return ''; }
-  };
+/**
+ * Definición de equipos, supervisores y agentes
+ * Sistema de gestión de teams del CRM
+ */
 
-  // Alias conocidos para canonización (variantes históricas -> canónico actual)
-  const ALIASES = {
-    'eduardor': 'eduardo rivas'
-  };
+(function() {
+  console.log('[TEAMS] Inicializando sistema de equipos...');
 
-  // Overrides de nombres para visualización en UI
-  const DISPLAY_NAME_OVERRIDES = {
-    // Compatibilidad con nombre previo
-    'eduardor': 'Eduardo R.',
-    // Nombre nuevo solicitado: Eduardo Rivas
-    'eduardo rivas': 'Eduardo Rivas'
-  };
-
-  // Definición inicial de equipos (seed). Expandir aquí según crezcan los equipos.
-  // Nota: guardar nombres en formato canónico: todo minúsculas, sin acentos
+  // Definición de equipos con sus supervisores
   const TEAMS = {
-    'team irania': {
-      displayName: 'TEAM IRANIA',
-      supervisor: 'irania serrano',
-      agents: [
-        'josue renderos',
-        'tatiana ayala',
-        'giselle diaz',
-        'miguel nunez',
-        'roxana martinez',
-        'irania serrano'
-      ]
+    'TEAM IRANIA': {
+      name: 'TEAM IRANIA',
+      supervisor: 'irania.serrano',
+      supervisorName: 'Irania Serrano',
+      color: '#667eea',
+      agents: []
     },
-    // TEAM BRYAN PLEITEZ
-    'team bryan pleitez': {
-      displayName: 'TEAM BRYAN PLEITEZ',
-      supervisor: 'bryan pleitez',
-      agents: [
-        'abigail galdamez',
-        'alexander rivera',
-        'diego mejia',
-        'evelin garcia',
-        'fabricio panameno',
-        'luis chavarria',
-        'steven varela'
-      ]
+    'TEAM BRYAN PLEITEZ': {
+      name: 'TEAM BRYAN PLEITEZ',
+      supervisor: 'bryan.pleitez',
+      supervisorName: 'Bryan Pleitez',
+      color: '#764ba2',
+      agents: []
     },
-    // TEAM MARISOL BELTRAN
-    'team marisol beltran': {
-      displayName: 'TEAM MARISOL BELTRAN',
-      supervisor: 'marisol beltran',
-      agents: [
-        'fernanda castillo',
-        'jonathan morales',
-        'katerine gomez',
-        'kimberly iglesias',
-        'stefani martinez',
-        // Agente actualizado: Eduardo Rivas
-        'eduardo rivas'
-      ]
+    'TEAM MARISOL BELTRAN': {
+      name: 'TEAM MARISOL BELTRAN',
+      supervisor: 'marisol.beltran',
+      supervisorName: 'Marisol Beltrán',
+      color: '#f093fb',
+      agents: []
     },
-    // TEAM ROBERTO VELASQUEZ
-    'team roberto velasquez': {
-      displayName: 'TEAM ROBERTO VELASQUEZ',
-      supervisor: 'roberto velasquez',
-      agents: [
-        'cindy flores',
-        'daniela bonilla',
-        'francisco aguilar',
-        'levy ceren',
-        'lisbeth cortez',
-        'lucia ferman',
-        'nelson ceren'
-      ]
+    'TEAM ROBERTO VELASQUEZ': {
+      name: 'TEAM ROBERTO VELASQUEZ',
+      supervisor: 'roberto.velasquez',
+      supervisorName: 'Roberto Velásquez',
+      color: '#4facfe',
+      agents: []
     },
-    // TEAM RANDAL MARTINEZ
-    'team randal martinez': {
-      displayName: 'TEAM RANDAL MARTINEZ',
-      supervisor: 'randal martinez',
-      agents: [
-        'anderson guzman',
-        'carlos grande',
-        'guadalupe santana',
-        'julio chavez',
-        'priscila hernandez',
-        'riquelmi torres'
-      ]
+    'TEAM RANDAL MARTINEZ': {
+      name: 'TEAM RANDAL MARTINEZ',
+      supervisor: 'randal.martinez',
+      supervisorName: 'Randal Martínez',
+      color: '#00f2fe',
+      agents: []
     },
-    // EQUIPO LINEAS UNIFICADO
-    'team lineas': {
-      displayName: 'TEAM LINEAS',
-      // Mantenemos ambos supervisores
-      supervisor: 'jonathan figueroa',
-      // Segundo supervisor se manejará internamente
-      additionalSupervisors: ['luis gutierrez'],
-      // Lista completa de agentes
-      agents: [
-        'lineas-carlos',
-        'lineas-cristian r',
-        'lineas-edward',
-        'lineas-jocelyn',
-        'lineas-oscar r',
-        'lineas-daniel',
-        'lineas-karla',
-        'lineas-sandy',
-        'lineas-angie',
-        'luis gutierrez'  // Añadido como agente también para mantener la jerarquía
-      ]
+    'TEAM LINEAS': {
+      name: 'TEAM LÍNEAS',
+      supervisor: 'jonathan.figueroa',
+      supervisorName: 'Jonathan Figueroa',
+      color: '#43e97b',
+      agents: []
+    },
+    'Backoffice': {
+      name: 'Backoffice',
+      supervisor: null,
+      supervisorName: 'Sin supervisor específico',
+      color: '#fa709a',
+      agents: []
+    },
+    'Administración': {
+      name: 'Administración',
+      supervisor: null,
+      supervisorName: 'Sin supervisor específico',
+      color: '#fee140',
+      agents: []
     }
   };
 
-  // Índices derivados para búsquedas rápidas
-  const agentToTeam = new Map();
-  const supervisorToTeam = new Map();
-  const canonicalNames = new Set();
-
-  const registerTeam = (teamKey, def) => {
-    const key = norm(teamKey);
-    if (!key || !def) return;
-    const sup = norm(def.supervisor);
-    const agents = (def.agents || []).map(norm).filter(Boolean);
-    TEAMS[key] = {
-      displayName: def.displayName || teamKey,
-      supervisor: sup,
-      agents
-    };
+  // Roles del sistema
+  const ROLES = {
+    ADMIN: 'Administrador',
+    SUPERVISOR: 'Supervisor',
+    BACKOFFICE: 'Backoffice',
+    AGENT: 'Agente',
+    TEAM_LINEAS: 'Team Líneas'
   };
 
-  // Construir índices
-  Object.entries(TEAMS).forEach(([k, def]) => {
-    const key = norm(k);
-    const sup = norm(def.supervisor);
-    supervisorToTeam.set(sup, key);
-    (def.agents || []).forEach(a => {
-      const ca = norm(a);
-      if (ca) {
-        agentToTeam.set(ca, key);
-        canonicalNames.add(ca);
-      }
-    });
-    if (sup) canonicalNames.add(sup);
-    if (def.additionalSupervisors) {
-      def.additionalSupervisors.forEach(sup => {
-        const supNorm = norm(sup);
-        canonicalNames.add(supNorm);
-      });
-    }
-  });
+  /**
+   * Obtener información de un equipo
+   */
+  function getTeam(teamName) {
+    return TEAMS[teamName] || null;
+  }
 
-  // Canoniza un nombre a uno de los canónicos conocidos (por tokens incluidos)
-  const canonicalFromName = (name) => {
-    const n = norm(name);
-    if (!n) return '';
-    if (ALIASES[n]) return ALIASES[n];
-    const nCollapsed = n.replace(/\s+/g, '');
-    if (canonicalNames.has(n)) return n;
-    // Igualdad por forma "colapsada" (sin espacios)
-    for (const c of canonicalNames) {
-      const cCollapsed = c.replace(/\s+/g, '');
-      if (nCollapsed === cCollapsed) return c;
-    }
-    // Inclusión por tokens (todas las palabras del canónico presentes en n)
-    for (const c of canonicalNames) {
-      const toks = c.split(' ');
-      if (toks.every(t => n.includes(t))) return c;
-    }
-    // Inclusión por forma colapsada (p.ej. "eduardor" dentro de "eduardor")
-    for (const c of canonicalNames) {
-      const cCollapsed = c.replace(/\s+/g, '');
-      if (nCollapsed.includes(cCollapsed)) return c;
-    }
-    return '';
-  };
+  /**
+   * Obtener todos los equipos
+   */
+  function getAllTeams() {
+    return Object.values(TEAMS);
+  }
 
-  const getAllTeams = () => Object.keys(TEAMS);
-  const getTeamDef = (teamKey) => TEAMS[norm(teamKey)] || null;
-  const getTeamByAgent = (agentName) => agentToTeam.get(canonicalFromName(agentName)) || '';
-  const getTeamBySupervisor = (supName) => supervisorToTeam.get(canonicalFromName(supName)) || '';
-  const isSupervisor = (name) => {
-    const normName = canonicalFromName(name);
-    // Verificar si es supervisor principal
-    if (supervisorToTeam.get(normName)) return true;
+  /**
+   * Obtener equipos como array para select
+   */
+  function getTeamsForSelect() {
+    return Object.keys(TEAMS).map(key => ({
+      value: key,
+      label: TEAMS[key].name,
+      supervisor: TEAMS[key].supervisor,
+      supervisorName: TEAMS[key].supervisorName
+    }));
+  }
+
+  /**
+   * Obtener supervisor de un equipo
+   */
+  function getSupervisor(teamName) {
+    const team = TEAMS[teamName];
+    return team ? {
+      username: team.supervisor,
+      name: team.supervisorName
+    } : null;
+  }
+
+  /**
+   * Verificar si un usuario es supervisor
+   */
+  function isSupervisor(username) {
+    return Object.values(TEAMS).some(team => team.supervisor === username);
+  }
+
+  /**
+   * Obtener equipo de un supervisor
+   */
+  function getTeamBySupervisor(username) {
+    const teamEntry = Object.entries(TEAMS).find(([_, team]) => team.supervisor === username);
+    return teamEntry ? teamEntry[1] : null;
+  }
+
+  /**
+   * Verificar si un usuario pertenece a un equipo
+   */
+  function isInTeam(username, teamName) {
+    const team = TEAMS[teamName];
+    if (!team) return false;
     
-    // Verificar si es supervisor adicional en algún equipo
-    for (const team of Object.values(TEAMS)) {
-      if (team.additionalSupervisors && 
-          team.additionalSupervisors.some(sup => canonicalFromName(sup) === normName)) {
+    return team.agents.includes(username) || team.supervisor === username;
+  }
+
+  /**
+   * Obtener color de un equipo
+   */
+  function getTeamColor(teamName) {
+    const team = TEAMS[teamName];
+    return team ? team.color : '#94a3b8';
+  }
+
+  /**
+   * Agregar agente a un equipo
+   */
+  function addAgentToTeam(username, teamName) {
+    const team = TEAMS[teamName];
+    if (team && !team.agents.includes(username)) {
+      team.agents.push(username);
+      console.log(`[TEAMS] Agente ${username} agregado a ${teamName}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Remover agente de un equipo
+   */
+  function removeAgentFromTeam(username, teamName) {
+    const team = TEAMS[teamName];
+    if (team) {
+      const index = team.agents.indexOf(username);
+      if (index > -1) {
+        team.agents.splice(index, 1);
+        console.log(`[TEAMS] Agente ${username} removido de ${teamName}`);
         return true;
       }
     }
     return false;
-  };
-  const getAgentsByTeam = (teamKey) => (getTeamDef(teamKey)?.agents || []).slice();
-  const getAgentsBySupervisor = (supName) => {
-    const team = getTeamBySupervisor(supName);
-    return team ? getAgentsByTeam(team) : [];
-  };
-  const getSupervisorByAgent = (agentName) => {
-    const normAgent = canonicalFromName(agentName);
-    const teamKey = getTeamByAgent(normAgent);
-    const team = getTeamDef(teamKey);
-    
-    if (!team) return '';
-    
-    // Si el agente es un supervisor adicional, devolverlo a sí mismo
-    if (team.additionalSupervisors && 
-        team.additionalSupervisors.some(sup => canonicalFromName(sup) === normAgent)) {
-      return normAgent;
-    }
-    
-    // Si no, devolver el supervisor principal del equipo
-    return team.supervisor || '';
-  };
+  }
 
-  // Convierte a Title Case simple
-  const toTitle = (s) => String(s || '')
-    .split(' ')
-    .map(w => w ? w[0].toUpperCase() + w.slice(1) : '')
-    .join(' ');
+  /**
+   * Obtener estadísticas de un equipo
+   */
+  function getTeamStats(teamName, leads) {
+    const team = TEAMS[teamName];
+    if (!team || !Array.isArray(leads)) return null;
 
-  // Obtiene nombre para mostrar en UI con overrides
-  const getDisplayName = (name) => {
-    const c = canonicalFromName(name);
-    if (!c) return toTitle(name || '');
-    if (DISPLAY_NAME_OVERRIDES[c]) return DISPLAY_NAME_OVERRIDES[c];
-    return toTitle(c);
-  };
+    const teamLeads = leads.filter(lead => {
+      const agente = lead.agenteNombre || lead.agente || lead.ownerName;
+      return team.agents.includes(agente) || agente === team.supervisor;
+    });
 
-  // Lista de agentes de un team con nombres listos para UI
-  const getAgentsDisplayByTeam = (teamKey) => {
-    const def = getTeamDef(teamKey);
-    const list = (def?.agents || []);
-    return list.map(a => getDisplayName(a));
-  };
+    return {
+      team: teamName,
+      totalLeads: teamLeads.length,
+      supervisor: team.supervisorName,
+      agents: team.agents.length,
+      color: team.color
+    };
+  }
 
-  // Deducción de team por usuario actual (si hay objeto usuario)
-  const getTeamForUser = (user) => {
-    try {
-      const name = user?.name || user?.nombre || user?.username || user?.email || '';
-      const cn = canonicalFromName(name);
-      // Si es supervisor
-      const tSup = getTeamBySupervisor(cn);
-      if (tSup) return tSup;
-      // Si es agente
-      const tAg = getTeamByAgent(cn);
-      if (tAg) return tAg;
-      return '';
-    } catch { return ''; }
-  };
-
-  // Exponer API pública en window
-  window.Teams = {
-    norm,
-    TEAMS, // referencia (no congelada) por si se quiere extender dinámicamente
-    registerTeam,
-    canonicalFromName,
+  // Exponer API globalmente
+  window.TeamsAPI = {
+    TEAMS,
+    ROLES,
+    getTeam,
     getAllTeams,
-    getTeamDef,
-    getTeamByAgent,
-    getTeamBySupervisor,
+    getTeamsForSelect,
+    getSupervisor,
     isSupervisor,
-    getAgentsByTeam,
-    getAgentsBySupervisor,
-    getSupervisorByAgent,
-    getTeamForUser,
-    getDisplayName,
-    getAgentsDisplayByTeam
+    getTeamBySupervisor,
+    isInTeam,
+    getTeamColor,
+    addAgentToTeam,
+    removeAgentFromTeam,
+    getTeamStats
   };
+
+  console.log('[TEAMS] Sistema inicializado correctamente');
+  console.log('[TEAMS] Equipos disponibles:', Object.keys(TEAMS).length);
 })();

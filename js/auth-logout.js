@@ -1,67 +1,75 @@
 /**
- * Manejador de cierre de sesión unificado
- * Este script debe ser incluido en todas las páginas que requieran funcionalidad de cierre de sesión
+ * Manejador de autenticación y logout
+ * Compatibilidad con logout-handler.js
  */
 
-// Función para cerrar sesión
-function cerrarSesion(e) {
-    if (e) e.preventDefault();
-    
-    console.log('Cerrando sesión...');
-    
-    // 1. Eliminar datos de autenticación
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    localStorage.removeItem('userData');
-    
-    // 2. Redirigir a la página de inicio
-    window.location.href = 'inicio.html';
-}
+(function() {
+  console.log('[AUTH LOGOUT] Inicializando...');
 
-// Función para configurar los botones de cierre de sesión
-function setupLogoutButtons() {
-    // Buscar botones de cierre de sesión
-    const logoutButtons = document.querySelectorAll('#logoutBtn, [id^=logout-], [id$=-logout], .logout-button, [data-logout-button]');
+  // Verificar si ya existe window.logout
+  if (typeof window.logout === 'function') {
+    console.log('[AUTH LOGOUT] Función logout ya existe, usando la existente');
+    return;
+  }
+
+  /**
+   * Función de logout
+   */
+  async function logout() {
+    try {
+      console.log('[AUTH LOGOUT] Cerrando sesión...');
+      
+      // Llamar al endpoint de logout
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        console.log('[AUTH LOGOUT] Sesión cerrada correctamente en el servidor');
+      } else {
+        console.warn('[AUTH LOGOUT] Error al cerrar sesión en el servidor:', data.message);
+      }
+    } catch (error) {
+      console.error('[AUTH LOGOUT] Error:', error);
+    } finally {
+      // Limpiar datos locales independientemente del resultado
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      
+      console.log('[AUTH LOGOUT] Datos locales limpiados, redirigiendo a login');
+      
+      // Redirigir al login
+      window.location.replace('/login.html?message=Sesión cerrada correctamente');
+    }
+  }
+
+  // Exponer función globalmente
+  window.logout = logout;
+
+  // Configurar botones de logout
+  document.addEventListener('DOMContentLoaded', function() {
+    const logoutButtons = document.querySelectorAll('[data-action="logout"], .logout-btn, #logoutBtn');
+    
+    logoutButtons.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        logout();
+      });
+    });
     
     if (logoutButtons.length > 0) {
-        console.log('Configurando botones de cierre de sesión:', logoutButtons.length);
-        logoutButtons.forEach(button => {
-            // Remover listeners antiguos para evitar duplicados
-            button.removeEventListener('click', cerrarSesion);
-            // Agregar nuevo listener
-            button.addEventListener('click', cerrarSesion);
-            // Asegurar que el cursor sea un puntero
-            button.style.cursor = 'pointer';
-        });
+      console.log('[AUTH LOGOUT] Configurados', logoutButtons.length, 'botones de logout');
     }
-}
+  });
 
-// Configurar botones cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar botones iniciales
-    setupLogoutButtons();
-    
-    // Configurar un MutationObserver para detectar cambios en el DOM
-    const observer = new MutationObserver(function(mutations) {
-        let shouldCheck = false;
-        
-        mutations.forEach(function(mutation) {
-            if (mutation.addedNodes.length > 0) {
-                shouldCheck = true;
-            }
-        });
-        
-        if (shouldCheck) {
-            setupLogoutButtons();
-        }
-    });
-    
-    // Empezar a observar el documento con los parámetros configurados
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-    
-    // También exponer la función globalmente por si se necesita llamar desde otros scripts
-    window.cerrarSesion = cerrarSesion;
-});
+  console.log('[AUTH LOGOUT] Inicializado correctamente');
+})();

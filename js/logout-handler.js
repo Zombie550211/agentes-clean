@@ -1,31 +1,45 @@
 /**
- * Manejador de cierre de sesión para todas las páginas
- * Este script debe incluirse en todas las páginas que requieran funcionalidad de cierre de sesión
+ * Manejador de cierre de sesión
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar el manejador de clic para todos los botones de cierre de sesión
-    const logoutButtons = document.querySelectorAll('[data-logout-button]');
+async function logout() {
+  try {
+    console.log('[LOGOUT] Cerrando sesión...');
     
-    logoutButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            cerrarSesion();
-        });
+    // Llamar al endpoint de logout
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
     });
-
-    // Función para cerrar sesión
-    function cerrarSesion() {
-        // Eliminar tokens y datos de usuario de todos los almacenamientos
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
-        
-        // Redirigir a la página de login
-        window.location.href = '/login.html';
+    
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log('[LOGOUT] Sesión cerrada correctamente');
+    } else {
+      console.warn('[LOGOUT] Error al cerrar sesión:', data.message);
     }
+  } catch (error) {
+    console.error('[LOGOUT] Error:', error);
+  } finally {
+    // Limpiar datos locales independientemente del resultado
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    
+    console.log('[LOGOUT] Datos locales limpiados, redirigiendo a login');
+    
+    // Redirigir al login
+    window.location.replace('/login.html?message=Sesión cerrada correctamente');
+  }
+}
 
-    // Hacer la función disponible globalmente
-    window.cerrarSesion = cerrarSesion;
-});
+// Exponer función globalmente
+window.logout = logout;
+
+console.log('[LOGOUT HANDLER] Inicializado correctamente');

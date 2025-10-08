@@ -84,9 +84,6 @@
   
   <!-- Scripts locales -->
   <script src="agentes/js/auth-check.js?v=20250915-1200"></script>
-  <script src="/js/logout-handler.js?v=20250915-1200"></script>
-  <script src="/js/user-info.js?v=20250915-1200"></script>
-  <script src="/js/sidebar-loader.js?v=20250915-1200"></script>
   <script src="/utils/teams.js?v=20250915-1200"></script>
   
   <!-- Estilos específicos para Team Líneas -->
@@ -473,7 +470,12 @@
   <nav class="sidebar sidebar-inicio" data-active="lead">
     <!-- Usuario -->
     <div class="user-info">
-      <div class="avatar"><i class="fas fa-user-circle"></i></div>
+      <div class="avatar"><i class="fas fa-user-circle"></i>  
+  <!-- Scripts de sidebar unificado -->
+  <script src="js/auth-logout.js"></script>
+  <script src="js/user-info-updater.js"></script>
+  <script src="js/sidebar-loader.js"></script>
+</div>
       <div class="user-details">
         <span id="user-name" class="user-name">Usuario</span>
         <span id="user-role" class="user-role">Team Líneas</span>

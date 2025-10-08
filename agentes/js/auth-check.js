@@ -1,140 +1,133 @@
 /**
- * Verificación de autenticación para rutas protegidas
- * Soporta autenticación por token JWT y cookies HttpOnly
+ * Script de verificación de autenticación
+ * Verifica si el usuario está autenticado antes de cargar páginas protegidas
  */
-(async function checkAuth() {
-  // No verificar autenticación en la página de login
-  if (window.location.pathname.endsWith('login.html')) {
+
+(async function() {
+  // No ejecutar en páginas públicas
+  const publicPages = ['/login.html', '/register.html', '/reset-password.html'];
+  const currentPath = window.location.pathname;
+  
+  if (publicPages.some(page => currentPath.endsWith(page))) {
+    console.log('[AUTH] Página pública, no se requiere autenticación');
     return;
   }
 
-  console.log('[AUTH] Verificando autenticación...');
-  
   try {
-    // 1. Verificar si hay un token en localStorage o sessionStorage
+    // Primero verificar si hay token en storage local
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
-    // 2. Intentar autenticación con el token si existe
+    // Preparar headers
+    const headers = {
+      'Accept': 'application/json'
+    };
+    
+    // Si hay token en storage, incluirlo en el header Authorization
     if (token) {
-      console.log('[AUTH] Token encontrado, verificando validez...');
-      
-      try {
-        // Limpiar el token de posibles comillas o espacios en blanco
-        const cleanToken = token.replace(/^['"]|['"]$/g, '').trim();
-        console.log('[AUTH] Token limpio para verificación');
-        
-        const response = await fetch('/api/auth/verify', {
-          method: 'GET',
-          headers: { 
-            'Authorization': `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          credentials: 'include'
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-          console.log('[AUTH] Token válido, usuario autenticado');
-          
-          // Actualizar información del usuario en el almacenamiento local
-          if (data.user) {
-            const userData = {
-              id: data.user.id,
-              username: data.user.username,
-              role: data.user.role,
-              permissions: data.user.permissions || []
-            };
-            
-            // Guardar en el mismo almacenamiento donde está el token
-            const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-            storage.setItem('user', JSON.stringify(userData));
-            
-            console.log('[AUTH] Datos de usuario actualizados');
-          }
-          
-          return; // Usuario autenticado, salir
-        } else {
-          console.warn('[AUTH] Token inválido o expirado:', data.message || 'Sin mensaje de error');
-          // Limpiar token inválido
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
-        }
-      } catch (tokenError) {
-        console.error('[AUTH] Error al verificar el token:', tokenError);
-      }
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('[AUTH] Token encontrado en storage, enviando en Authorization header');
     }
     
-    // 3. Si no hay token o es inválido, intentar con cookie de sesión
-    console.log('[AUTH] Intentando autenticación con cookie de sesión...');
+    // Verificar autenticación con el servidor
+    const response = await fetch('/api/auth/verify-server', {
+      method: 'GET',
+      credentials: 'include', // Importante: incluir cookies en la solicitud
+      headers: headers
+    });
+
+    const data = await response.json();
     
-    try {
-      const response = await fetch('/api/auth/verify', { 
-        method: 'GET', 
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+    console.log('[AUTH] Respuesta del servidor:', data);
+    console.log('[AUTH] authenticated:', data.authenticated);
+    console.log('[AUTH] success:', data.success);
+
+    // IMPORTANTE: Verificar que el usuario esté autenticado
+    if (!data.authenticated) {
+      console.log('[AUTH] Usuario no autenticado (authenticated=false), redirigiendo a login');
       
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        console.log('[AUTH] Autenticación por cookie exitosa');
-        
-        // Guardar el token en el almacenamiento local para futuras peticiones
-        if (data.token) {
-          const storage = localStorage.getItem('token') ? localStorage : sessionStorage;
-          // Limpiar el token antes de guardarlo
-          const cleanToken = data.token.replace(/^['"]|['"]$/g, '').trim();
-          storage.setItem('token', cleanToken);
+      // Verificar si hay datos de usuario válidos en storage antes de redirigir
+      const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          const role = String(user?.role || user?.rol || '').toLowerCase();
+          const allowedRoles = ['admin','backoffice','b:o','b.o','b-o','bo'];
           
-          // Guardar información del usuario
-          if (data.user) {
-            storage.setItem('user', JSON.stringify({
-              id: data.user.id,
-              username: data.user.username,
-              role: data.user.role,
-              permissions: data.user.permissions || []
-            }));
+          if (user && allowedRoles.includes(role)) {
+            console.log('[AUTH] Usuario con rol permitido encontrado en storage, permitiendo acceso');
+            return; // No redirigir
           }
-          
-          console.log('[AUTH] Token y datos de usuario guardados');
+        } catch (e) {
+          console.warn('[AUTH] Error parseando usuario guardado:', e);
         }
-        
-        return; // Usuario autenticado, salir
-      } else {
-        console.warn('[AUTH] No se pudo autenticar con cookie de sesión:', data.message || 'Sin mensaje de error');
       }
-    } catch (cookieError) {
-      console.error('[AUTH] Error al verificar la cookie de sesión:', cookieError);
+      
+      // Limpiar cualquier dato de sesión antiguo
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      
+      // Redirigir al login con la página actual como redirect
+      const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.replace(`/login.html?redirect=${currentUrl}`);
+      return;
     }
-    
-    // 4. Si llegamos aquí, la autenticación falló
-    console.warn('[AUTH] No se pudo autenticar al usuario, redirigiendo a login...');
-    
-    // Limpiar datos de sesión
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-    
-    // Redirigir a la página de login con parámetro de redirección
-    const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
-    window.location.href = `/login.html?redirect=${currentPath}`;
-    
+
+    // Usuario autenticado correctamente
+    console.log('[AUTH] Usuario autenticado:', data.user?.username);
+
+    // Guardar información del usuario en storage para uso en la aplicación
+    const userInfo = {
+      id: data.user.id,
+      username: data.user.username,
+      role: data.user.role,
+      team: data.user.team,
+      supervisor: data.user.supervisor,
+      name: data.user.name || data.user.username,
+      permissions: data.user.permissions || []
+    };
+
+    // Guardar en sessionStorage (más seguro que localStorage)
+    sessionStorage.setItem('user', JSON.stringify(userInfo));
+
+    // También verificar si hay preferencia de "recordar sesión" en localStorage
+    const rememberUser = localStorage.getItem('user');
+    if (rememberUser) {
+      // Actualizar la información en localStorage también
+      localStorage.setItem('user', JSON.stringify(userInfo));
+    }
+
   } catch (error) {
-    console.error('[AUTH] Error en el proceso de autenticación:', error);
+    console.error('[AUTH] Error verificando autenticación:', error);
     
-    // En caso de error de red, intentar continuar si hay un token
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-      console.warn('[AUTH] No hay token disponible, redirigiendo a login...');
-      window.location.href = '/login.html';
+    // En caso de error de red, intentar verificar si hay datos de usuario guardados
+    const savedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+    
+    if (!savedUser) {
+      // No hay información guardada, redirigir al login
+      console.log('[AUTH] Error de autenticación y sin datos guardados, redirigiendo');
+      const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.replace(`/login.html?redirect=${currentUrl}`);
     } else {
-      console.warn('[AUTH] Usando token existente a pesar del error de red');
+      // Verificar rol antes de permitir acceso temporal
+      try {
+        const user = JSON.parse(savedUser);
+        const role = String(user?.role || user?.rol || '').toLowerCase();
+        const allowedRoles = ['admin','backoffice','b:o','b.o','b-o','bo'];
+        
+        if (user && allowedRoles.includes(role)) {
+          console.warn('[AUTH] Error verificando con servidor, pero usuario con rol permitido - permitiendo acceso temporal'); 
+        } else {
+          console.log('[AUTH] Usuario sin rol permitido, redirigiendo a login');
+          const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.replace(`/login.html?redirect=${currentUrl}`);
+        }
+      } catch (e) {
+        console.log('[AUTH] Error parseando datos guardados, redirigiendo');
+        const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.replace(`/login.html?redirect=${currentUrl}`);
+      }
     }
   }
 })();

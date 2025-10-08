@@ -1,137 +1,96 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
-require('dotenv').config();
+const { MongoClient } = require('mongodb');
 
-// Configuración de conexión
+// Configuración de conexión a MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Zombie550211:fDJneHzSCsiU5mdy@cluster0.ywxaotz.mongodb.net/crmagente?retryWrites=true&w=majority&appName=Cluster0';
-const MONGODB_DB = process.env.MONGODB_DB; // Opcional; si no se define, usa el de la URI
 
-// Opciones de conexión mejoradas
-const mongoOptions = {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-  serverSelectionTimeoutMS: 10000, // 10 segundos
-  socketTimeoutMS: 45000, // 45 segundos
-  maxPoolSize: 10, // Número máximo de conexiones en el pool
-  retryWrites: true,
-  w: 'majority'
-};
-
-let client = null;
+// Variable global para mantener la conexión
 let db = null;
-let isConnecting = false;
-let connectionPromise = null;
 
+/**
+ * Conecta a MongoDB Atlas y devuelve la instancia de la base de datos
+ * @returns {Promise<Db>} Instancia de la base de datos conectada
+ */
 async function connectToMongoDB() {
-  // Si ya hay una conexión en curso, devolver esa promesa
-  if (isConnecting) {
-    console.log('[MongoDB] Ya hay una conexión en curso, reutilizando...');
-    return connectionPromise;
-  }
-
-  // Si ya estamos conectados, devolver la conexión existente
-  if (db) {
-    return Promise.resolve(db);
-  }
-
-  isConnecting = true;
-  
-  connectionPromise = new Promise(async (resolve, reject) => {
-    try {
-      console.log(`[MongoDB] Conectando a la base de datos...`);
-      
-      // Crear una nueva instancia del cliente
-      client = new MongoClient(MONGODB_URI, mongoOptions);
-      
-      // Conectar al servidor
-      await client.connect();
-      
-      // Seleccionar la base de datos
-      db = MONGODB_DB ? client.db(MONGODB_DB) : client.db();
-      
-      // Verificar la conexión
-      await db.command({ ping: 1 });
-      
-      console.log(`[MongoDB] Conectado exitosamente a: ${db.databaseName} (MongoDB Atlas)`);
-      
-      // Configurar manejadores de eventos
-      client.on('serverClosed', () => {
-        console.log('[MongoDB] Conexión cerrada por el servidor');
-        db = null;
-        isConnecting = false;
-      });
-      
-      client.on('error', (err) => {
-        console.error('[MongoDB] Error de conexión:', err);
-        db = null;
-        isConnecting = false;
-      });
-      
-      resolve(db);
-    } catch (error) {
-      console.error('[MongoDB] Error al conectar a la base de datos:', error);
-      db = null;
-      isConnecting = false;
-      reject(error);
-    }
-  });
-
-  return connectionPromise;
-}
-
-async function closeConnection() {
   try {
-    if (client) {
-      console.log('[MongoDB] Cerrando conexión...');
-      await client.close();
-      db = null;
-      client = null;
-      isConnecting = false;
-      console.log('[MongoDB] Conexión cerrada exitosamente');
+    if (db && db.serverConfig && db.serverConfig.isConnected()) {
+      console.log('[DB] Reutilizando conexión existente');
+      return db;
     }
+
+    console.log('[DB] Conectando a MongoDB Atlas...');
+    const client = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000, // 10 segundos
+      socketTimeoutMS: 45000, // 45 segundos
+      maxPoolSize: 5, // Máximo 5 conexiones en el pool
+      minPoolSize: 1, // Mínimo 1 conexión
+    });
+
+    // Conectar el cliente
+    await client.connect();
+    db = client.db('crmagente');
+
+    console.log('[DB] Conexión a MongoDB Atlas establecida correctamente');
+
+    // Manejar errores de conexión
+    client.on('error', (error) => {
+      console.error('[DB] Error de conexión:', error);
+      db = null;
+    });
+
+    // Manejar desconexión
+    client.on('close', () => {
+      console.log('[DB] Conexión cerrada');
+      db = null;
+    });
+
+    return db;
   } catch (error) {
-    console.error('[MongoDB] Error al cerrar la conexión:', error);
+    console.error('[DB] Error al conectar a MongoDB:', error);
     throw error;
   }
 }
 
-// Función para obtener la instancia de la base de datos (solo para uso interno)
+/**
+ * Obtiene la instancia actual de la base de datos
+ * @returns {Db|null} Instancia de la base de datos o null si no está conectada
+ */
 function getDb() {
   if (!db) {
-    throw new Error('No se ha establecido conexión con la base de datos. Llama a connectToMongoDB() primero.');
+    console.warn('[DB] No hay conexión activa a la base de datos');
   }
   return db;
 }
 
-// Función para verificar el estado de la conexión
-async function checkConnection() {
+/**
+ * Cierra la conexión a la base de datos
+ */
+async function closeConnection() {
   try {
-    if (!db) {
-      return { ok: false, message: 'No hay conexión activa' };
+    if (db) {
+      await db.client.close();
+      db = null;
+      console.log('[DB] Conexión cerrada correctamente');
     }
-    await db.command({ ping: 1 });
-    return { 
-      ok: true, 
-      message: 'Conexión activa', 
-      dbName: db.databaseName,
-      serverStatus: await db.admin().serverStatus()
-    };
   } catch (error) {
-    return { 
-      ok: false, 
-      message: 'Error en la conexión', 
-      error: error.message 
-    };
+    console.error('[DB] Error al cerrar conexión:', error);
   }
 }
 
+// Manejar cierre de aplicación
+process.on('SIGINT', async () => {
+  console.log('[DB] Recibida señal de cierre, cerrando conexión...');
+  await closeConnection();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('[DB] Recibida señal de terminación, cerrando conexión...');
+  await closeConnection();
+  process.exit(0);
+});
+
 module.exports = {
   connectToMongoDB,
-  closeConnection,
   getDb,
-  checkConnection,
-  // Exportar el cliente para casos de uso avanzados
-  getClient: () => client
+  closeConnection
 };

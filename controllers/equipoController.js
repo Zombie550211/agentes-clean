@@ -1,264 +1,188 @@
-const Lead = require('../models/Lead');
-const Costumer = require('../models/Costumer');
-const { connectToMongoDB, getDb } = require('../config/db');
-const mongoose = require('mongoose');
+const { getDb } = require('../config/db');
 
-/**
- * Obtiene estadísticas de equipos
- */
-exports.obtenerEstadisticasEquipos = async (req, res) => {
+// Utilidad: parsear fecha desde string
+function parseDateInput(s) {
+  if (!s) return null;
   try {
-    // Datos de prueba para cuando MongoDB no esté disponible
-    const datosPrueba = [
-      { TEAM: 'TEAM IRANIA', ICON: 8, BAMO: 7, Total: 15, Puntaje: 46.7 },
-      { TEAM: 'TEAM ROBERTO VELASQUEZ', ICON: 12, BAMO: 11, Total: 23, Puntaje: 47.8 },
-      { TEAM: 'TEAM BRYAN PLEITEZ', ICON: 9, BAMO: 9, Total: 18, Puntaje: 50.0 },
-      { TEAM: 'TEAM MARISOL BELTRAN', ICON: 6, BAMO: 6, Total: 12, Puntaje: 50.0 },
-      { TEAM: 'TEAM RANDAL MARTINEZ', ICON: 11, BAMO: 9, Total: 20, Puntaje: 45.0 },
-      { TEAM: 'TEAM LINEA', ICON: 4, BAMO: 4, Total: 8, Puntaje: 50.0 }
-    ];
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str + 'T00:00:00.000Z');
+    if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(str)) {
+      const [d, m, y] = str.split(/[\/\-]/).map(Number);
+      return new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+    }
+    const d = new Date(str);
+    return isNaN(d) ? null : d;
+  } catch { return null; }
+}
 
-    const lineasPrueba = [
-      { name: 'JONATHAN', ICON: 2 },
-      { name: 'DIEGO', ICON: 2 }
-    ];
+async function obtenerEstadisticasEquipos(req, res) {
+  try {
+    const db = getDb();
+    if (!db) return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
 
-    // Rango de fechas: hoy por defecto, o por querystring (YYYY-MM-DD)
-    const { fechaInicio, fechaFin } = req.query || {};
-    // Obtener la fecha actual en la zona horaria de El Salvador (UTC-6) para evitar el corte a las 6 PM.
-    const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador' });
-    const hoyStr = formatter.format(now);
-
-    const startStr = (fechaInicio && String(fechaInicio).trim()) || hoyStr;
-    const endStr = (fechaFin && String(fechaFin).trim()) || hoyStr;
-
-    // Verificar si MongoDB está disponible
-    let db;
-    try {
-      db = getDb();
-      if (!db) db = await connectToMongoDB();
-    } catch (error) {
-      console.log('[EQUIPOS] MongoDB no disponible, usando datos de prueba');
-      return res.json({
-        success: true,
-        message: 'Datos de prueba - MongoDB no disponible',
-        total: datosPrueba.length,
-        fechaInicio: startStr,
-        fechaFin: endStr,
-        data: datosPrueba,
-        lineas: lineasPrueba,
-        lineasTotalICON: 4,
-        debugCount: { rawCount: datosPrueba.length, paddedCount: datosPrueba.length }
-      });
+    // Rango de fechas (por defecto: HOY)
+    let { fechaInicio, fechaFin } = req.query || {};
+    if (!fechaInicio && !fechaFin) {
+      const now = new Date();
+      const yyyy = now.getUTCFullYear();
+      const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(now.getUTCDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+      fechaInicio = todayStr;
+      fechaFin = todayStr;
     }
 
-    // Asegurar conexión nativa a Mongo (reutilizar db ya obtenido)
-    if (!db) {
-      try {
-        db = await connectToMongoDB();
-      } catch (error) {
-        console.log('[EQUIPOS] Error conectando a MongoDB en segunda intentona:', error.message);
-        return res.json({
-          success: true,
-          message: 'Datos de prueba - Error de conexión MongoDB',
-          total: datosPrueba.length,
-          data: datosPrueba,
-          lineas: lineasPrueba,
-          debugCount: { rawCount: datosPrueba.length, paddedCount: datosPrueba.length }
-        });
+    const start = parseDateInput(fechaInicio);
+    const end = parseDateInput(fechaFin);
+    const endOfDay = end ? new Date(end.getTime() + 24 * 60 * 60 * 1000 - 1) : null;
+
+    const costumers = db.collection('costumers');
+    const pipeline = [];
+
+    // Normalización previa
+    pipeline.push({
+      $addFields: {
+        saleDateRaw: { $ifNull: ['$dia_venta', '$createdAt'] },
+        teamNorm: { $toUpper: { $ifNull: ['$team', '$equipo', ''] } },
+        mercadoNorm: { $toUpper: { $ifNull: ['$mercado', ''] } },
+        puntajeNum: { $convert: { input: '$puntaje', to: 'double', onError: 0, onNull: 0 } }
       }
-    }
-
-    // Usar la colección correcta 'costumers' como especificó el usuario
-    const coll = db.collection('costumers');
-
-    // Construir el $match dinámico para el rango de fechas
-    // Construir el $match dinámico para el rango de fechas completo (agnóstico a la hora)
-    // Construir el $match dinámico para el rango de fechas completo en UTC
-    const matchStage = {
-      $match: {
-        dia_venta: startStr
-      }
-    };
-
-    // Agregación por team, contando ICON/BAMO, Total y sumando puntaje (normalizando mercado a mayúsculas)
-    const pipeline = [
-      matchStage,
-      // Normalizar campos para evitar fallos por espacios/caso
-      {
-        $addFields: {
-          mercado_norm: {
-            $toUpper: {
-              $trim: { input: { $ifNull: ['$mercado', ''] } }
-            }
-          },
-          team_norm: {
-            $trim: {
-              input: {
-                $ifNull: [
-                  '$team',
-                  { $ifNull: ['$supervisor', ''] }
-                ]
-              }
-            }
-          },
-          puntaje_num: {
-            $toDouble: { $ifNull: ['$puntaje', 0] }
-          }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $let: {
-              vars: { t: { $trim: { input: { $ifNull: ['$team_norm', ''] } } } },
-              in: { $cond: [ { $eq: ['$$t',''] }, 'Sin equipo', '$$t' ] }
-            }
-          },
-          ICON: { $sum: { $cond: [{ $eq: ['$mercado_norm', 'ICON'] }, 1, 0] } },
-          BAMO: { $sum: { $cond: [{ $eq: ['$mercado_norm', 'BAMO'] }, 1, 0] } },
-          Total: { $sum: 1 },
-          Puntaje: { $sum: '$puntaje_num' }
-        }
-      },
-      { $sort: { Total: -1, _id: 1 } },
-      {
-        $project: {
-          _id: 0,
-          TEAM: '$_id',
-          ICON: 1,
-          BAMO: 1,
-          Total: 1,
-          Puntaje: { $round: ['$Puntaje', 2] }
-        }
-      }
-    ];
-
-    const data = await coll.aggregate(pipeline, { maxTimeMS: 30000 }).toArray();
-
-    // Agregación específica para TEAM LINEA (desglose por supervisor, contando ICON)
-    const lineaPipeline = [
-      matchStage,
-      { $match: { team: { $in: ['LINEA','linea','Lineas','LINEAS','team lineas','TEAM LINEA'] } } },
-      {
-        $group: {
-          _id: { $toUpper: { $ifNull: ['$supervisor', 'SIN NOMBRE'] } },
-          ICON: { $sum: { $cond: [{ $eq: [{ $toUpper: { $ifNull: ['$mercado',''] } }, 'ICON'] }, 1, 0] } }
-        }
-      },
-      { $project: { _id: 0, name: '$_id', ICON: 1 } },
-      { $sort: { ICON: -1, name: 1 } }
-    ];
-    const lineasAgg = await coll.aggregate(lineaPipeline, { maxTimeMS: 30000 }).toArray();
-
-    // Normalización y padding: asegurar los 6 equipos siempre presentes
-    const normalizeTeam = (s) => {
-      try {
-        const up = String(s || '').toUpperCase().trim();
-        return up.startsWith('TEAM ') ? up.slice(5).trim() : up;
-      } catch { return ''; }
-    };
-    // Lista base en forma canónica (sin prefijo TEAM)
-    // No incluir LINEA en la tabla principal
-    const BASE_TEAMS = [
-      'IRANIA',
-      'ROBERTO VELASQUEZ',
-      'BRYAN PLEITEZ',
-      'MARISOL BELTRAN',
-      'RANDAL MARTINEZ',
-      'LINEA'
-    ];
-    // Alias conocidos desde la BD hacia los nombres base
-    const ALIASES = new Map([
-      ['IRANIA', 'IRANIA'],
-      ['MARISOL', 'MARISOL BELTRAN'],
-      ['ROBERTO', 'ROBERTO VELASQUEZ'],
-      ['ROBERTO V', 'ROBERTO VELASQUEZ'],
-      ['BRYAN', 'BRYAN PLEITEZ'],
-      ['PLEITEZ', 'BRYAN PLEITEZ'],
-      ['BRYAN P', 'BRYAN PLEITEZ'],
-      ['BRYAN PLEITES', 'BRYAN PLEITEZ'],
-      ['RANDAL', 'RANDAL MARTINEZ'],
-      ['LINEAS', 'LINEA'],
-      ['LINEA', 'LINEA']
-    ]);
-    const byKey = new Map();
-    for (const r of (data || [])) {
-      const rawK = normalizeTeam(r.TEAM);
-      const k = ALIASES.get(rawK) || rawK;
-      if (!k) continue;
-      byKey.set(k, {
-        TEAM: `TEAM ${k}`,
-        ICON: Number(r.ICON || 0),
-        BAMO: Number(r.BAMO || 0),
-        Total: Number(r.Total || 0),
-        Puntaje: Number(r.Puntaje || 0)
-      });
-    }
-    const padded = BASE_TEAMS.map(k => byKey.get(k) || ({ TEAM: `TEAM ${k}`, ICON: 0, BAMO: 0, Total: 0, Puntaje: 0 }));
-    const lineasTotalICON = (lineasAgg || []).reduce((s, r) => s + Number(r.ICON || 0), 0);
-
-    // Encabezados de diagnóstico
-    res.set('X-Equipos-Source', 'aggregate');
-    res.set('X-Equipos-Coll', 'costumers');
-    const payload = {
-      success: true,
-      message: `OK-MONGO-AGG PADDED-${padded.length} LINEAS-${lineasAgg.length}`,
-      total: padded.length,
-      fechaInicio: startStr,
-      fechaFin: endStr,
-      data: padded,
-      lineas: lineasAgg,
-      lineasTotalICON,
-      debugCount: { rawCount: data.length, paddedCount: padded.length }
-    };
-    if (String(req.query?.debug || '').toLowerCase() === '1') {
-      payload.dataRaw = data;
-    }
-    console.log('[equipos/estadisticas] counts => raw:', data.length, 'padded:', padded.length);
-    return res.json(payload);
-  } catch (error) {
-    console.error('Error en obtenerEstadisticasEquipos:', error);
-    res.set('X-Equipos-Source', 'error');
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener estadísticas de equipos',
-      error: error?.message || 'Unknown error'
     });
-  }
-};
 
-/**
- * Debug: Información estática sin consultas
- */
-exports.debugCostumers = async (req, res) => {
-  res.json({
-    success: true,
-    debug: {
-      message: 'Debug endpoint - sin consultas MongoDB',
-      timestamp: new Date().toISOString(),
-      status: 'OK'
+    // Parseo de fecha a Date
+    pipeline.push({
+      $addFields: {
+        saleDate: {
+          $switch: {
+            branches: [
+              {
+                // yyyy-mm-dd (con o sin hora)
+                case: { $and: [ { $eq: [ { $type: '$saleDateRaw' }, 'string' ] }, { $regexMatch: { input: '$saleDateRaw', regex: /^\d{4}-\d{2}-\d{2}/ } } ] },
+                then: { $dateFromString: { dateString: '$saleDateRaw' } }
+              },
+              {
+                // dd/mm/yyyy o dd-mm-yyyy
+                case: { $and: [ { $eq: [ { $type: '$saleDateRaw' }, 'string' ] }, { $regexMatch: { input: '$saleDateRaw', regex: /^\d{2}[\/\-]\d{2}[\/\-]\d{4}/ } } ] },
+                then: { $dateFromString: { dateString: '$saleDateRaw', format: '%d/%m/%Y' } }
+              }
+            ],
+            default: '$saleDateRaw'
+          }
+        },
+        saleDateDate: { $cond: [ { $eq: [ { $type: '$saleDate' }, 'date' ] }, '$saleDate', { $toDate: '$saleDate' } ] }
+      }
+    });
+
+    // Match por rango
+    if (start || endOfDay) {
+      const expr = { $and: [] };
+      if (start) expr.$and.push({ $gte: ['$saleDateDate', start] });
+      if (endOfDay) expr.$and.push({ $lte: ['$saleDateDate', endOfDay] });
+
+      let startStr = null;
+      try { if (start) startStr = new Date(start).toISOString().slice(0,10); } catch {}
+
+      if (start && endOfDay && startStr) {
+        pipeline.push({
+          $match: {
+            $or: [
+              { $expr: expr },
+              { $and: [ { $expr: { $eq: [ { $type: '$saleDateRaw' }, 'string' ] } }, { $expr: { $eq: [ '$saleDateRaw', startStr ] } } ] }
+            ]
+          }
+        });
+      } else {
+        pipeline.push({ $match: { $expr: expr } });
+      }
     }
-  });
-};
 
-/**
- * Obtiene los equipos únicos disponibles
- */
-exports.obtenerListaEquipos = async (req, res) => {
-  const equipos = [
-    'TEAM IRANIA',
-    'TEAM ROBERTO VELASQUEZ', 
-    'TEAM BRYAN PLEITEZ',
-    'TEAM MARISOL BELTRAN',
-    'TEAM RANDAL MARTINEZ',
-    'TEAM LINEA'
-  ];
-  
-  res.json({
-    success: true,
-    data: equipos,
-    total: equipos.length
-  });
-};
+    // Agrupar por team
+    pipeline.push({
+      $group: {
+        _id: '$teamNorm',
+        ICON: { $sum: { $cond: [ { $eq: ['$mercadoNorm', 'ICON'] }, 1, 0 ] } },
+        BAMO: { $sum: { $cond: [ { $eq: ['$mercadoNorm', 'BAMO'] }, 1, 0 ] } },
+        Total: { $sum: 1 },
+        Puntaje: { $sum: '$puntajeNum' },
+        PuntajeICON: { $sum: { $cond: [ { $eq: ['$mercadoNorm', 'ICON'] }, '$puntajeNum', 0 ] } },
+        PuntajeBAMO: { $sum: { $cond: [ { $eq: ['$mercadoNorm', 'BAMO'] }, '$puntajeNum', 0 ] } }
+      }
+    });
+
+    pipeline.push({ $project: { _id: 0, TEAM: '$_id', ICON: 1, BAMO: 1, Total: 1, Puntaje: 1, PuntajeICON: 1, PuntajeBAMO: 1 } });
+    pipeline.push({ $sort: { TEAM: 1 } });
+
+    const equiposCol = costumers;
+    let equiposData = await equiposCol.aggregate(pipeline).toArray();
+
+    // Fallback por string exacto si no hubo matches
+    let total = equiposData.reduce((acc, r) => acc + (r?.Total || 0), 0);
+    if ((!equiposData || equiposData.length === 0) && start && endOfDay && (start.toDateString() === end.toDateString())) {
+      try {
+        const startStr = new Date(start).toISOString().slice(0,10);
+        const docs = await equiposCol.find({ $or: [ { dia_venta: startStr }, { fecha_contratacion: startStr } ] }).toArray();
+        if (docs && docs.length) {
+          const map = new Map();
+          for (const d of docs) {
+            const teamKey = String(d.team || d.equipo || '').toUpperCase() || 'SIN EQUIPO';
+            const mercadoKey = String(d.mercado || '').toUpperCase();
+            const punt = Number(d.puntaje || 0);
+            const obj = map.get(teamKey) || { TEAM: teamKey, ICON: 0, BAMO: 0, Total: 0, Puntaje: 0 };
+            if (mercadoKey === 'ICON') obj.ICON += 1; else if (mercadoKey === 'BAMO') obj.BAMO += 1;
+            obj.Total += 1; obj.Puntaje += punt; map.set(teamKey, obj);
+          }
+          equiposData = Array.from(map.values()).sort((a,b)=>a.TEAM.localeCompare(b.TEAM));
+          total = equiposData.reduce((acc, r) => acc + (r?.Total || 0), 0);
+        }
+      } catch(e){ console.warn('[EQUIPOS fallback] Error:', e?.message); }
+    }
+
+    // LINEAS
+    const lineasCol = db.collection('Lineas');
+    const lineasPipeline = [{ $addFields: { saleDate: { $ifNull: ['$dia_venta', '$creadoEn'] }, name: { $ifNull: ['$agenteNombre', { $ifNull: ['$agente', '$createdBy'] }] } } }];
+    if (start || endOfDay) {
+      const lm = {}; if (start) lm.$gte = start; if (endOfDay) lm.$lte = endOfDay;
+      lineasPipeline.push({ $match: { saleDate: lm } });
+    }
+    lineasPipeline.push({ $group: { _id: '$name', ICON: { $sum: 1 } } });
+    lineasPipeline.push({ $project: { _id: 0, name: '$_id', ICON: 1 } });
+    lineasPipeline.push({ $sort: { name: 1 } });
+
+    let lineas = [];
+    try { lineas = await lineasCol.aggregate(lineasPipeline).toArray(); } catch { lineas = []; }
+
+    return res.json({ success: true, message: 'Estadísticas calculadas', total, data: equiposData, lineas });
+  } catch (error) {
+    console.error('[EQUIPOS obtenerEstadisticasEquipos] Error:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor', error: error.message });
+  }
+}
+
+async function obtenerListaEquipos(req, res){
+  try {
+    const db = getDb();
+    const col = db.collection('costumers');
+    const teams = await col.aggregate([
+      { $addFields: { teamNorm: { $toUpper: { $ifNull: ['$team', '$equipo', ''] } } } },
+      { $group: { _id: '$teamNorm' } },
+      { $match: { _id: { $ne: '' } } },
+      { $sort: { _id: 1 } }
+    ]).toArray();
+    res.json({ success:true, data: teams.map(t=>t._id), total: teams.length });
+  } catch (e) {
+    res.status(500).json({ success:false, message:'Error obteniendo lista de equipos', error:e.message });
+  }
+}
+
+async function debugCostumers(req, res){
+  try{
+    const db = getDb();
+    const col = db.collection('costumers');
+    const sample = await col.find({}).sort({ _id: -1 }).limit(5).toArray();
+    res.json({ success:true, sample });
+  } catch(e){
+    res.status(500).json({ success:false, message:'Error debug', error:e.message });
+  }
+}
+
+module.exports = { obtenerEstadisticasEquipos, obtenerListaEquipos, debugCostumers };

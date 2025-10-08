@@ -532,6 +532,15 @@
         gap: 30px;
       }
     }
+  
+    /* Posicionamiento relativo para permitir overlays internos */
+    .employee-frame { position: relative; }
+    /* Mantener reglas de view-only para bloquear clicks en placeholder */
+    .view-only-mode .placeholder-photo { pointer-events: none; }
+    /* Forzar ocultar cualquier botón externo suelto (fuera del marco) */
+    .employee-winner > button,
+    .employee-winner .card-top-actions,
+    .employee-frame > button { display: none !important; }
   </style>
 </head>
 <body>
@@ -562,6 +571,14 @@
             <span>EMPLEADO DEL MES</span>
           </div>
           <div class="employee-frame">
+            <div class="card-top-actions">
+              <button class="card-action-btn edit" onclick="openPhotoModal('first')">
+                <i class="fas fa-edit"></i> Editar
+              </button>
+              <button class="card-action-btn delete" onclick="deletePhoto('first')">
+                <i class="fas fa-trash"></i> Eliminar
+              </button>
+            </div>
             <div class="frame-decoration">
               <div class="photo-container" id="first-photo-container">
                 <div class="placeholder-photo" onclick="openPhotoModal('first')">
@@ -591,6 +608,14 @@
             <span>EMPLEADO DEL MES</span>
           </div>
           <div class="employee-frame">
+            <div class="card-top-actions">
+              <button class="card-action-btn edit" onclick="openPhotoModal('second')">
+                <i class="fas fa-edit"></i> Editar
+              </button>
+              <button class="card-action-btn delete" onclick="deletePhoto('second')">
+                <i class="fas fa-trash"></i> Eliminar
+              </button>
+            </div>
             <div class="frame-decoration">
               <div class="photo-container" id="second-photo-container">
                 <div class="placeholder-photo" onclick="openPhotoModal('second')">
@@ -704,13 +729,7 @@
 
 
     async function checkUserPermissions() {
-      // La cookie httpOnly se envía automáticamente, solo necesitamos verificar la sesión.
-      // No es necesario obtener el token manualmente en el frontend.
-      const tokenExists = document.cookie.includes('token='); // Verificación simple
-      if (!document.cookie.includes('token=')) {
-        disableEditingFeatures();
-        return;
-      }
+      // La cookie es httpOnly y no aparece en document.cookie; confiamos en /api/auth/verify
       try {
         const response = await fetch('/api/auth/verify', { 
           credentials: 'include' // El navegador enviará la cookie automáticamente
@@ -718,14 +737,16 @@
         if (response.ok) {
           const { user } = await response.json();
           window.currentUser = user;
-                    const userRole = (user.role || '').toLowerCase();
-          const allowedRoles = ['admin', 'administrador', 'supervisor team lineas'];
+          if (window.setCurrentUser) { try { window.setCurrentUser(user); } catch(_) {} }
+          const userRole = String(user.role || '').toLowerCase().trim();
+          const allowedRoles = ['admin', 'administrador', 'backoffice'];
 
           if (allowedRoles.includes(userRole)) {
             enableEditingFeatures();
           } else {
             disableEditingFeatures();
           }
+          console.log('[EOM] Role detected:', userRole, 'view-only:', document.body.classList.contains('view-only-mode'));
         } else {
           disableEditingFeatures();
         }
@@ -744,6 +765,7 @@
     }
 
     function openPhotoModal(employee) {
+      if (document.body.classList.contains('view-only-mode')) { return; }
 
       currentEmployee = employee;
       document.getElementById('modal-title').innerText = `Editar Foto - ${employee === 'first' ? 'Primer' : 'Segundo'} Lugar`;
@@ -792,22 +814,29 @@
 
 
       try {
-        // Step 1: Upload image to Cloudinary
+        // Step 1: Subir imagen al endpoint genérico del servidor
         const formData = new FormData();
-        formData.append('employeeImage', file);
+        formData.append('file', file);
+        formData.append('category', 'employees-of-month'); // aislar uploads de esta página
 
-        const uploadResponse = await fetch('/api/employees-of-month/upload-image', {
+        const uploadResponse = await fetch('/api/upload', {
           method: 'POST',
           body: formData,
-          credentials: 'include' // Esto es suficiente para que el navegador envíe la cookie httpOnly
+          headers: { 'x-media-category': 'employees-of-month' },
+          credentials: 'include'
         });
 
         if (!uploadResponse.ok) {
-          const error = await uploadResponse.json();
-          throw new Error(error.message || 'Error al subir la imagen');
+          let errMsg = 'Error al subir la imagen';
+          try { const err = await uploadResponse.json(); errMsg = err.message || errMsg; } catch {}
+          throw new Error(errMsg);
         }
 
-        const { imageUrl } = await uploadResponse.json();
+        const uploadJson = await uploadResponse.json();
+        console.log('[EOM] Upload response:', uploadJson);
+        // Soportar ambas formas: {success, file:{url}} o {imageUrl}
+        const imageUrl = uploadJson?.file?.url || uploadJson?.imageUrl;
+        if (!imageUrl) throw new Error('No se recibió URL de la imagen');
 
         // Step 2: Save employee data with the new image URL
         const employeeData = {
@@ -815,9 +844,11 @@
           name,
           description,
           imageUrl,
+          imageData: imageUrl,
           date: new Date().toLocaleDateString('es-ES')
         };
 
+        console.log('[EOM] Saving employee data:', employeeData);
         const saveResponse = await fetch('/api/employees-of-month', {
           method: 'POST',
           headers: {
@@ -828,8 +859,11 @@
         });
 
         if (saveResponse.ok) {
+          // Render inmediato en UI para feedback instantáneo
+          displayEmployeePhoto(currentEmployee, employeeData);
           showCustomNotification('Éxito', 'Empleado del mes guardado correctamente.', 'success');
           closeModal();
+          // Recargar desde servidor para asegurar consistencia
           loadSavedEmployees();
         } else {
           const error = await saveResponse.json();
@@ -845,10 +879,24 @@
       try {
         const response = await fetch('/api/employees-of-month', { credentials: 'include' });
         if (!response.ok) throw new Error('No se pudo obtener la información.');
-        const employees = await response.json();
-        
-        const firstPlace = employees.find(e => e.employee === 'first');
-        const secondPlace = employees.find(e => e.employee === 'second');
+        const json = await response.json();
+        console.log('[EOM] GET response raw:', json);
+        // Normalizar posibles formatos de respuesta
+        let employees = [];
+        if (Array.isArray(json)) {
+          employees = json;
+        } else if (Array.isArray(json?.data)) {
+          employees = json.data;
+        } else if (json?.data && typeof json.data === 'object') {
+          employees = Object.values(json.data);
+        } else if (json?.employees && typeof json.employees === 'object') {
+          employees = Object.values(json.employees);
+        }
+        console.log('[EOM] Normalized employees:', employees);
+
+        const firstPlace = employees.find?.(e => e.employee === 'first');
+        const secondPlace = employees.find?.(e => e.employee === 'second');
+        console.log('[EOM] first:', firstPlace, 'second:', secondPlace);
 
         if (firstPlace) {
           displayEmployeePhoto('first', firstPlace);
@@ -871,13 +919,18 @@
       document.getElementById(`${employee}-name`).innerText = data.name;
       document.getElementById(`${employee}-description`).innerText = data.description;
 
+      const imgSrc = data.imageUrl || data.imageData || data.url || (data.file && data.file.url) || '';
+
+      const hasEdit = !document.body.classList.contains('view-only-mode');
       container.innerHTML = `
         <div class="employee-photo-frame">
-          <img src="${data.imageUrl}" alt="${data.name}">
+          <img src="${imgSrc}" alt="${data.name}">
+          ${hasEdit ? `
           <div class="photo-controls">
             <button class="photo-control-btn change" onclick="openPhotoModal('${employee}')"><i class="fas fa-edit"></i></button>
             <button class="photo-control-btn delete" onclick="deletePhoto('${employee}')"><i class="fas fa-trash"></i></button>
           </div>
+          ` : ''}
         </div>
       `;
     }

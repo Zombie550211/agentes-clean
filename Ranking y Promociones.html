@@ -203,8 +203,7 @@
     }
 
     .ranking-content {
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(20px);
+      background: transparent;
       padding: 40px;
       position: relative;
       z-index: 1;
@@ -1177,6 +1176,7 @@
       display: block !important;
       position: relative !important;
       z-index: 1 !important;
+      background: transparent !important;
     }
     
     /* Overlay para astronautas */
@@ -1196,28 +1196,30 @@
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
+      width: 200px !important;
+      height: 300px !important;
     }
     
-    /* Posicionamiento específico */
+    /* Posicionamiento específico - astronautas parados ENCIMA de los cilindros */
     .second-pos {
       left: 20% !important;
-      top: 15% !important;   /* un poco más abajo sobre la tapa izq */
+      top: 35% !important; /* Astronauta parado encima del cilindro izquierdo */
       transform: translateX(-50%) !important;
     }
     
     .first-pos {
       left: 50% !important;
-      top: -5% !important;   /* subir un poco más */
+      top: 20% !important; /* Astronauta parado encima del cilindro central (más alto) - bajado un poco más */
       transform: translateX(-50%) !important;
     }
     
     .third-pos {
       left: 80% !important;
-      top: 18% !important;   /* un poco más abajo */
+      top: 35% !important; /* Restaurado para no mover el nombre ni la info */
       transform: translateX(-50%) !important;
     }
     
-    /* Wrapper de astronautas */
+    /* Wrapper de astronautas - tamaño original restaurado */
     .astronaut-wrapper {
       width: 380px !important;
       height: 380px !important;
@@ -1235,16 +1237,38 @@
       height: 460px !important;
     }
     
-    /* Imágenes de astronautas sin fondo */
+    /* Imágenes de astronautas */
     .astronaut-image {
       width: 100% !important;
       height: 100% !important;
       object-fit: contain !important;
       filter: drop-shadow(0 8px 12px rgba(0,0,0,0.25)) !important; /* base */
       background: transparent !important;
-      clip-path: none !important; /* PNG transparente: no recortamos */
+      clip-path: none !important;
       -webkit-clip-path: none !important;
       display: block !important; /* elimina espacio-inline del img */
+    }
+
+    /* Ajustes SOLO para el TERCER lugar: más pequeño y centrado */
+    .third-pos .astronaut-wrapper {
+      width: 320px !important;
+      height: 320px !important;
+      justify-content: center !important;
+      align-items: flex-end !important; /* anclar abajo para que "pise" */
+      transform: translateY(30px) !important; /* bajar SOLO el astronauta (no el texto) */
+    }
+    .third-pos .astronaut-image {
+      width: 88% !important;
+      height: 88% !important;
+      object-position: center center !important;
+      /* quitar transform directo para no pelear con la animación */
+      animation: float 3s ease-in-out infinite !important; /* efecto flotante */
+    }
+
+    /* Solo MÁS GRANDE el SEGUNDO lugar (sin mover posición) */
+    .second-pos .astronaut-image {
+      width: 110% !important;
+      height: 110% !important;
     }
 
     /* Glow por lugar */
@@ -1262,8 +1286,10 @@
         drop-shadow(0 0 28px rgba(37,99,235,.35)) !important; /* azul vivo */
     }
     
-    /* Badges de posición */
-    .position-badge { display: none !important; }
+    /* Badges de posición - OCULTOS */
+    .position-badge { 
+      display: none !important;
+    }
     
     .position-badge.gold {
       background: #fbbf24 !important;
@@ -1272,17 +1298,27 @@
       font-size: 14px !important;
     }
     
-    /* Información de astronautas en la parte azul del podio */
+    /* Información de astronautas - EN LA CARA FRONTAL de los cilindros */
     .astronaut-info {
       text-align: center !important;
-      margin-top: 90px !important; /* empuja el texto hacia la base azul */
+      position: absolute !important;
+      bottom: -200px !important; /* Posicionar en la cara frontal del cilindro */
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      z-index: 4 !important;
+      width: 140px !important;
     }
     
-    /* Afinar por pedestal */
-    /* Colocar textos justo bajo la tapa (zona marcada en verde) */
-    .first-pos .astronaut-info { margin-top: 12px !important; }
-    .second-pos .astronaut-info { margin-top: -17px !important; }
-    .third-pos .astronaut-info { margin-top: -24px !important; }
+    /* Ajustar posicionamiento específico por lugar - en la cara frontal de cada cilindro */
+    .first-pos .astronaut-info { 
+      bottom: -290px !important; /* Primer lugar: cara frontal del cilindro más alto - bajado aún más */
+    }
+    .second-pos .astronaut-info { 
+      bottom: -190px !important; /* Segundo lugar: cara frontal del cilindro medio */
+    }
+    .third-pos .astronaut-info { 
+      bottom: -200px !important; /* Tercer lugar: cara frontal del cilindro más bajo */
+    }
     
     .astronaut-name {
       font-size: 1.4rem !important;
@@ -1684,52 +1720,49 @@
     }
   </style>
   <script>
-    // Verificar autenticación al cargar la página
+    // La verificación de autenticación se maneja por auth-check.js
+    // Este script solo maneja la lógica específica de la página
     document.addEventListener('DOMContentLoaded', async function() {
+      // Esperar a que auth-check.js termine su verificación
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       try {
-        console.log('🔍 Iniciando verificación de autenticación...');
-        const res = await fetch('/api/auth/verify', { method: 'GET', credentials: 'include' });
+        console.log('🔍 Obteniendo datos del usuario autenticado...');
         
-        console.log('📡 Response status:', res.status);
-        console.log('📡 Response ok:', res.ok);
+        // Obtener datos del usuario desde sessionStorage (establecido por auth-check.js)
+        let user = null;
+        const storedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
         
-        if (!res.ok) {
-          console.error('❌ Respuesta no válida, redirigiendo a login');
-          window.location.href = 'login.html';
+        if (storedUser) {
+          try {
+            user = JSON.parse(storedUser);
+            console.log('👤 Usuario encontrado en storage:', user);
+          } catch (e) {
+            console.error('❌ Error parseando usuario guardado:', e);
+          }
+        }
+        
+        // Si no hay usuario en storage, intentar obtenerlo del servidor
+        if (!user) {
+          console.log('🔄 Obteniendo usuario del servidor...');
+          const res = await fetch('/api/auth/verify', { method: 'GET', credentials: 'include' });
+          
+          if (res.ok) {
+            const data = await res.json();
+            user = data?.user;
+            if (user) {
+              // Guardar en sessionStorage para uso futuro
+              sessionStorage.setItem('user', JSON.stringify(user));
+            }
+          }
+        }
+        
+        if (!user || !user.username) {
+          console.error('❌ No se pudieron obtener datos del usuario');
           return;
         }
         
-        const data = await res.json().catch((err) => {
-          console.error('❌ Error parseando JSON:', err);
-          return {};
-        });
-        
-        console.log('📦 Datos completos recibidos del servidor:', JSON.stringify(data, null, 2));
-        
-        const user = data?.user || {};
-        console.log('👤 Usuario extraído:', JSON.stringify(user, null, 2));
-        
-        // Verificar si realmente hay datos de usuario
-        if (!user || !user.username) {
-          console.error('❌ No se recibieron datos válidos del usuario');
-          console.log('🔄 Data recibida:', data);
-          console.log('🔄 User extraído:', user);
-          
-          // Verificar si hay token en cookies
-          console.log('🍪 Cookies disponibles:', document.cookie);
-          
-          // Intentar obtener de localStorage como fallback
-          const storedUser = localStorage.getItem('user');
-          console.log('💾 Usuario en localStorage:', storedUser);
-          
-          if (!user.username && !storedUser) {
-            console.error('❌ No hay datos de usuario disponibles, redirigiendo a login');
-            window.location.href = 'login.html';
-            return;
-          }
-        } else {
-          console.log('✅ Datos de usuario válidos recibidos');
-        }
+        console.log('✅ Datos de usuario válidos:', user.username);
 
         // Mostrar nombre de usuario en el sidebar
         const welcomeMessage = document.getElementById('welcome-message');
@@ -2058,14 +2091,14 @@
             <div class="ranking-content">
               <!-- Podio con imagen ranking.png -->
               <div class="ranking-podium-final">
-                <img src="images/ranking.png" alt="Podio Ranking" class="ranking-base-image">
+                <img src="images/podio.png" alt="Podio Ranking" class="ranking-base-image">
                 
                 <!-- Astronautas posicionados sobre la imagen -->
                 <div class="astronauts-overlay">
                   <!-- Segundo Lugar -->
                   <div class="astronaut-position second-pos">
                     <div class="astronaut-wrapper">
-                      <img src="images/segundolugar-removebg-preview.png" class="astronaut-image" alt="Anderson Guzman">
+                      <img src="images/segundo lugar.png" class="astronaut-image" alt="Anderson Guzman">
                       <div class="position-badge">2</div>
                     </div>
                     <div class="astronaut-info">
@@ -2077,7 +2110,7 @@
                   <!-- Primer Lugar -->
                   <div class="astronaut-position first-pos">
                     <div class="astronaut-wrapper winner">
-                      <img src="images/primer_lugar-removebg-preview.png" class="astronaut-image" alt="Jonathan Morales">
+                      <img src="images/primer lugar.png" class="astronaut-image" alt="Jonathan Morales">
                       <div class="position-badge gold">1</div>
                     </div>
                     <div class="astronaut-info">
@@ -2089,7 +2122,7 @@
                   <!-- Tercer Lugar -->
                   <div class="astronaut-position third-pos">
                     <div class="astronaut-wrapper">
-                      <img src="images/tercerlugar-removebg-preview.png" class="astronaut-image" alt="Giselle Diaz">
+                      <img src="images/tercer lugar.png" class="astronaut-image" alt="Giselle Diaz">
                       <div class="position-badge">3</div>
                     </div>
                     <div class="astronaut-info">
@@ -2102,7 +2135,10 @@
 
               <!-- Resto del ranking -->
               <div class="other-ranks">
-                <h3>Otros Participantes</h3>
+                <div class="other-ranks-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                  <h3 style="margin:0;">Otros Participantes</h3>
+                  <button id="btn-open-full-ranking" type="button" style="background:#111827; color:#fff; border:none; padding:8px 14px; border-radius:8px; cursor:pointer;">Ver todos</button>
+                </div>
                 <div class="rank-list" id="rank-list-dynamic">
                   <!-- Se llena dinámicamente con datos reales del endpoint /api/ranking -->
                 </div>
@@ -2110,6 +2146,32 @@
             </div>
           </div>
     </main>
+
+    <!-- Modal de tabla completa de ranking -->
+    <div id="fullRankingModal" style="position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; z-index:9999;">
+      <div style="background:#fff; width:min(1100px, 92vw); max-height:88vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25); display:flex; flex-direction:column;">
+        <div style="padding:14px 18px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #e5e7eb;">
+          <h3 style="margin:0; font-size:1.1rem;">Ranking completo (mes actual)</h3>
+          <button id="btn-close-full-ranking" type="button" style="background:#111827; color:#fff; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">Cerrar</button>
+        </div>
+        <div style="padding:12px 18px; overflow:auto;">
+          <div class="table-responsive">
+            <table id="full-rank-table" style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+              <thead>
+                <tr style="background:linear-gradient(90deg,#6366f1,#9333ea); color:#fff;">
+                  <th style="text-align:left; padding:10px;">#</th>
+                  <th style="text-align:left; padding:10px;">Agente</th>
+                  <th style="text-align:right; padding:10px;">Ventas</th>
+                  <th style="text-align:right; padding:10px;">Puntos (suma)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
       document.addEventListener('DOMContentLoaded', async () => {
         console.log('🎯 Ranking y Promociones - Script cargado correctamente');
@@ -2117,9 +2179,26 @@
         // --- Funciones de utilidad y lógica de la página ---
         async function getUser(){
           try {
+            // Primero intentar obtener del storage (más rápido)
+            const storedUser = sessionStorage.getItem('user') || localStorage.getItem('user');
+            if (storedUser) {
+              try {
+                return JSON.parse(storedUser);
+              } catch (e) {
+                console.warn('Error parseando usuario guardado:', e);
+              }
+            }
+            
+            // Si no hay en storage, obtener del servidor
             const res = await fetch('/api/auth/verify', { credentials: 'include' });
             if (!res.ok) return null;
             const data = await res.json();
+            
+            // Guardar en storage para uso futuro
+            if (data.user) {
+              sessionStorage.setItem('user', JSON.stringify(data.user));
+            }
+            
             return data.user;
           } catch(error){
             console.error('Error obteniendo usuario:', error);
@@ -2178,16 +2257,20 @@
             setSlot('.second-pos', top2);
             setSlot('.third-pos', top3);
 
+            // Persistir lista completa en memoria local del módulo para 'Ver todos'
+            window.__rankFullList = list;
+
             // Renderizar "Otros Participantes" con el resto de la lista
             const container = document.getElementById('rank-list-dynamic');
             if (container) {
-              const rest = list.slice(3);
+              const viewAll = !!window.__rankViewAll;
+              const rest = (viewAll ? list : list.slice(0, 10)).slice(3);
               container.innerHTML = '';
               rest.forEach((agent, idx) => {
                 const li = document.createElement('div');
                 li.className = 'rank-item';
                 li.innerHTML = `
-                  <span class="rank-number">${(agent.posicion || (idx + 4))}</span>
+                  <span class="rank-number">${(agent.position || agent.posicion || (idx + 4))}</span>
                   <div class="agent-info">
                     <div class="agent-avatar"><i class="fas fa-user"></i></div>
                     <div class="agent-details">
@@ -2201,6 +2284,146 @@
                   </div>`;
                 container.appendChild(li);
               });
+            }
+
+            // Renderizar TABLA de puntajes con todos los agentes del ranking
+            const table = document.getElementById('rank-table');
+            if (table) {
+              const tbody = table.querySelector('tbody');
+              tbody.innerHTML = '';
+              const viewAll = !!window.__rankViewAll;
+              const dataForTable = viewAll ? list : list.slice(0, 10);
+              dataForTable.forEach((agent, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                  <td style="padding:8px; border-bottom:1px solid #f1f5f9;">${agent.position || agent.posicion || (idx + 1)}</td>
+                  <td style="padding:8px; border-bottom:1px solid #f1f5f9;">${agent.nombre || agent.name || '—'}</td>
+                  <td style="padding:8px; border-bottom:1px solid #f1f5f9; text-align:right;">${agent.ventas ?? 0}</td>
+                  <td style="padding:8px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700;">${(agent.sumPuntaje ?? agent.puntos ?? 0).toFixed ? (agent.sumPuntaje ?? agent.puntos ?? 0).toFixed(1) : (agent.sumPuntaje ?? agent.puntos ?? 0)}</td>
+                `;
+                tbody.appendChild(tr);
+              });
+            }
+
+            // Configurar botón 'Ver todos' (refetch con all=1 al expandir)
+            const btn = document.getElementById('btn-view-all');
+            if (btn) {
+              btn.onclick = async () => {
+                window.__rankViewAll = !window.__rankViewAll;
+                btn.textContent = window.__rankViewAll ? 'Ver menos' : 'Ver todos';
+
+                // Si se va a ver todo, pedir al backend toda la lista (all=1)
+                if (window.__rankViewAll) {
+                  try {
+                    const now = new Date();
+                    const y = now.getFullYear();
+                    const m = String(now.getMonth() + 1).padStart(2, '0');
+                    const d = String(now.getDate()).padStart(2, '0');
+                    const fechaInicio = `${y}-${m}-01`;
+                    const fechaFin = `${y}-${m}-${d}`;
+                    const urlAll = `/api/ranking?all=1&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`;
+                    const resAll = await fetch(urlAll, { credentials: 'include' });
+                    if (resAll.ok) {
+                      const dataAll = await resAll.json();
+                      const full = Array.isArray(dataAll?.ranking) ? dataAll.ranking : [];
+                      window.__rankFullList = full.length ? full : (window.__rankFullList || []);
+                    }
+                  } catch (e) {
+                    console.warn('[RANKING] No se pudo obtener lista completa:', e);
+                  }
+                }
+
+                const listSaved = window.__rankFullList || [];
+                // Render lista
+                const container2 = document.getElementById('rank-list-dynamic');
+                if (container2) {
+                  const source = window.__rankViewAll ? listSaved : listSaved.slice(0, 10);
+                  const rest2 = source.slice(3);
+                  container2.innerHTML = '';
+                  rest2.forEach((agent, idx) => {
+                    const li = document.createElement('div');
+                    li.className = 'rank-item';
+                    li.innerHTML = `
+                      <span class="rank-number">${(agent.position || agent.posicion || (idx + 4))}</span>
+                      <div class="agent-info">
+                        <div class="agent-avatar"><i class="fas fa-user"></i></div>
+                        <div class="agent-details">
+                          <h4>${agent.nombre || agent.name || '—'}</h4>
+                          <p>${agent.cargo || ''}</p>
+                        </div>
+                      </div>
+                      <div class="agent-stats">
+                        <span class="points">${(typeof agent.puntos === 'number' ? agent.puntos : (agent.promedio ?? 0))} pts</span>
+                        <span class="sales">${agent.ventas || 0} ventas</span>
+                      </div>`;
+                    container2.appendChild(li);
+                  });
+                }
+                // Render tabla
+                const table2 = document.getElementById('rank-table');
+                if (table2) {
+                  const tbody2 = table2.querySelector('tbody');
+                  tbody2.innerHTML = '';
+                  const data2 = window.__rankViewAll ? listSaved : listSaved.slice(0, 10);
+                  data2.forEach((agent, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                      <td style="padding:8px; border-bottom:1px solid #f1f5f9;">${agent.position || agent.posicion || (idx + 1)}</td>
+                      <td style="padding:8px; border-bottom:1px solid #f1f5f9;">${agent.nombre || agent.name || '—'}</td>
+                      <td style="padding:8px; border-bottom:1px solid #f1f5f9; text-align:right;">${agent.ventas ?? 0}</td>
+                      <td style="padding:8px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700;">${(agent.sumPuntaje ?? agent.puntos ?? 0).toFixed ? (agent.sumPuntaje ?? agent.puntos ?? 0).toFixed(1) : (agent.sumPuntaje ?? agent.puntos ?? 0)}</td>
+                    `;
+                    tbody2.appendChild(tr);
+                  });
+                }
+              };
+            }
+
+            // Botón abrir modal "Ver todos"
+            const openBtn = document.getElementById('btn-open-full-ranking');
+            if (openBtn) {
+              openBtn.onclick = async () => {
+                try {
+                  const modal = document.getElementById('fullRankingModal');
+                  const tbody = document.querySelector('#full-rank-table tbody');
+                  if (tbody) tbody.innerHTML = '';
+                  // Rango del mes actual
+                  const now = new Date();
+                  const y = now.getFullYear();
+                  const m = String(now.getMonth() + 1).padStart(2, '0');
+                  const d = String(now.getDate()).padStart(2, '0');
+                  const fechaInicio = `${y}-${m}-01`;
+                  const fechaFin = `${y}-${m}-${d}`;
+                  // Pedir lista completa (mismo mes, límite alto)
+                  const res = await fetch(`/api/ranking?all=1&limit=500&fechaInicio=${fechaInicio}&fechaFin=${fechaFin}`, { credentials: 'include' });
+                  const data = res.ok ? await res.json() : { ranking: [] };
+                  const full = Array.isArray(data?.ranking) ? data.ranking : [];
+                  if (tbody) {
+                    full.forEach((agent, idx) => {
+                      const tr = document.createElement('tr');
+                      tr.innerHTML = `
+                        <td style="padding:10px; border-bottom:1px solid #f1f5f9;">${agent.position || agent.posicion || (idx + 1)}</td>
+                        <td style="padding:10px; border-bottom:1px solid #f1f5f9;">${agent.nombre || agent.name || '—'}</td>
+                        <td style="padding:10px; border-bottom:1px solid #f1f5f9; text-align:right;">${agent.ventas ?? 0}</td>
+                        <td style="padding:10px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700;">${(agent.sumPuntaje ?? agent.puntos ?? 0).toFixed ? (agent.sumPuntaje ?? agent.puntos ?? 0).toFixed(1) : (agent.sumPuntaje ?? agent.puntos ?? 0)}</td>
+                      `;
+                      tbody.appendChild(tr);
+                    });
+                  }
+                  if (modal) modal.style.display = 'flex';
+                } catch(e) {
+                  console.error('[RANKING] No se pudo abrir el ranking completo:', e);
+                  alert('No se pudo cargar el ranking completo.');
+                }
+              };
+            }
+
+            // Cerrar modal
+            const closeBtn = document.getElementById('btn-close-full-ranking');
+            const modalEl = document.getElementById('fullRankingModal');
+            if (closeBtn && modalEl) {
+              closeBtn.onclick = () => { modalEl.style.display = 'none'; };
+              modalEl.addEventListener('click', (ev) => { if (ev.target === modalEl) modalEl.style.display = 'none'; });
             }
 
             console.log('[RANKING] ✅ Podio actualizado desde BD');
@@ -2228,11 +2451,13 @@
           console.log('[PROMO] 📤 Iniciando subida de archivo:', file.name);
           const formData = new FormData();
           formData.append('file', file);
+          formData.append('category', 'marketing'); // identifica como material de marketing
 
           try {
             const res = await fetch('/api/upload', {
               method: 'POST',
               credentials: 'include',
+              headers: { 'x-media-category': 'marketing' },
               body: formData
             });
             
@@ -2310,12 +2535,13 @@
           if (!mediaBox) return;
           
           try {
-            console.log('[PROMO] 🔄 Cargando promoción más reciente...');
-            const res = await fetch(`/api/media?limit=1&sort=desc&orderBy=uploadDate&t=${Date.now()}`, { credentials: 'include' });
+            console.log('[PROMO] 🔄 Cargando promoción más reciente (categoría marketing)...');
+            const url = `/api/media?category=marketing&limit=1&sort=desc&orderBy=uploadDate&t=${Date.now()}`;
+            const res = await fetch(url, { credentials: 'include' });
             if (!res.ok) throw new Error('Server response not OK');
 
             const list = await res.json();
-            console.log('[PROMO] 📋 Respuesta del servidor:', list);
+            console.log('[PROMO] 📋 Respuesta (marketing):', list);
             const last = Array.isArray(list) && list.length ? list[0] : null;
 
             if (!last || !last.url) {

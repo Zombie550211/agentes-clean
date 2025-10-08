@@ -1,74 +1,67 @@
 /**
- * Interceptor global para fetch que incluye automáticamente el token de autenticación
+ * Interceptor para fetch - automáticamente incluye cookies en todas las solicitudes
  */
+
 (function() {
-    'use strict';
-    
-    // Guardar la función fetch original
-    const originalFetch = window.fetch;
-    
-    // Función para obtener el token
-    function getToken() {
-        return localStorage.getItem('token') || sessionStorage.getItem('token');
+  // Guardar el fetch original
+  const originalFetch = window.fetch;
+
+  // Sobrescribir fetch para incluir credentials automáticamente solo en same-origin
+  window.fetch = function(url, options = {}) {
+    const absUrl = new URL(url, window.location.origin);
+    const isSameOrigin = absUrl.origin === window.location.origin;
+
+    // Asegurar headers estructura
+    options.headers = options.headers || {};
+    if (!(options.headers instanceof Headers)) {
+      const headers = options.headers;
+      options.headers = new Headers();
+      for (const key in headers) {
+        options.headers.append(key, headers[key]);
+      }
     }
-    
-    // Función para limpiar el token
-    function cleanToken(token) {
-        return token ? token.replace(/^['"]|['"]$/g, '').trim() : null;
+
+    // Solo forzar credentials en same-origin; en cross-origin usar 'omit'
+    if (options.credentials == null) {
+      options.credentials = isSameOrigin ? 'include' : 'omit';
     }
+
+    // Agregar Accept JSON solo para same-origin o cuando esperamos JSON (no HEAD)
+    const method = (options.method || 'GET').toUpperCase();
+    const isHead = method === 'HEAD';
+    if (!isHead && isSameOrigin && !options.headers.has('Accept')) {
+      options.headers.append('Accept', 'application/json');
+    }
+
+    // Log para debug (opcional)
+    console.log(`[FETCH] ${options.method || 'GET'} ${url}`);
     
-    // Interceptor de fetch
-    window.fetch = function(url, options = {}) {
-        // Obtener el token
-        const token = getToken();
+    // Llamar al fetch original con las opciones modificadas
+    return originalFetch(url, options)
+      .then(response => {
+        // Log de respuesta (opcional)
+        console.log(`[FETCH] Response ${response.status} ${url}`);
         
-        // Si hay token y la URL es una petición a la API
-        if (token && (url.startsWith('/api/') || url.includes('/api/'))) {
-            const cleanedToken = cleanToken(token);
-            
-            // Asegurar que options.headers existe
-            options.headers = options.headers || {};
-            
-            // Agregar el token al header Authorization si no existe
-            if (!options.headers['Authorization'] && !options.headers['authorization']) {
-                options.headers['Authorization'] = `Bearer ${cleanedToken}`;
-            }
-            
-            // Asegurar que credentials está configurado
-            if (!options.credentials) {
-                options.credentials = 'include';
-            }
-            
-            console.log('[FETCH-INTERCEPTOR] Token agregado a petición:', url);
+        // Si recibimos 401 (no autorizado), redirigir al login
+        if (response.status === 401) {
+          console.warn('[FETCH] 401 No autorizado, redirigiendo a login');
+          
+          // Limpiar datos de sesión
+          localStorage.removeItem('user');
+          sessionStorage.removeItem('user');
+          
+          // Redirigir al login
+          const currentUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.replace(`/login.html?redirect=${currentUrl}`);
         }
         
-        // Llamar a la función fetch original
-        return originalFetch.call(this, url, options)
-            .then(response => {
-                // Si la respuesta es 401 (no autorizado), limpiar tokens y redirigir
-                if (response.status === 401 && !url.includes('/auth/login') && !url.includes('/auth/register')) {
-                    console.warn('[FETCH-INTERCEPTOR] Token expirado o inválido, limpiando sesión...');
-                    
-                    // Limpiar tokens
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    sessionStorage.removeItem('token');
-                    sessionStorage.removeItem('user');
-                    
-                    // Redirigir al login si no estamos ya ahí
-                    if (!window.location.pathname.includes('login.html')) {
-                        const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
-                        window.location.href = `/login.html?redirect=${currentPath}`;
-                    }
-                }
-                
-                return response;
-            })
-            .catch(error => {
-                console.error('[FETCH-INTERCEPTOR] Error en petición:', error);
-                throw error;
-            });
-    };
-    
-    console.log('[FETCH-INTERCEPTOR] Interceptor de fetch inicializado');
+        return response;
+      })
+      .catch(error => {
+        console.error(`[FETCH] Error en ${url}:`, error);
+        throw error;
+      });
+  };
+
+  console.log('[FETCH INTERCEPTOR] Inicializado correctamente');
 })();

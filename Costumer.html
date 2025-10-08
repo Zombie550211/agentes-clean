@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/costumer-table-clean.css">
   <link rel="stylesheet" href="css/costumer-table-actions.css">
-  <link rel="stylesheet" href="css/costumer-table-comments.css">
+  <link rel="stylesheet" href="css/costumer-table-comments.css">`n  <link rel="stylesheet" href="css/costumer-calendar.css">
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/sidebar-inicio.css">
   <!-- Guard temporal ANTES de cargar scripts: bloquear redirecciones a inicio -->
@@ -4534,20 +4534,16 @@
       }
     }
 
-    // Configurar bot¨®n de cerrar sesi¨®n y cargar info del usuario
+    // Configurar botón de cerrar sesión y cargar info del usuario
     document.addEventListener('DOMContentLoaded', function() {
-      debugLog('DOM completamente cargado, inicializando p¨¢gina...');
-      // Inicializar la p¨¢gina
+      debugLog('DOM completamente cargado, inicializando página...');
+      // Inicializar la página
       initPage();
       
-      // Cargar datos iniciales
-      cargarDatosIniciales();
-      
-      // Configurar bot¨®n de cerrar sesi¨®n
+      // Configurar botón de cerrar sesión
       const logoutBtn = document.getElementById('logoutBtn');
       if (logoutBtn) {
         logoutBtn.addEventListener('click', function(e) {
-          e.preventDefault();
           // Redirigir a la p¨¢gina de inicio de sesi¨®n
           window.location.href = 'index.html';
         });
@@ -4555,8 +4551,12 @@
     });
   </script>
   
-  <!-- Script de cierre de sesi¨®n unificado -->
+  <!-- Script de cierre de sesión unificado -->
   <script src="js/auth-logout.js"></script>
   <script src="js/monthly-cutoff.js"></script>
+  
+  <!-- Scripts de Costumer -->
+  <script src="js/costumer-actions.js"></script>
+  <script src="js/costumer-init.js"></script>`n  <script src="js/costumer-calendar.js"></script>
 </body>
 </html>

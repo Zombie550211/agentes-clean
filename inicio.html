@@ -15,18 +15,9 @@
   <link rel="stylesheet" href="css/sidebar.css">
   <link rel="stylesheet" href="css/sidebar-inicio.css">
   <link rel="stylesheet" href="css/costumer-table-actions.css">
-  <!-- Scripts -->
-  <script src="js/fetch-interceptor.js"></script>
-  <script src="agentes/js/auth-check.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="/js/logout-handler.js"></script>
-  <script src="/js/user-info.js"></script>
-  <script src="js/sidebar-loader.js"></script>
-  <!-- Sistema de Inactividad -->
+  <!-- Scripts críticos que deben cargar primero -->
   <script src="js/crm-config.js"></script>
-  <script src="js/inactivity-manager.js"></script>
-  <script src="js/crm-init.js"></script>
+  <script src="js/fetch-interceptor.js"></script>
   <style>
     /* Estilos globales para eliminar scroll */
     * {
@@ -1366,7 +1357,7 @@
     document.addEventListener('DOMContentLoaded', async function() {
       try {
         console.log('🔍 Iniciando verificación de autenticación...');
-        const res = await fetch('/api/auth/verify', { method: 'GET', credentials: 'include' });
+        const res = await fetch('/api/auth/verify-server', { method: 'GET', credentials: 'include' });
         
         console.log('📡 Response status:', res.status);
         console.log('📡 Response ok:', res.ok);
@@ -1384,30 +1375,16 @@
         
         console.log('📦 Datos completos recibidos del servidor:', JSON.stringify(data, null, 2));
         
-        const user = data?.user || {};
-        console.log('👤 Usuario extraído:', JSON.stringify(user, null, 2));
-        
-        // Verificar si realmente hay datos de usuario
-        if (!user || !user.username) {
-          console.error('❌ No se recibieron datos válidos del usuario');
-          console.log('🔄 Data recibida:', data);
-          console.log('🔄 User extraído:', user);
-          
-          // Verificar si hay token en cookies
-          console.log('🍪 Cookies disponibles:', document.cookie);
-          
-          // Intentar obtener de localStorage como fallback
-          const storedUser = localStorage.getItem('user');
-          console.log('💾 Usuario en localStorage:', storedUser);
-          
-          if (!user.username && !storedUser) {
-            console.error('❌ No hay datos de usuario disponibles, redirigiendo a login');
-            window.location.href = 'login.html';
-            return;
-          }
-        } else {
-          console.log('✅ Datos de usuario válidos recibidos');
+        // Verificar si el usuario está autenticado
+        if (!data.authenticated || !data.user) {
+          console.error('❌ Usuario no autenticado');
+          window.location.href = 'login.html';
+          return;
         }
+        
+        const user = data.user;
+        console.log('👤 Usuario extraído:', JSON.stringify(user, null, 2));
+        console.log('✅ Usuario autenticado correctamente:', user.username);
 
         // Mostrar nombre de usuario en el sidebar
         const welcomeMessage = document.getElementById('welcome-message');
@@ -2070,3 +2047,21 @@
           </a>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Scripts al final del body para mejor rendimiento -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="js/inactivity-manager.js"></script>
+  <script src="agentes/js/auth-check.js"></script>
+  <script src="js/crm-init.js"></script>
+</main>
+  </div>
+
+  <!-- Sidebar unified scripts -->
+  <script src="js/auth-logout.js"></script>
+  <script src="js/user-info-updater.js"></script>
+  <script src="js/sidebar-loader.js"></script>
+</body>
+</html>

@@ -1,117 +1,85 @@
 const express = require('express');
 const router = express.Router();
-const EmployeeOfMonth = require('../models/EmployeeOfMonth'); 
+const { getDb } = require('../config/db');
 const { protect, authorize } = require('../middleware/auth');
-const multer = require('multer');
-const cloudinary = require('cloudinary').v2;
-const { getDb, connectToMongoDB } = require('../config/db');
 
-// Configuración de Multer para subida en memoria (para Cloudinary)
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-const COLLECTION = 'employees_of_month';
-
-async function ensureCollection() {
+/**
+ * @route GET /api/employees-of-month
+ * @desc Obtener empleados del mes
+ * @access Private
+ */
+router.get('/', protect, async (req, res) => {
   try {
     const db = getDb();
-    return db.collection(COLLECTION);
-  } catch (err) {
-    await connectToMongoDB();
-    return getDb().collection(COLLECTION);
-  }
-}
-
-// GET - Obtener empleados del mes
-router.get('/', async (req, res) => {
-  try {
-    const collection = await ensureCollection();
-    const employees = await collection.find({}).toArray();
-    res.json(employees);
+    if (!db) {
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
+    }
+    const coll = db.collection('employeesOfMonth');
+    // Devolver un ARRAY como espera el front
+    const docs = await coll.find({}).sort({ updatedAt: -1 }).toArray();
+    const response = docs.map(d => ({
+      employee: d.employee, // 'first' | 'second'
+      name: d.name || '',
+      description: d.description || '',
+      imageUrl: d.imageUrl || '',
+      date: d.date || null,
+      updatedAt: d.updatedAt || null
+    }));
+    return res.json(response);
   } catch (error) {
-    console.error('Error obteniendo empleados del mes:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('[EMPLOYEES OF MONTH] Error:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 });
 
-// POST - Guardar/actualizar datos de empleado del mes (sin imagen)
-router.post('/', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), async (req, res) => {
+/**
+ * @route POST /api/employees-of-month
+ * @desc Crear nuevo empleado del mes
+ * @access Private
+ */
+router.post('/', protect, authorize('Administrador', 'admin', 'administrador'), async (req, res) => {
   try {
-    const { employee, name, description, imageUrl, imageClass, date } = req.body;
-    if (!employee || !name || !imageUrl) {
-      return res.status(400).json({ message: 'Datos incompletos. Se requiere employee, name y imageUrl.' });
+    const db = getDb();
+    if (!db) {
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
     }
-    const collection = await ensureCollection();
-    await collection.updateOne(
-      { employee },
-      {
-        $set: {
-          employee,
-          name,
-          description: description || '',
-          imageUrl, // Guardamos la URL de Cloudinary
-          imageClass: imageClass || '',
-          date: date || new Date().toLocaleDateString('es-ES'),
-          updatedBy: req.user?.username || 'Sistema',
-          updatedAt: new Date()
-        }
-      },
-      { upsert: true }
-    );
-    res.json({ message: 'Empleado guardado correctamente' });
+    const coll = db.collection('employeesOfMonth');
+
+    const { employee, name, description, imageUrl, date } = req.body || {};
+    if (!employee || !['first','second'].includes(employee)) {
+      return res.status(400).json({ success: false, message: 'Parámetro "employee" inválido (first|second)' });
+    }
+
+    const now = new Date();
+    const doc = { employee, name: name||'', description: description||'', imageUrl: imageUrl||'', date: date||null, updatedAt: now };
+
+    // Upsert por clave employee
+    await coll.updateOne({ employee }, { $set: doc }, { upsert: true });
+
+    return res.json({ success: true, message: 'Empleado del mes guardado', data: doc });
   } catch (error) {
-    console.error('Error guardando empleado del mes:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('[EMPLOYEES OF MONTH CREATE] Error:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 });
 
-// POST - Nuevo endpoint para subir la imagen a Cloudinary
-router.post('/upload-image', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), upload.single('employeeImage'), async (req, res) => {
+// DELETE /api/employees-of-month/:employee
+router.delete('/:employee', protect, authorize('Administrador', 'admin', 'administrador'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No se recibió ningún archivo.' });
+    const db = getDb();
+    if (!db) {
+      return res.status(500).json({ success: false, message: 'Error de conexión a la base de datos' });
     }
-
-    const uploadResult = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: 'image',
-          folder: 'employees_of_the_month' // Carpeta dedicada en Cloudinary
-        },
-        (error, result) => {
-          if (error) return reject(error);
-          resolve(result);
-        }
-      );
-      uploadStream.end(req.file.buffer);
-    });
-
-    res.json({ 
-      message: 'Imagen subida exitosamente a Cloudinary',
-      imageUrl: uploadResult.secure_url 
-    });
-
-  } catch (error) {
-    console.error('[CLOUDINARY EOM UPLOAD] Error:', error);
-    res.status(500).json({ message: 'Error subiendo la imagen a Cloudinary' });
-  }
-});
-
-
-// DELETE - Eliminar empleado del mes
-router.delete('/:employee', protect, authorize('Administrador', 'admin', 'Supervisor Team Lineas'), async (req, res) => {
-  try {
-    const { employee } = req.params;
-    const collection = await ensureCollection();
-    const result = await collection.deleteOne({ employee });
-    if (result.deletedCount > 0) {
-      res.json({ message: 'Empleado eliminado correctamente' });
-    } else {
-      res.status(404).json({ message: 'Empleado no encontrado' });
+    const coll = db.collection('employeesOfMonth');
+    const employee = (req.params.employee||'').toString();
+    if (!['first','second'].includes(employee)) {
+      return res.status(400).json({ success: false, message: 'Parámetro "employee" inválido (first|second)' });
     }
+    await coll.deleteOne({ employee });
+    return res.json({ success: true, message: 'Empleado eliminado' });
   } catch (error) {
-    console.error('Error eliminando empleado del mes:', error);
-    res.status(500).json({ message: 'Error interno del servidor' });
+    console.error('[EMPLOYEES OF MONTH DELETE] Error:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 });
 

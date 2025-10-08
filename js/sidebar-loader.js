@@ -1,299 +1,101 @@
-'use strict';
-(function(){
-  // Decodificador base64url -> JSON string
-  function base64UrlDecode(seg){
-    try {
-      if (!seg) return '';
-      // Reemplazar caracteres url-safe y agregar padding
-      seg = seg.replace(/-/g, '+').replace(/_/g, '/');
-      const pad = seg.length % 4;
-      if (pad) seg += '='.repeat(4 - pad);
-      return atob(seg);
-    } catch { return ''; }
-  }
+/**
+ * Cargador de sidebar dinámico
+ */
 
-  function decodeTokenRole() {
-    // Intenta obtener el rol desde el JWT; si no existe, cae a user en storage
-    try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (token && token.split('.').length === 3) {
-        const payloadStr = base64UrlDecode(token.split('.')[1]);
-        const payload = JSON.parse(payloadStr || '{}');
-        const roleFromToken = (payload.role || payload.rol || payload.userRole || '').toString().toLowerCase();
-        if (roleFromToken) return roleFromToken;
-      }
-    } catch { /* ignorar y continuar al fallback */ }
-    try {
-      const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-      return (user.role || user?.usuario?.role || '').toString().toLowerCase();
-    } catch { return ''; }
-  }
+(function() {
+  console.log('[SIDEBAR LOADER] Inicializando...');
 
-  // Normaliza distintos alias a un rol canónico
-  function normalizeRole(raw){
-    try {
-      const r = (raw || '').toString().trim();
-      // Mapeo de roles antiguos a nuevos roles unificados
-      const map = { 
-        'admin': 'Administrador',
-        'administrador': 'Administrador',
-        'Administrativo': 'Administrador',
-        'backoffice': 'Backoffice',
-        'b:o': 'Backoffice',
-        'b.o': 'Backoffice',
-        'b-o': 'Backoffice',
-        'bo': 'Backoffice',
-        'supervisor': 'Supervisor',
-        'agent': 'Agentes',
-        'agente': 'Agentes',
-        'teamlineas': 'Supervisor Team Lineas',
-        'Team Líneas': 'Supervisor Team Lineas',
-        'lineas': 'Lineas-Agentes'
-      };
-      return map[r] || r;
-    } catch { return ''; }
-  }
-
-  function setActive(nav, preferKey) {
-    try {
-      const role = normalizeRole(decodeTokenRole());
-      const isTeamLineas = role === 'teamlineas' || (() => {
-        try {
-          const user = JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}');
-          const username = (user.username || '').toLowerCase();
-          return username.startsWith('lineas-');
-        } catch { return false; }
-      })();
-      
-      // Para Team Líneas NO retornamos: necesitamos construir el mapa y marcar activos
-
-      // Mapa de claves soportadas
-      const map = [
-        { key: 'inicio', href: 'inicio.html' },
-        { key: 'ranking', href: 'Ranking y Promociones.html' },
-        { key: 'lead', href: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
-        { key: 'costumer', href: 'Costumer.html' },
-        { key: 'register', href: 'register.html' },
-        { key: 'facturacion', href: 'facturacion.html' },
-        { key: 'estadisticas', href: 'Estadisticas.html' },
-        { key: 'tabla-puntaje', href: 'Tabla de puntaje.html' },
-        { key: 'multimedia', href: 'multimedia.html' }
-      ];
-
-      // 1) Prioridad: atributo data-active si viene de la página
-      let target = null;
-      const keyAttr = (preferKey || nav.getAttribute('data-active') || '').toLowerCase();
-      if (keyAttr) target = map.find(m => m.key === keyAttr);
-
-      // 2) Fallback por URL
-      if (!target) {
-        const path = decodeURIComponent(location.pathname || '').toLowerCase();
-        const urlTarget = [
-          { key: 'inicio', match: 'inicio.html' },
-          { key: 'ranking', match: 'ranking y promociones.html' },
-          { key: 'lead', match: isTeamLineas ? 'lead-lineas.html' : 'lead.html' },
-          { key: 'lead', match: 'lead.html' }, // Para compatibilidad con enlaces existentes
-          { key: 'costumer', match: 'costumer.html' },
-          { key: 'register', match: 'register.html' },
-          { key: 'facturacion', match: 'facturacion.html' },
-          { key: 'estadisticas', match: 'estadisticas.html' },
-          { key: 'tabla-puntaje', match: 'tabla de puntaje.html' },
-          { key: 'multimedia', match: 'multimedia.html' }
-        ].find(m => path.endsWith(m.match));
-        
-        if (urlTarget) {
-          target = map.find(m => m.key === urlTarget.key);
-        }
-      }
-
-      // Actualizar el enlace de Lead en el sidebar
-      const leadLinks = nav.querySelectorAll('a[href$="lead.html"]');
-      leadLinks.forEach(link => {
-        if (isTeamLineas) {
-          link.href = 'lead-lineas.html';
-        }
-      });
-
-      // Actualizar clases activas
-      const links = nav.querySelectorAll('a.btn.btn-sidebar');
-      links.forEach(a => a.classList.remove('is-active'));
-      
-      if (!target) return;
-      
-      for (const a of links) {
-        const ahref = (a.getAttribute('href') || '').toLowerCase();
-        if (ahref.endsWith(target.href.toLowerCase())) { 
-          a.classList.add('is-active'); 
-          break; 
-        }
-      }
-    } catch (e) { console.warn('sidebar active state error', e); }
-  }
-
-  function applyAdminVisibility(nav){
-    try {
-      const rawRole = decodeTokenRole();
-      const role = normalizeRole(rawRole);
-      console.log('[SIDEBAR] Rol detectado - Raw:', rawRole, 'Normalizado:', role);
-      // 1) Mostrar/ocultar items exclusivamente de admin por ID conocido
-      const ids = ['#menu-create-account'];
-      ids.forEach(sel => {
-        const li = nav.querySelector(sel);
-        if (li) {
-          // Verificar múltiples variantes de admin
-          const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
-          li.style.display = isAdmin ? 'block' : 'none';
-          console.log('[SIDEBAR] Menu crear cuenta:', isAdmin ? 'VISIBLE' : 'OCULTO', 'para rol:', role);
-        }
-      });
-      // 2) Ocultar el enlace de Facturación si no es admin (sin modificar el componente)
-      const factLink = nav.querySelector('a[href$="facturacion.html"]');
-      const factLi = factLink ? (factLink.closest('li') || factLink.parentElement) : null;
-      if (factLi) {
-        const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
-        factLi.style.display = isAdmin ? '' : 'none';
-      }
-      // 3) Ocultar Estadísticas para quienes NO sean admin o BO (variantes)
-      const allowedStats = ['admin', 'Administrador', 'administrador', 'Administrativo', 'backoffice', 'Backoffice', 'b:o', 'b.o', 'b-o', 'bo'];
-      const statsLink = nav.querySelector('a[href$="Estadisticas.html"], a[href$="estadisticas.html"]');
-      const statsLi = statsLink ? (statsLink.closest('li') || statsLink.parentElement) : null;
-      if (statsLi) {
-        statsLi.style.display = allowedStats.includes(role) ? '' : 'none';
-      }
-
-      // 3.1) Ocultar Multimedia para todos excepto Administrador
-      const multimediaLink = nav.querySelector('a[href$="multimedia.html"]');
-      const multimediaLi = multimediaLink ? (multimediaLink.closest('li') || multimediaLink.parentElement) : null;
-      if (multimediaLi) {
-        const isAdmin = ['admin', 'Administrador', 'administrador', 'Administrativo'].includes(role);
-        multimediaLi.style.display = isAdmin ? '' : 'none';
-      }
-
-      // 4) Habilitar SIEMPRE Costumer para todos los roles (incluyendo Team Líneas)
-      const costumerLink = nav.querySelector('a[href$="Costumer.html"], a[href$="costumer.html"]');
-      const costumerLi = costumerLink ? (costumerLink.closest('li') || costumerLink.parentElement) : null;
-      if (costumerLi) {
-        costumerLi.style.display = '';
-      }
-    } catch(e){ console.warn('sidebar admin visibility error', e); }
-  }
-
-  function wireLogout(nav){
-    const btn = nav.querySelector('[data-logout-button]');
-    if (!btn) return;
-    btn.addEventListener('click', function(e){
-      e.preventDefault();
-      try {
-        if (typeof window.logout === 'function') {
-          return window.logout();
-        }
-      } catch {}
-      try { localStorage.removeItem('token'); } catch{}
-      try { sessionStorage.removeItem('token'); } catch{}
-      try { localStorage.removeItem('user'); } catch{}
-      try { sessionStorage.removeItem('user'); } catch{}
-      location.href = 'login.html';
-    });
-  }
-
-  async function loadSidebar(){
-    const nav = document.querySelector('nav.sidebar');
-    if (!nav) return;
-    try {
-      // Ocultar temporalmente para evitar flicker hasta aplicar activo
-      const prevVisibility = nav.style.visibility;
-      nav.style.visibility = 'hidden';
-      const desiredKey = nav.getAttribute('data-active');
-      // Intentar múltiples rutas para mayor robustez según basePath
-      async function fetchFirstOk(urls){
-        let lastErr = null;
-        for (const u of urls) {
-          try {
-            const r = await fetch(u, { cache: 'no-store' });
-            if (r && r.ok) return r;
-          } catch (e) { lastErr = e; }
-        }
-        if (lastErr) throw lastErr;
-        throw new Error('Ninguna ruta de sidebar.html respondió OK');
-      }
-      // Usar rutas relativas a la raíz del sitio
-      const basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '/';
-      // Agregar timestamp para evitar cache
-      const timestamp = Date.now();
-      const candidates = [
-        `/components/sidebar.html?v=${timestamp}`,
-        `components/sidebar.html?v=${timestamp}`,
-        `./components/sidebar.html?v=${timestamp}`,
-        `../components/sidebar.html?v=${timestamp}`,
-        basePath + `/components/sidebar.html?v=${timestamp}`,
-        window.location.origin + `/components/sidebar.html?v=${timestamp}`,
-        `/dashboard/components/sidebar.html?v=${timestamp}`,  // Ruta específica para el servidor local
-        window.location.origin + `/dashboard/components/sidebar.html?v=${timestamp}`  // Ruta completa para el servidor local
-      ].filter(Boolean);
-      console.log('Buscando sidebar en rutas:', candidates);
-      const resp = await fetchFirstOk(candidates);
-      const html = await resp.text();
-      nav.innerHTML = html;
-      // post-setup
-      setActive(nav, desiredKey);
-      applyAdminVisibility(nav);
-      wireLogout(nav);
-      // Hardening: asegurar que el enlace de Costumer funcione para todos los roles
-      try {
-        const links = Array.from(nav.querySelectorAll('a'));
-        const costumerLink = links.find(a => {
-          const href = (a.getAttribute('href') || '').toLowerCase();
-          const txt = (a.textContent || '').toLowerCase().trim();
-          return href.endsWith('costumer.html') || txt.includes('costumer');
-        });
-        if (costumerLink) {
-          console.debug('[sidebar] Normalizando enlace Costumer:', costumerLink.outerHTML);
-          costumerLink.setAttribute('href', 'Costumer.html');
-          costumerLink.removeAttribute('onclick');
-          costumerLink.removeAttribute('target');
-          costumerLink.style.pointerEvents = '';
-          // Asegurar navegación directa al hacer click
-          costumerLink.addEventListener('click', function(ev){
-            try { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); } catch(_) {}
-            const abs = window.location.origin + '/Costumer.html';
-            window.location.assign(abs);
-          });
-        } else {
-          console.warn('[sidebar] No se encontró enlace Costumer en el sidebar');
-        }
-      } catch(err){ console.warn('[sidebar] Error normalizando Costumer:', err); }
-      // Delegated handler de respaldo: forzar navegación a Costumer.html
-      try {
-        nav.addEventListener('click', function(ev){
-          const a = ev.target && ev.target.closest ? ev.target.closest('a.btn.btn-sidebar') : null;
-          if (!a) return;
-          const txt = (a.textContent || '').toLowerCase().trim();
-          if (txt.includes('costumer')) {
-            try { ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); } catch(_) {}
-            const abs = window.location.origin + '/Costumer.html';
-            window.location.replace(abs);
-          }
-        });
-      } catch(_){ /* noop */ }
-      // Rellenar la info de usuario si el script está disponible
-      try { if (typeof window.cargarInfoUsuario === 'function') window.cargarInfoUsuario(); } catch {}
-      // let other scripts (user-info.js) populate name/role after injection
-      document.dispatchEvent(new CustomEvent('sidebar:loaded'));
-      // Mostrar el nav ya configurado
-      nav.style.visibility = prevVisibility || '';
-    } catch (e) {
-      console.error('Error cargando el sidebar compartido:', e);
-      try {
-        console.warn('Diagnóstico: intentando acceder a rutas absolutas/relativas de sidebar.html falló');
-      } catch {}
-      // Asegurar que no quede oculto en caso de error
-      try { nav.style.visibility = ''; } catch {}
+  function loadSidebar() {
+    const sidebarElement = document.querySelector('.sidebar');
+    
+    if (!sidebarElement) {
+      console.warn('[SIDEBAR LOADER] No se encontró elemento .sidebar');
+      return;
     }
+
+    // Obtener información del usuario
+    const user = window.getCurrentUser ? window.getCurrentUser() : null;
+    const username = user?.username || user?.name || 'Usuario';
+    const role = user?.role || 'Usuario';
+    const team = user?.team || 'Sin equipo';
+    
+    // Obtener iniciales para el avatar
+    const initials = username.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    
+    // Obtener página activa
+    const activePage = sidebarElement.getAttribute('data-active') || 'inicio';
+    
+    // Generar HTML del sidebar
+    const sidebarHTML = `
+      <!-- Información del Usuario -->
+      <div class="user-info">
+        <div class="avatar">
+          <span class="user-avatar">${initials}</span>
+        </div>
+        <span class="user-name" id="user-name">${username}</span>
+        <span class="user-role" id="user-role">${role}</span>
+      </div>
+
+      <!-- Estadísticas del Usuario -->
+      <div class="user-stats">
+        <div class="stat-item">
+          <i class="fas fa-chart-line"></i>
+          <div class="stat-content">
+            <span class="stat-value" id="sidebar-user-sales">0</span>
+            <span class="stat-label">Ventas</span>
+          </div>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-star"></i>
+          <div class="stat-content">
+            <span class="stat-value" id="sidebar-user-points">0</span>
+            <span class="stat-label">Puntos</span>
+          </div>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-users"></i>
+          <div class="stat-content">
+            <span class="stat-value" id="sidebar-user-team">${team}</span>
+            <span class="stat-label">Equipo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menú de Navegación -->
+      <h3>Menú</h3>
+      <ul>
+        <li><a href="inicio.html" class="${activePage === 'inicio' ? 'active' : ''}"><i class="fas fa-home"></i> Inicio</a></li>
+        <li><a href="lead.html" class="${activePage === 'lead' ? 'active' : ''}"><i class="fas fa-user-plus"></i> Nuevo Lead</a></li>
+        <li><a href="Costumer.html" class="${activePage === 'costumer' ? 'active' : ''}"><i class="fas fa-users"></i> Clientes</a></li>
+        <li><a href="Estadisticas.html" class="${activePage === 'estadisticas' ? 'active' : ''}"><i class="fas fa-chart-bar"></i> Estadísticas</a></li>
+        <li><a href="Ranking y Promociones.html" class="${activePage === 'ranking' ? 'active' : ''}"><i class="fas fa-trophy"></i> Rankings</a></li>
+        <li><a href="empleado-del-mes.html" class="${activePage === 'empleado' ? 'active' : ''}"><i class="fas fa-award"></i> Empleado del Mes</a></li>
+        <li><a href="equipos.html" class="${activePage === 'equipos' ? 'active' : ''}"><i class="fas fa-users-cog"></i> Equipos</a></li>
+        <li><a href="facturacion.html" class="${activePage === 'facturacion' ? 'active' : ''}"><i class="fas fa-file-invoice-dollar"></i> Facturación</a></li>
+        <li id="menu-create-account" style="display: ${role.toLowerCase() === 'admin' || role.toLowerCase() === 'administrador' ? 'block' : 'none'};">
+          <a href="register.html"><i class="fas fa-user-plus"></i> Crear Cuenta</a>
+        </li>
+        <li><a href="#" onclick="window.logout(); return false;" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a></li>
+      </ul>
+    `;
+    
+    sidebarElement.innerHTML = sidebarHTML;
+    
+    console.log('[SIDEBAR LOADER] Sidebar cargado correctamente');
+    
+    // Disparar evento personalizado
+    document.dispatchEvent(new Event('sidebar:loaded'));
   }
 
+  // Cargar sidebar cuando el DOM esté listo
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadSidebar);
   } else {
     loadSidebar();
   }
+
+  // Exponer función globalmente
+  window.loadSidebar = loadSidebar;
+
+  console.log('[SIDEBAR LOADER] Inicializado correctamente');
 })();

@@ -74,6 +74,8 @@
         }
         
         console.log('[REGISTER] Acceso autorizado para:', username, 'con rol:', role);
+        // Persistir usuario para sidebar unificado
+        try { if (window.setCurrentUser) window.setCurrentUser(data.user); } catch(_) {}
         // Autorizado: continuar
       } catch (e) {
         console.error('[REGISTER] Error validando acceso:', e);
@@ -84,6 +86,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/sidebar-inicio.css">
+  <link rel="stylesheet" href="css/sidebar.css">
   <style>
     :root {
       --primary: #667eea;
@@ -1040,6 +1043,7 @@
     </main>
   </div>
 
+  <script src="js/auth-logout.js"></script>
   <script src="js/user-info-updater.js"></script>
   <script src="js/sidebar-loader.js"></script>
   <script>
@@ -1420,11 +1424,12 @@
           console.error('Error al restablecer contraseña:', error);
           showNotification(error.message || 'Error al restablecer la contraseña', 'error');
         } finally {
+          // Restaurar botón del formulario de reset
           submitBtn.disabled = false;
           submitBtn.innerHTML = originalBtnText;
         }
-      });
-    });
+      }); // end resetForm submit
+    }); // end DOMContentLoaded
   </script>
 </body>
 </html>

@@ -514,15 +514,19 @@
                         permissions: data.user?.permissions || []
                     };
 
+                    // Guardar tanto token como información del usuario
                     const storage = rememberMe ? localStorage : sessionStorage;
                     storage.setItem('token', data.token);
                     storage.setItem('user', JSON.stringify(userInfo));
+                    
+                    console.log('[LOGIN] Token guardado:', data.token.substring(0, 20) + '...');
+                    console.log('[LOGIN] Usuario guardado:', userInfo);
 
                     messageDiv.textContent = '¡Inicio de sesión exitoso! Redirigiendo...';
                     messageDiv.className = 'alert alert-success';
 
                     let finalRedirectUrl = getUrlParameter('redirect') || '/inicio.html';
-                    
+
                     const isTeamLineas = (userInfo.role || '').toLowerCase().includes('lineas');
                     if (isTeamLineas) {
                         finalRedirectUrl = '/lead-lineas.html';
