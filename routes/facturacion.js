@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const { connectToMongoDB } = require('../config/db');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 
 // Helpers
 function toFechaKey(fecha) {
@@ -73,7 +73,7 @@ async function getCollection() {
 
 // GET /api/facturacion/anual/:anio -> { ok, totalesPorMes: [12] }
 // Suma la columna "TOTAL DEL DIA" (columna 10 -> índice 9 en campos)
-router.get('/anual/:anio', protect, async (req, res) => {
+router.get('/anual/:anio', protect, authorize('admin','Administrador','administrador'), async (req, res) => {
   try {
     const anio = Number(req.params.anio);
     if (!anio) return res.status(400).json({ ok: false, message: 'Año inválido' });
@@ -98,7 +98,7 @@ router.get('/anual/:anio', protect, async (req, res) => {
 });
 
 // GET /api/facturacion/:anio/:mes -> { ok, data: [{fecha, campos}] }
-router.get('/:anio/:mes', protect, async (req, res) => {
+router.get('/:anio/:mes', protect, authorize('admin','Administrador','administrador'), async (req, res) => {
   try {
     const anio = Number(req.params.anio);
     const mes = Number(req.params.mes);
@@ -120,7 +120,7 @@ router.get('/:anio/:mes', protect, async (req, res) => {
 });
 
 // POST /api/facturacion -> body { fecha, campos[14] }
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, authorize('admin','Administrador','administrador'), async (req, res) => {
   try {
     const { fecha, campos } = req.body || {};
     const parsed = parseFecha(fecha);
