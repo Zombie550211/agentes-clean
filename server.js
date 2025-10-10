@@ -40,6 +40,7 @@ const apiRoutes = require('./routes/api');
 const rankingRoutes = require('./routes/ranking');
 const equipoRoutes = require('./routes/equipoRoutes');
 const employeesOfMonthRoutes = require('./routes/employeesOfMonth');
+const facturacionRoutes = require('./routes/facturacion');
 
 // Configuración de JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_super_segura';
@@ -57,9 +58,9 @@ if (process.env.NODE_ENV === 'production' && process.env.DEBUG_LOGS !== '1') {
 
 // Inicializar Express app
 const app = express();
-// En Render SIEMPRE se debe escuchar en process.env.PORT. En local usamos 10000 por defecto.
+// En Render SIEMPRE se debe escuchar en process.env.PORT. En local usamos 3000 por defecto (alineado con front).
 const isRender = !!process.env.RENDER || /render/i.test(process.env.RENDER_EXTERNAL_URL || '');
-const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 10000);
+const PORT = isRender ? Number(process.env.PORT) : (Number(process.env.PORT) || 3000);
 
 // Variable para almacenar la referencia del servidor activo
 let activeServer = null;
@@ -507,6 +508,7 @@ app.use('/api', apiRoutes);
 app.use('/api/ranking', rankingRoutes);
 app.use('/api/employees-of-month', employeesOfMonthRoutes);
 app.use('/api/equipos', equipoRoutes);
+app.use('/api/facturacion', facturacionRoutes);
 
 // Middleware inline (authenticateJWT) queda reemplazado por middleware/auth.js (protect)
 // Wrapper mínimo por compatibilidad con referencias existentes
