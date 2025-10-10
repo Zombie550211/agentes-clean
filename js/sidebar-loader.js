@@ -72,6 +72,7 @@
         <li><a href="Ranking y Promociones.html" class="${activePage === 'ranking' ? 'active' : ''}"><i class="fas fa-trophy"></i> Rankings</a></li>
         <li><a href="empleado-del-mes.html" class="${activePage === 'empleado' ? 'active' : ''}"><i class="fas fa-award"></i> Empleado del Mes</a></li>
         <li><a href="equipos.html" class="${activePage === 'equipos' ? 'active' : ''}"><i class="fas fa-users-cog"></i> Equipos</a></li>
+        <li><a href="Reglas.html" class="${activePage === 'reglas' ? 'active' : ''}"><i class="fas fa-clipboard-list"></i> Reglas</a></li>
         <li style="display: ${isAdmin ? 'block' : 'none'};"><a href="facturacion.html" class="${activePage === 'facturacion' ? 'active' : ''}"><i class="fas fa-file-invoice-dollar"></i> Facturación</a></li>
         <li id="menu-create-account" style="display: ${role.toLowerCase() === 'admin' || role.toLowerCase() === 'administrador' ? 'block' : 'none'};">
           <a href="register.html"><i class="fas fa-user-plus"></i> Crear Cuenta</a>
