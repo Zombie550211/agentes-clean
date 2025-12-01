@@ -1,0 +1,823 @@
+[
+  {
+    "_id": "68ae37931369710d4bd07935",
+    "username": "Israel Barrientos",
+    "password": "$2b$10$x.l5DCCvBkZtcfyCnhWPme1AEXPn2gK1YnuN1JC2RIU4Ei864kYE6",
+    "role": "admin",
+    "createdAt": "2025-08-26T22:39:15.040Z",
+    "updatedAt": "2025-09-24T16:23:27.545Z"
+  },
+  {
+    "_id": "68ae46e41369710d4bd0794a",
+    "username": "AGENTE",
+    "password": "$2b$10$Ba/i9aA4zAtEQXMnz32e/.2UhG4ttHPS8LveiRFkLzZM1rIGH9f2y",
+    "role": "agent",
+    "createdAt": "2025-08-26T23:44:36.051Z",
+    "updatedAt": "2025-08-26T23:44:36.051Z"
+  },
+  {
+    "_id": "68af3e28c61c405e2bb7b0bd",
+    "username": "Daniel Martinez",
+    "password": "$2b$10$kTFkvP9mfR3DuWOROUOPF.z0c/0dtti0.c2qhsV.GleSdXMRDa0mS",
+    "role": "admin",
+    "createdAt": "2025-08-27T17:19:36.804Z",
+    "updatedAt": "2025-10-13T18:01:00.119Z"
+  },
+  {
+    "_id": "68af3ebec61c405e2bb7b0be",
+    "username": "MarketingGaray",
+    "password": "$2b$10$VYs2ipcgjCTd2ZJbjo0WJeSujExhIxMwcaLynazC7wtHeHPtopaQy",
+    "role": "admin",
+    "createdAt": "2025-08-27T17:22:05.872Z",
+    "updatedAt": "2025-08-27T17:22:05.872Z"
+  },
+  {
+    "_id": "68af40a1c61c405e2bb7b0c1",
+    "username": "Fernanda Castillo",
+    "password": "$2b$10$RaZgz2kw9xVbmNtmt9pX.ukEkl67EFYaKuIB9ZKPJPGsW.paJhxWW",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:30:09.712Z",
+    "updatedAt": "2025-08-27T17:30:09.712Z",
+    "supervisorId": "68af41b3c61c405e2bb7b0c7"
+  },
+  {
+    "_id": "68af40c1c61c405e2bb7b0c2",
+    "username": "Jonathan Morales",
+    "password": "$2b$10$ua2TbK3szN/d8V3c09Xhp.qgZSTpdtH6I6vU7eQSvunkdECQrJQu6",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:30:41.223Z",
+    "updatedAt": "2025-08-27T17:30:41.223Z",
+    "supervisorId": "68af41b3c61c405e2bb7b0c7"
+  },
+  {
+    "_id": "68af4175c61c405e2bb7b0c3",
+    "username": "Kimberly Iglesias",
+    "password": "$2b$10$6tAhHz8N7SWbE9dxgMAKkusA48meloGDhoeE3yD2buefbw3V3pVYK",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:33:41.401Z",
+    "updatedAt": "2025-08-27T17:33:41.401Z",
+    "supervisorId": "68af41b3c61c405e2bb7b0c7"
+  },
+  {
+    "_id": "68af418dc61c405e2bb7b0c5",
+    "username": "Katerine Gomez",
+    "password": "$2b$10$GoNX44yfopWjkDCpcQjFLOQRW1iMjbBv6dFPWNWihPQIAzoKQhvhS",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:34:05.641Z",
+    "updatedAt": "2025-08-27T17:34:05.641Z",
+    "supervisorId": "68af41b3c61c405e2bb7b0c7"
+  },
+  {
+    "_id": "68af41b3c61c405e2bb7b0c7",
+    "username": "Marisol Beltran",
+    "password": "$2b$10$Wk.GtNB8U6vfntw/XdZm.eWZsOmUV/8jLaEjfbSsPWdPFfTsVDp2a",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T17:34:43.491Z",
+    "updatedAt": "2025-08-27T17:34:43.491Z"
+  },
+  {
+    "_id": "68af41d0c61c405e2bb7b0c8",
+    "username": "Stefani Martinez",
+    "password": "$2b$10$LpqyVbAYSRE2kmnAfNDgkeWe.T./LYLpcD0LH..eAZ.5.yoz1rLoy",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:35:12.699Z",
+    "updatedAt": "2025-08-27T17:35:12.699Z",
+    "supervisorId": "68af41b3c61c405e2bb7b0c7"
+  },
+  {
+    "_id": "68af44c3c61c405e2bb7b0cb",
+    "username": "Giselle Diaz",
+    "password": "$2b$10$a4RnviDvWwOosduM7EQbpOJTs2hUXp6z7KBzs9NqwWHFn/bqL1/Qq",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:47:46.894Z",
+    "updatedAt": "2025-08-27T17:47:46.894Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af44efc61c405e2bb7b0cc",
+    "username": "Josue Renderos",
+    "password": "$2b$10$qNYEOcRbtZ8BTwVHMuNhYee7Sm1ewOEmc/p7RhZNbgbe9vZxoXnna",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:48:31.376Z",
+    "updatedAt": "2025-09-18T00:19:30.522Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af453bc61c405e2bb7b0cd",
+    "username": "Miguel Nunez",
+    "password": "$2b$10$8pp0YLXsvlVgnIlWupT0SOijgAmpOa4CJ1Fyp5BbDT1hirizumk9i",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:49:47.482Z",
+    "updatedAt": "2025-10-06T16:56:17.705Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af457bc61c405e2bb7b0ce",
+    "username": "Roxana Martinez",
+    "password": "$2b$10$vlY9GSudPIonTEUx7slbfuPpVR3eGUeJqsHQ4YevwKXUG.EXA7ASe",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:50:51.425Z",
+    "updatedAt": "2025-08-29T22:03:05.423Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af4597c61c405e2bb7b0cf",
+    "username": "Tatiana Ayala",
+    "password": "$2b$10$zEWYByWqJ318OddEmthQOeKZlGR1AtH8ytoKwelsWZmyyofOtkMVO",
+    "role": "agent",
+    "createdAt": "2025-08-27T17:51:18.860Z",
+    "updatedAt": "2025-08-27T17:51:18.860Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af4f79c61c405e2bb7b0d3",
+    "username": "Abigail Galdamez",
+    "password": "$2b$10$qgZQ4jCperlqcn5Cjqro.eJzQ1UfMrfgiR3KSIvilRWwTx9hpyJ0e",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:33:29.557Z",
+    "updatedAt": "2025-09-22T23:24:06.074Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68af4f8cc61c405e2bb7b0d4",
+    "username": "Alexander Rivera",
+    "password": "$2b$10$m18j4SAG.6vZge3bzaAfLeEDDJzAfDjAsCwNoinIDFA4/uUjhddVe",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:33:48.303Z",
+    "updatedAt": "2025-08-27T18:33:48.303Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68af5050c61c405e2bb7b0d8",
+    "username": "Fabricio Panameño",
+    "password": "$2b$10$h1fdJh3i08R0O1S5VmVya.rFTAWl8mI0vO8bb98fgHBvPhS8158fS",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:37:04.702Z",
+    "updatedAt": "2025-08-27T18:37:04.702Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68af5079c61c405e2bb7b0d9",
+    "username": "Luis Chavarria",
+    "password": "$2b$10$0x4xB9Rw.zbZl2x4/wn.veSoJfxbx/xebWPvbQGGNmWQ4vijr4W4i",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:37:45.685Z",
+    "updatedAt": "2025-09-22T23:23:16.474Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68af53edc61c405e2bb7b0db",
+    "username": "Anderson Guzman",
+    "password": "$2b$10$3DJi2Vy7qX561mFx1L9aLeViMJU09f2.r0/839hKcS1PXB7hTvL1K",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:52:29.487Z",
+    "updatedAt": "2025-08-27T18:52:29.487Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390"
+  },
+  {
+    "_id": "68af542ec61c405e2bb7b0dc",
+    "username": "Carlos Grande",
+    "password": "$2b$10$hQVxS4emgcVeLgar0cstGeYc3z.K1qYQ0gBSsmJh4Afgu8o/SP7TC",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:53:34.026Z",
+    "updatedAt": "2025-09-22T17:59:34.536Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390"
+  },
+  {
+    "_id": "68af5441c61c405e2bb7b0dd",
+    "username": "Guadalupe Santana",
+    "password": "$2b$10$Rbu/iqoccNJagmGHo02iUOVFcloMPzlL3Xaz5UoOxe3oe7xmUGhIa",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T18:53:53.678Z",
+    "updatedAt": "2025-11-27T22:33:59.721Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390",
+    "team": "TEAM GUADALUPE SANTANA",
+    "updatedBy": "Daniel Martinez"
+  },
+  {
+    "_id": "68af545cc61c405e2bb7b0de",
+    "username": "Julio Chavez",
+    "password": "$2b$10$yXMxNKkr.fbcYyHjZs5wTeV0qERrvY3ibZezoEr0FHgm8i1rjD8em",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:54:20.089Z",
+    "updatedAt": "2025-09-02T21:27:43.517Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390"
+  },
+  {
+    "_id": "68af546cc61c405e2bb7b0df",
+    "username": "Priscila Hernandez",
+    "password": "$2b$10$sZSwiwtZvDCP45wuX5qnguA6nTJbc09FXUUTZK/1UI7Wzdb/5uWE2",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:54:35.852Z",
+    "updatedAt": "2025-08-27T18:54:35.852Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390"
+  },
+  {
+    "_id": "68af5551c61c405e2bb7b0e1",
+    "username": "Riquelmi Torres",
+    "password": "$2b$10$wHXZvCiMb1HA/JLEgPOXZ.2yimzT6KVSq6O8PjXYrk0DTi91HAHau",
+    "role": "agent",
+    "createdAt": "2025-08-27T18:58:25.588Z",
+    "updatedAt": "2025-10-08T23:08:29.940Z",
+    "supervisorId": "68afa1bd5a007ea8f2e98390"
+  },
+  {
+    "_id": "68af55fec61c405e2bb7b0e2",
+    "username": "Cindy Flores",
+    "password": "$2b$10$PwC80NIOOtIRIvfXRSGlv.KAv3YkXsoYXM/870YJxqdrm2j3c9nFu",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:01:18.297Z",
+    "updatedAt": "2025-08-27T19:01:18.297Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af5610c61c405e2bb7b0e3",
+    "username": "Daniela Bonilla",
+    "password": "$2b$10$8bdfII7O4oO07XLA76ksdexQ5YAGPuU3b4thRdlNkEY9.WzXjEQ8C",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:01:35.989Z",
+    "updatedAt": "2025-08-27T19:01:35.989Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af5623c61c405e2bb7b0e4",
+    "username": "Francisco Aguilar",
+    "password": "$2b$10$t9IbX4s5dHTWgQvtMErv1en.oGGvCHCRZVk4zNBZwnBqn9.l/.g0.",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:01:55.355Z",
+    "updatedAt": "2025-08-27T19:01:55.355Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af5642c61c405e2bb7b0e5",
+    "username": "Levy Ceren",
+    "password": "$2b$10$sIE2Eghg5T/92vvUfe5O7uyRKcKw3sELvXlyT2H7A5OuDze.AlS.u",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:02:26.355Z",
+    "updatedAt": "2025-08-27T19:02:26.355Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af5651c61c405e2bb7b0e6",
+    "username": "Lisbeth Cortez",
+    "password": "$2b$10$D73l22YD3x1DQgeg4RNzzu5fRe0RPvm/d9sb9KFFCw4op/.3Yrvda",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:02:41.352Z",
+    "updatedAt": "2025-08-27T19:02:41.352Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af566cc61c405e2bb7b0e7",
+    "username": "Lucia Ferman",
+    "password": "$2b$10$4jz5z7Xwmb.WEwZ3wpA3melxYGFR2KBDjdW33.qxzwlywM/4EuIee",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:03:08.090Z",
+    "updatedAt": "2025-08-27T19:03:08.090Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af568bc61c405e2bb7b0e8",
+    "username": "Nelson Ceren",
+    "password": "$2b$10$WgioLKDvq2rXXfIyt9G1mOVu8h8XuixIYpr9v3Uq53REB5UmmwT7G",
+    "role": "agent",
+    "createdAt": "2025-08-27T19:03:39.799Z",
+    "updatedAt": "2025-08-27T19:03:39.799Z",
+    "supervisorId": "68af569fc61c405e2bb7b0e9"
+  },
+  {
+    "_id": "68af569fc61c405e2bb7b0e9",
+    "username": "Roberto Velasquez",
+    "password": "$2b$10$ZHnMKpWFpTPTu4vlO7VUwebyD7VFWMz9hw8ZIuUoUR.tz9DYsxf2q",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T19:03:59.374Z",
+    "updatedAt": "2025-08-27T19:03:59.374Z"
+  },
+  {
+    "_id": "68af7c71f224a80d0b04a991",
+    "username": "Jonathan Figueroa",
+    "password": "$2b$10$KMxLuWS2jdRhNyiVX6wj/ux5gUSnxQRvcihVyb7Sn555EM.MtQkWe",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T21:45:20.863Z",
+    "updatedAt": "2025-08-27T21:45:20.863Z"
+  },
+  {
+    "_id": "68af7cfdf224a80d0b04a992",
+    "username": "Lineas- Daniel",
+    "password": "$2b$10$wP8ns5t8i9NOGeXJrKUGDOcYkFbhRcbXeJR5Q2F6oIQegctAkUNGC",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:47:41.436Z",
+    "updatedAt": "2025-08-27T21:47:41.436Z"
+  },
+  {
+    "_id": "68af7d24f224a80d0b04a993",
+    "username": "Lineas- Karla",
+    "password": "$2b$10$qy6bmN9yN2dYALWE4GQz6uUeAydjIB4yL.XlWYStFwznTqAYOt/Li",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:48:19.772Z",
+    "updatedAt": "2025-08-27T21:48:19.772Z"
+  },
+  {
+    "_id": "68af7d3af224a80d0b04a994",
+    "username": "Lineas-Angie",
+    "password": "$2b$10$1KVl2gbRmZhQQhejE377KeFIkaRES6wGC67QbmA3ubqO0Wzl6ys56",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:48:42.195Z",
+    "updatedAt": "2025-08-27T21:48:42.195Z"
+  },
+  {
+    "_id": "68af7d50f224a80d0b04a995",
+    "username": "Lineas-Aracely",
+    "password": "$2b$10$1hbHlSlV1loD3mISHVMeH.RSONh.IDons/ODHlhzn6vi7GWafAuDC",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:49:03.559Z",
+    "updatedAt": "2025-08-27T21:49:03.559Z"
+  },
+  {
+    "_id": "68af7d69f224a80d0b04a996",
+    "username": "Lineas-Carlos",
+    "password": "$2b$10$poXHtyLcwTppYHgHW.fg0O97/jjhdHv6WEzKA2qgvSJ17nv/NJqAy",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:49:28.818Z",
+    "updatedAt": "2025-08-27T21:49:28.818Z"
+  },
+  {
+    "_id": "68af7d89f224a80d0b04a997",
+    "username": "Lineas-Cristian R",
+    "password": "$2b$10$cy.LezAqzcfc64YfXJL8PuGl2BqqLSRMCfhFbKP3zuMRp7lN8Efry",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:50:00.441Z",
+    "updatedAt": "2025-08-27T21:50:00.441Z"
+  },
+  {
+    "_id": "68af7daaf224a80d0b04a998",
+    "username": "Lineas-Diego.O",
+    "password": "$2b$10$93bLjUf0Hanqh7ARgjsmx.lZJh6zdwtHzc86WXRif5dQMkUvk7BeC",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T21:50:34.318Z",
+    "updatedAt": "2025-08-27T21:50:34.318Z"
+  },
+  {
+    "_id": "68af7dd4f224a80d0b04a999",
+    "username": "Lineas-Edward",
+    "password": "$2b$10$NGeWE10q/It9VS2MOPnJLe42LVxLQOvLHUmqnN5bxKWh1w8ts8zB.",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:51:16.349Z",
+    "updatedAt": "2025-08-27T21:51:16.349Z"
+  },
+  {
+    "_id": "68af7deff224a80d0b04a99a",
+    "username": "Lineas-Jocelyn",
+    "password": "$2b$10$GEMZoF2S2iWnu9aDAcIEUOuTtJz2WfZmgG6k3vGDI.TZGBvKSUtGO",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:51:42.734Z",
+    "updatedAt": "2025-08-27T21:51:42.734Z"
+  },
+  {
+    "_id": "68af7e09f224a80d0b04a99b",
+    "username": "Lineas-Luis G",
+    "password": "$2b$10$NZotugupT/0h1mYmt8duSe39QZE4pBdHwQwKovF89yQwhH1gNCKa2",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:52:09.029Z",
+    "updatedAt": "2025-08-27T21:52:09.029Z"
+  },
+  {
+    "_id": "68af7e28f224a80d0b04a99c",
+    "username": "Lineas-Oscar R",
+    "password": "$2b$10$3mN5p8lEusikU6YcJ5Kj8.7eHrC.oKktsM4keiOGZnD6JwJvANXBq",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:52:39.911Z",
+    "updatedAt": "2025-08-27T21:52:39.911Z"
+  },
+  {
+    "_id": "68af7e3cf224a80d0b04a99d",
+    "username": "Lineas-Ricardo",
+    "password": "$2b$10$LECByXtfJ8sWZjOEgpmD1e5rIVPec5MBWTFpnzFgkxU4wWJZnD4G6",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:53:00.489Z",
+    "updatedAt": "2025-08-27T21:53:00.489Z"
+  },
+  {
+    "_id": "68af7e5ef224a80d0b04a99e",
+    "username": "Lineas-Sandy",
+    "password": "$2b$10$2vV1xhUEFOBBQpcg6fg6eOwoJ2CrXu66DvdCi046meIb2ELZ7I/jy",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:53:33.702Z",
+    "updatedAt": "2025-08-27T21:53:33.702Z"
+  },
+  {
+    "_id": "68af7e7df224a80d0b04a99f",
+    "username": "Lineas-Stanley",
+    "password": "$2b$10$q7RPcMUnN5yjODZMKdoxpuFQhf9Q57cJmJRSn89VdNNu4ph0.B1AK",
+    "role": "agent",
+    "createdAt": "2025-08-27T21:54:04.575Z",
+    "updatedAt": "2025-08-27T21:54:04.575Z"
+  },
+  {
+    "_id": "68af9393f224a80d0b04a9a6",
+    "username": "Irania Serrano",
+    "password": "$2b$10$k5bEpOxTQUqpSO/L5cgs7e1pZ2MYxIegqMXkku/HbaDBqQtcd2BHi",
+    "role": "supervisor",
+    "createdAt": "2025-08-27T23:24:03.394Z",
+    "updatedAt": "2025-08-27T23:24:03.394Z",
+    "supervisorId": "68af9393f224a80d0b04a9a6"
+  },
+  {
+    "_id": "68af9c745a007ea8f2e9838a",
+    "username": "Steven Varela",
+    "password": "$2b$10$w4OtCnVeUzrpH3y4Dhc2kuvk4nifGLe3lAtmyWpBjkqS/bG/Uo4nq",
+    "role": "agent",
+    "createdAt": "2025-08-28T00:01:55.850Z",
+    "updatedAt": "2025-08-28T00:01:55.850Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68afa1bd5a007ea8f2e98390",
+    "username": "Randal Martinez",
+    "password": "$2b$10$l7FoPwHeXGCpc7AOtU4dcOvN2L4q6pTREO8SZ36znCXg4yQn4ZNe2",
+    "role": "supervisor",
+    "createdAt": "2025-08-28T00:24:29.372Z",
+    "updatedAt": "2025-08-28T00:24:29.372Z"
+  },
+  {
+    "_id": "68afa59e16d4bc737513f4f8",
+    "username": "Kelvin Rodriguez",
+    "password": "$2b$10$Se5sMWjPVAiKX0hgKFljMO5RcZHNBE5F.2UKP.0SkBkNE3ZS/B30K",
+    "role": "admin",
+    "createdAt": "2025-08-28T00:41:02.415Z",
+    "updatedAt": "2025-10-20T21:33:15.357Z"
+  },
+  {
+    "_id": "68afa5c416d4bc737513f4f9",
+    "username": "Alexis Diaz",
+    "password": "$2b$10$4zKRwmbn49DFWvXMk2s5o.qQVj2ftikI5fepV3FkRDTd5iCXC.88S",
+    "role": "admin",
+    "createdAt": "2025-08-28T00:41:40.410Z",
+    "updatedAt": "2025-08-28T00:41:40.410Z"
+  },
+  {
+    "_id": "68b09e0e16d4bc737513f501",
+    "username": "Diego Mejia",
+    "password": "$2b$10$TGPpRfNnwwCSOjp6wncn..brZxfvrytKbRqMCF7NaFvasn5nslr2O",
+    "role": "agent",
+    "createdAt": "2025-08-28T18:21:02.152Z",
+    "updatedAt": "2025-09-19T22:48:47.866Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68b0d02316d4bc737513f50c",
+    "username": "Bryan Pleitez",
+    "password": "$2b$10$N7NNqkpL5ao1rD1L1jTVIOJwIQgORPo/.UtRD61Yl9iwis4GmXKt2",
+    "role": "supervisor",
+    "createdAt": "2025-08-28T21:54:42.991Z",
+    "updatedAt": "2025-09-02T17:24:42.514Z"
+  },
+  {
+    "_id": "68b1dea61449d766c75b586a",
+    "username": "Evelin Garcia",
+    "password": "$2b$10$4L16RGBB3YGVXcIbInVe.uVNXVcEAb7mOBaXmaoWY42C6DC9Q5zFa",
+    "role": "agent",
+    "createdAt": "2025-08-29T17:08:53.912Z",
+    "updatedAt": "2025-08-29T17:08:53.912Z",
+    "supervisorId": "68b0d02316d4bc737513f50c"
+  },
+  {
+    "_id": "68b1e372a16f98c182f51bdb",
+    "username": "BO 1",
+    "password": "$2b$10$Fq8ovhxAbG8n4LS4VPVHUOYq6XDXn8P8YC40.Ss/5eRZ9ubMJJq1K",
+    "role": "backoffice",
+    "createdAt": "2025-08-29T17:29:22.698Z",
+    "updatedAt": "2025-11-28T21:28:55.656Z",
+    "team": "Backoffice",
+    "updatedBy": "Daniel Martinez"
+  },
+  {
+    "_id": "68ba19a7c0605d2b8a29fff1",
+    "username": "EduardoR",
+    "password": "$2b$10$3n0wNIHm0Yg7mux6WZLSa..WdtDu6LeEyr6TgTv/Vi0MEihBbaH/a",
+    "role": "agent",
+    "createdAt": "2025-09-04T22:58:46.952Z",
+    "updatedAt": "2025-09-04T22:58:46.952Z"
+  },
+  {
+    "_id": "68bb1ddd0d4d7cdcb6eb3605",
+    "username": "EduardoRivas",
+    "password": "$2b$10$x5jjD3YGhLjm/E/7k5Lfg.7dhOBAth0.rqPuLVbl0zUQDt4sS81Fu",
+    "role": "agent",
+    "createdAt": "2025-09-05T17:29:01.241Z",
+    "updatedAt": "2025-09-05T17:29:01.241Z"
+  },
+  {
+    "_id": "68cc8d785f58a74ce494cb52",
+    "username": "DAYANACHICAS",
+    "password": "$2b$10$4AVcRCHuZJtsFSYaFl5DVu0yB6gSzX8DRNu0doWcPrOIdPgM.rcBS",
+    "role": "agent",
+    "createdAt": "2025-09-18T22:53:44.416Z",
+    "updatedAt": "2025-09-18T22:53:44.416Z"
+  },
+  {
+    "_id": "68cc8dd15f58a74ce494cb53",
+    "username": "NANCYLOPEZ",
+    "password": "$2b$10$X8.V.0VcjuOK1q0znQMbQeXiRqI4hVHQWGr0Jwc0tNPz66A3hDMzW",
+    "role": "agent",
+    "createdAt": "2025-09-18T22:55:13.617Z",
+    "updatedAt": "2025-09-18T22:55:13.617Z"
+  },
+  {
+    "_id": "68cc8e255f58a74ce494cb54",
+    "username": "DANNAMONTES",
+    "password": "$2b$10$mD5uv7NgaKJPFvRgJmGZ0uaxDQfkFOkwVnX03yMA8pkOn2TaxJycS",
+    "role": "agent",
+    "createdAt": "2025-09-18T22:56:37.376Z",
+    "updatedAt": "2025-09-18T22:56:37.376Z"
+  },
+  {
+    "_id": "68cc8e515f58a74ce494cb55",
+    "username": "PAMELAZELAYA",
+    "password": "$2b$10$j0VCY9IMAWfibjVcrNiaPuxE0XsCRQRs4l4wP10sYQwC5qMG/Sb3C",
+    "role": "agent",
+    "createdAt": "2025-09-18T22:57:21.099Z",
+    "updatedAt": "2025-09-18T22:57:21.099Z"
+  },
+  {
+    "_id": "68cc8e8e5f58a74ce494cb56",
+    "username": "ELIZABETHSANCHEZ",
+    "password": "$2b$10$.Iaemh3zaIK444smPc3Q1uamrk2gydCshz1ocTnvfW1PFhj/EpEqi",
+    "role": "agent",
+    "createdAt": "2025-09-18T22:58:22.748Z",
+    "updatedAt": "2025-09-18T22:58:22.748Z"
+  },
+  {
+    "_id": "68cca9adc5ae568c4f833e55",
+    "username": "EduardoGaray",
+    "password": "$2b$10$8Wrp2xss7L.4K6po01GPzO9/MH93VMjYgwjxqYelM9DbLhv6NFz1K",
+    "role": "admin",
+    "createdAt": "2025-09-19T00:54:04.584Z",
+    "updatedAt": "2025-09-22T20:21:15.734Z"
+  },
+  {
+    "_id": "68df051fa474ddbf4ac44967",
+    "username": "admin",
+    "password": "$2b$10$oGMdpMnyLGhVXR7kWdyQZe5JnhNdiwy2PUFFgQSaBNl3AsX7PI0..",
+    "role": "Administrador",
+    "createdAt": "2025-10-02T23:05:03.992Z",
+    "updatedAt": "2025-10-02T23:05:03.992Z"
+  },
+  {
+    "_id": "68e0423f477cd689af736e4b",
+    "username": "MelissaEscobar",
+    "password": "$2b$10$V4fFSuyxPvibHKOTfhQIT.JbJ445v2roKi0.VtKb1bW57ok4LCVwG",
+    "role": "Agentes",
+    "createdAt": "2025-10-03T21:38:07.213Z",
+    "updatedAt": "2025-10-03T21:38:07.213Z"
+  },
+  {
+    "_id": "68e6e788e878e212dc64e8c4",
+    "username": "MichelleLeiva",
+    "password": "$2b$10$HqpBBB.FTxK.6OrD06DK1eIna3oyfvl8myVzCPqeC3QfIo.PAfKIO",
+    "role": "Agentes",
+    "team": "TEAM ROBERTO VELASQUEZ",
+    "supervisor": "roberto.velasquez",
+    "name": "MichelleLeiva",
+    "createdBy": "Daniel Martinez",
+    "createdAt": "2025-10-08T22:36:56.607Z",
+    "updatedAt": "2025-10-08T22:36:56.607Z"
+  },
+  {
+    "_id": "68e976e7bb7e9fa2bb73f483",
+    "username": "alejandraMelara",
+    "password": "$2b$10$1LrJexuNSMN3csEiJlQSqe4yM2gR3rO7lnvg5vgSESXNLY8370JgK",
+    "role": "Agentes",
+    "team": "TEAM ROBERTO VELASQUEZ",
+    "supervisor": "roberto.velasquez",
+    "name": "alejandraMelara",
+    "createdBy": "Daniel Martinez",
+    "createdAt": "2025-10-10T21:13:11.678Z",
+    "updatedAt": "2025-10-10T21:31:01.882Z"
+  },
+  {
+    "_id": "68f6d6323784db17398ab007",
+    "username": "Monitoreo1",
+    "password": "$2b$10$YqsVqf1Pn0MXinFx1jLDz.4qSe3WvnlHc1RchrDt4fRV4EO4OxXSW",
+    "role": "Backoffice",
+    "team": "Backoffice",
+    "supervisor": null,
+    "name": "Monitoreo1",
+    "createdBy": "Israel Barrientos",
+    "createdAt": "2025-10-21T00:39:14.974Z",
+    "updatedAt": "2025-10-21T00:39:14.974Z"
+  },
+  {
+    "_id": "68f6d6693784db17398ab008",
+    "username": "Monitoreo2",
+    "password": "$2b$10$rinIynQKJPr0lQQAeM7D0O9F0MfQNI.9J/BLaLe3jf2XWPGT7gatO",
+    "role": "Backoffice",
+    "team": "Backoffice",
+    "supervisor": null,
+    "name": "Monitoreo2",
+    "createdBy": "Israel Barrientos",
+    "createdAt": "2025-10-21T00:40:09.478Z",
+    "updatedAt": "2025-10-21T00:40:09.478Z"
+  },
+  {
+    "_id": "68f6d6c23784db17398ab00a",
+    "username": "Monitoreo3",
+    "password": "$2b$10$tSyqpaA.SuYD5xkiiBrpHeEFaksuuOWsi8xNxvDsf8FeosiCUDWj6",
+    "role": "Agentes",
+    "team": "Backoffice",
+    "supervisor": null,
+    "name": "Monitoreo3",
+    "createdBy": "Israel Barrientos",
+    "createdAt": "2025-10-21T00:41:38.279Z",
+    "updatedAt": "2025-10-21T00:41:38.279Z"
+  },
+  {
+    "_id": "69028217064816ce4d605ed2",
+    "username": "JONATHAN F",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "JONATHAN F",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Supervisor",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:15:12.880Z"
+  },
+  {
+    "_id": "69028217064816ce4d605ed3",
+    "username": "LUIS G",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "LUIS G",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Supervisor Team Lineas",
+    "supervisor": "LUIS G",
+    "team": "team lineas luis",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed4",
+    "username": "VICTOR HURTADO",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "VICTOR HURTADO",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed5",
+    "username": "EDWARD RAMIREZ",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "EDWARD RAMIREZ",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed6",
+    "username": "CRISTIAN RIVERA",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "CRISTIAN RIVERA",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed7",
+    "username": "DANIEL DEL CID",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "DANIEL DEL CID",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "LUIS G",
+    "team": "team lineas luis",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed8",
+    "username": "FERNANDO BELTRAN",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "FERNANDO BELTRAN",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "LUIS G",
+    "team": "team lineas luis",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605ed9",
+    "username": "KARLA RODRIGUEZ",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "KARLA RODRIGUEZ",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "LUIS G",
+    "team": "team lineas luis",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605eda",
+    "username": "JOCELYN REYES",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "JOCELYN REYES",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028218064816ce4d605edb",
+    "username": "JONATHAN GARCIA",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "JONATHAN GARCIA",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "LUIS G",
+    "team": "team lineas luis",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "69028219064816ce4d605edc",
+    "username": "NANCY LOPEZ",
+    "createdAt": "2025-10-29T21:07:35.224Z",
+    "name": "NANCY LOPEZ",
+    "password": "$2b$10$HfBNkTxPAsfYEKqQoPfMM.FLf0QvSPSfm53hVztOg/IjGyIZB5p86",
+    "role": "Lineas-Agentes",
+    "supervisor": "JONATHAN F",
+    "team": "team lineas jonathan",
+    "updatedAt": "2025-10-29T21:07:35.224Z"
+  },
+  {
+    "_id": "6904e7d694628f99ad2a4d26",
+    "username": "abigail.bernal",
+    "password": "$2b$10$Ts7kjdyecQOjybSXOeDt0eWsAvHsXCCM5IMZpUIQhAL4b2R2zT0GG",
+    "role": "Agentes",
+    "team": "IRANIA",
+    "supervisor": "JOHANA",
+    "name": "abigail.bernal",
+    "createdBy": "Daniel Martinez",
+    "createdAt": "2025-10-31T16:46:14.837Z",
+    "updatedAt": "2025-10-31T16:46:21.464Z"
+  },
+  {
+    "_id": "69124849c5bd2c2d0826eaaf",
+    "username": "OSCAR RIVERA",
+    "name": "OSCAR RIVERA",
+    "password": "$2b$10$YGv.Ajmb6r1OJC.4sWfld.83pz.zvABsJMhQd7yWlYGK/dPccnxtG",
+    "role": "Agente",
+    "team": "team lineas jonathan",
+    "supervisor": "JONATHAN F",
+    "createdAt": "2025-11-10T20:17:13.303Z",
+    "updatedAt": "2025-11-10T20:17:13.303Z"
+  },
+  {
+    "_id": "69161a8433ff3e5599ebca04",
+    "username": "1",
+    "password": "$2b$10$dM7XO1E2suzgcLJO7wqVruFIGal4R9iy4hWjB4yJm6da2XBwNHZzy",
+    "role": "administrador",
+    "team": "backoffice",
+    "supervisor": null,
+    "name": "1",
+    "createdBy": "Daniel Martinez",
+    "createdAt": "2025-11-13T17:51:00.418Z",
+    "updatedAt": "2025-11-13T17:51:00.418Z"
+  },
+  {
+    "_id": "69165850148b48c8ef86aeca",
+    "username": "B.O 1 ",
+    "password": "$2b$10$iJCCSAcKyFtoLwlLu5oS1OatRZuKiPAwnnuFbpgydUiOGkz0f1iNi",
+    "role": "backoffice",
+    "team": "Backoffice",
+    "name": "FABIOLA VELAZQUEZ",
+    "email": "danielernestoperezmartinez394@gmail.com",
+    "createdAt": "2025-11-13T22:14:40.780Z",
+    "updatedAt": "2025-11-28T21:37:30.594Z",
+    "updatedBy": "Daniel Martinez"
+  },
+  {
+    "_id": "691b8628af8026f685d8d6ba",
+    "username": "NICOLE.CRUZ",
+    "password": "$2b$10$cnz00MfOY.dqucGIO6lBtuyHAQaKqjQdzLkgiCS4t2mJ06dyvaKOC",
+    "role": "vendedor",
+    "team": "team_irania",
+    "name": "TATIANA NICOLE CRUZ ",
+    "email": "nicole.cruz@directvdeals.net",
+    "createdAt": "2025-11-17T20:31:36.678Z",
+    "updatedAt": "2025-11-17T20:31:36.678Z"
+  },
+  {
+    "_id": "6923718377e18836bf2d47d0",
+    "username": "JORGE.SEGOVIA",
+    "password": "$2b$10$9CmY5TRnM7.LG3CjrtssV.O2DLhgBaVEAam8TiiZBxumeIaM3cymK",
+    "role": "vendedor",
+    "team": "team_irania",
+    "name": "JORGE LUIS SEGOVIA RIVERA ",
+    "email": "jorge.segovia@directvdeals.net",
+    "createdAt": "2025-11-23T20:41:39.311Z",
+    "updatedAt": "2025-11-23T20:41:39.311Z"
+  }
+]
