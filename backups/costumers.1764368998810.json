@@ -59132,5 +59132,15 @@
         "agenteId": "68af40c1c61c405e2bb7b0c2"
       }
     ]
+  },
+  {
+    "_id": "691111111111111111111111",
+    "supervisor": "PLEITEZ",
+    "agenteNombre": "Luis Chavarria",
+    "comentario": "ADQUIRIR SERVICIOS",
+    "motivo_llamada": "BILL ALTO",
+    "zip_code": "20109",
+    "createdAt": "2025-10-25T16:47:46.720Z",
+    "team": "PLEITEZ"
   }
 ]
